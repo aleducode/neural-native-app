@@ -1,56 +1,49 @@
-import React, { useEffect, useCallback } from 'react';
-import { View, StyleSheet } from 'react-native';
+import React from 'react';
 import { StatusBar } from 'expo-status-bar';
+import { ActivityIndicator, View } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import * as SplashScreen from 'expo-splash-screen';
-import 'react-native-gesture-handler';
-import { AuthProvider } from './src/context/AuthContext';
-import RootNavigator from './src/navigation/RootNavigator';
-import { useFonts } from './src/hooks/useFonts';
+import { AuthProvider, useAuth } from './src/context/AuthContext';
+import BottomTabs from './src/navigation/BottomTabs';
+import LoginScreen from './src/screens/LoginScreen';
+import RegisterScreen from './src/screens/RegisterScreen';
 import { colors } from './src/theme/colors';
 
-// Keep the splash screen visible while we fetch resources
-SplashScreen.preventAutoHideAsync();
+const Stack = createNativeStackNavigator();
 
-export default function App() {
-  const { fontsLoaded, fontError } = useFonts();
-
-  const onLayoutRootView = useCallback(async () => {
-    if (fontsLoaded || fontError) {
-      // Hide splash screen once fonts are loaded (or failed)
-      await SplashScreen.hideAsync();
-    }
-  }, [fontsLoaded, fontError]);
-
-  useEffect(() => {
-    if (fontsLoaded || fontError) {
-      onLayoutRootView();
-    }
-  }, [fontsLoaded, fontError, onLayoutRootView]);
-
-  // Wait for fonts to load
-  if (!fontsLoaded && !fontError) {
-    return null;
-  }
-
+function AuthStack() {
   return (
-    <View style={styles.container} onLayout={onLayoutRootView}>
-      <SafeAreaProvider>
-        <AuthProvider>
-          <NavigationContainer>
-            <StatusBar style="light" />
-            <RootNavigator />
-          </NavigationContainer>
-        </AuthProvider>
-      </SafeAreaProvider>
-    </View>
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="Login" component={LoginScreen} />
+      <Stack.Screen name="Register" component={RegisterScreen} />
+    </Stack.Navigator>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.bgDark,
-  },
-});
+function RootNavigator() {
+  const { isAuthenticated, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.bgDark }}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
+
+  return isAuthenticated ? <BottomTabs /> : <AuthStack />;
+}
+
+export default function App() {
+  return (
+    <SafeAreaProvider>
+      <AuthProvider>
+        <NavigationContainer>
+          <StatusBar style="light" />
+          <RootNavigator />
+        </NavigationContainer>
+      </AuthProvider>
+    </SafeAreaProvider>
+  );
+}

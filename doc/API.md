@@ -175,14 +175,58 @@ https://app.neural.com.co/api/v1/
 
 **Autenticado** - Slots disponibles para una fecha
 
+Query params:
+- `date` (requerido): Fecha en formato YYYY-MM-DD
+- `type` (opcional): Filtrar por tipo de entrenamiento (slug_name)
+
 ```json
 // Response 200
-[
-  {
+{
+  "date": "2025-12-23",
+  "day_name": "Lunes",
+  "already_scheduled": false,
+  "slots": [
+    {
+      "id": 1,
+      "date": "2025-12-23",
+      "hour_init": "06:00 AM",
+      "hour_end": "07:00 AM",
+      "max_places": 10,
+      "available_places": 5,
+      "training_type": {
+        "id": 1,
+        "name": "Grupal",
+        "slug_name": "grupal",
+        "is_group": true
+      }
+    }
+  ]
+}
+
+// Response 400 - Sin parámetro date
+{ "error": "El parámetro 'date' es requerido" }
+
+// Response 400 - Formato inválido
+{ "error": "Formato de fecha inválido. Use YYYY-MM-DD" }
+```
+
+**Notas:**
+- `already_scheduled`: `true` si el usuario ya tiene un entrenamiento confirmado para esa fecha
+- Si es hoy, solo muestra slots con 20+ minutos de anticipación
+- `hour_init` y `hour_end` vienen formateados en formato 12h (ej: "06:00 AM")
+
+### GET `/training/slots/<id>/`
+
+**Autenticado** - Detalles de un slot específico
+
+```json
+// Response 200
+{
+  "slot": {
     "id": 1,
-    "date": "2025-12-23",
-    "hour_init": "06:00:00",
-    "hour_end": "07:00:00",
+    "date": "2025-12-29",
+    "hour_init": "06:00 AM",
+    "hour_end": "07:00 AM",
     "max_places": 10,
     "available_places": 5,
     "training_type": {
@@ -191,9 +235,23 @@ https://app.neural.com.co/api/v1/
       "slug_name": "grupal",
       "is_group": true
     }
-  }
-]
+  },
+  "confirmed_users": [
+    { "id": 1, "name": "Juan Pérez" },
+    { "id": 2, "name": "María García" }
+  ],
+  "confirmed_count": 2,
+  "user_has_booked": false,
+  "already_scheduled_today": false
+}
+
+// Response 404
+{ "error": "Slot no encontrado" }
 ```
+
+**Notas:**
+- `user_has_booked`: `true` si el usuario ya reservó este slot específico
+- `already_scheduled_today`: `true` si el usuario tiene cualquier reserva para la misma fecha
 
 ### POST `/training/book/`
 

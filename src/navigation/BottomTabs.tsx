@@ -87,32 +87,25 @@ export default function BottomTabs() {
   );
 }
 
-const SCREEN_WIDTH = 428;
-const TAB_BAR_WIDTH = 388;
-const TAB_BAR_LEFT = (SCREEN_WIDTH - TAB_BAR_WIDTH) / 2; // 20px
-
 const styles = StyleSheet.create({
   tabBar: {
     position: 'absolute',
-    bottom: 0, // At bottom
-    left: TAB_BAR_LEFT, // 20px from left
-    width: TAB_BAR_WIDTH, // 388px width
+    bottom: 16,
+    left: 20,
+    right: 20,
     height: 70,
     backgroundColor: colors.white,
-    borderRadius: borderRadius.xl, // 24px
+    borderRadius: borderRadius.xl,
     borderTopWidth: 0,
     elevation: 10,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.15,
     shadowRadius: 20,
-    paddingHorizontal: 0,
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'center',
+    paddingHorizontal: 10,
   },
   iconWrapper: {
-    width: 40,
+    width: 50,
     height: 40,
     borderRadius: borderRadius.full,
     alignItems: 'center',
@@ -120,7 +113,7 @@ const styles = StyleSheet.create({
   },
   iconWrapperActive: {
     backgroundColor: colors.primary,
-    width: 40,
-    height: 40,
+    paddingHorizontal: 20,
+    width: 70,
   },
 });

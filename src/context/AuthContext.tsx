@@ -9,15 +9,22 @@ import {
   setUser,
   clearAuthData,
 } from '../utils/storage';
+import { biometricService } from '../utils/biometrics';
 
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   isAuthenticated: boolean;
-  login: (credentials: LoginRequest) => Promise<{ success: boolean; error?: string }>;
+  biometricAvailable: boolean;
+  biometricEnabled: boolean;
+  biometricType: string;
+  login: (credentials: LoginRequest, saveForBiometric?: boolean) => Promise<{ success: boolean; error?: string }>;
+  loginWithBiometric: () => Promise<{ success: boolean; error?: string }>;
   register: (data: RegisterRequest) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
   updateUser: (user: User) => void;
+  enableBiometric: (email: string, password: string) => Promise<boolean>;
+  disableBiometric: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -29,11 +36,28 @@ interface AuthProviderProps {
 export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUserState] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [biometricAvailable, setBiometricAvailable] = useState(false);
+  const [biometricEnabled, setBiometricEnabled] = useState(false);
+  const [biometricType, setBiometricType] = useState('Biométrico');
 
-  // Check for existing session on mount
+  // Check for existing session and biometric availability on mount
   useEffect(() => {
     checkAuthStatus();
+    checkBiometricStatus();
   }, []);
+
+  const checkBiometricStatus = async () => {
+    const available = await biometricService.isAvailable();
+    setBiometricAvailable(available);
+
+    if (available) {
+      const type = await biometricService.getBiometricType();
+      setBiometricType(type);
+
+      const enabled = await biometricService.isEnabled();
+      setBiometricEnabled(enabled);
+    }
+  };
 
   // Set up unauthorized callback
   useEffect(() => {
@@ -73,13 +97,23 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   };
 
-  const login = async (credentials: LoginRequest): Promise<{ success: boolean; error?: string }> => {
+  const login = async (
+    credentials: LoginRequest,
+    saveForBiometric: boolean = false
+  ): Promise<{ success: boolean; error?: string }> => {
     const { data, error, errors } = await authApi.login(credentials);
 
     if (data) {
       await setToken(data.token);
       await setUser(data.user);
       setUserState(data.user);
+
+      // Save credentials for biometric login if requested
+      if (saveForBiometric && biometricAvailable) {
+        await biometricService.saveCredentials(credentials.email, credentials.password);
+        setBiometricEnabled(true);
+      }
+
       return { success: true };
     }
 
@@ -93,6 +127,53 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
 
     return { success: false, error: errorMessage };
+  };
+
+  const loginWithBiometric = async (): Promise<{ success: boolean; error?: string }> => {
+    if (!biometricAvailable) {
+      return { success: false, error: 'Biometría no disponible' };
+    }
+
+    const hasCredentials = await biometricService.hasStoredCredentials();
+    if (!hasCredentials) {
+      return { success: false, error: 'No hay credenciales guardadas' };
+    }
+
+    const authenticated = await biometricService.authenticate(
+      `Usa ${biometricType} para iniciar sesión`
+    );
+
+    if (!authenticated) {
+      return { success: false, error: 'Autenticación cancelada' };
+    }
+
+    const credentials = await biometricService.getCredentials();
+    if (!credentials) {
+      return { success: false, error: 'Error al obtener credenciales' };
+    }
+
+    return login(credentials, false);
+  };
+
+  const enableBiometric = async (email: string, password: string): Promise<boolean> => {
+    if (!biometricAvailable) return false;
+
+    const authenticated = await biometricService.authenticate(
+      `Configura ${biometricType} para inicio rápido`
+    );
+
+    if (!authenticated) return false;
+
+    const saved = await biometricService.saveCredentials(email, password);
+    if (saved) {
+      setBiometricEnabled(true);
+    }
+    return saved;
+  };
+
+  const disableBiometric = async (): Promise<void> => {
+    await biometricService.disable();
+    setBiometricEnabled(false);
   };
 
   const register = async (data: RegisterRequest): Promise<{ success: boolean; error?: string }> => {
@@ -137,10 +218,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
     user,
     isLoading,
     isAuthenticated: !!user,
+    biometricAvailable,
+    biometricEnabled,
+    biometricType,
     login,
+    loginWithBiometric,
     register,
     logout,
     updateUser,
+    enableBiometric,
+    disableBiometric,
   };
 
   return (

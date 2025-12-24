@@ -1,74 +1,67 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, typography, borderRadius, spacing } from '../theme/colors';
+import { colors, typography, spacing } from '../theme/colors';
 
 interface StatCardProps {
   label: string;
   value: string;
-  unit: string;
+  unit?: string;
   icon: keyof typeof Ionicons.glyphMap;
-  variant?: 'primary' | 'default';
+  variant?: 'default' | 'primary';
 }
 
 export default function StatCard({ label, value, unit, icon, variant = 'default' }: StatCardProps) {
   const isPrimary = variant === 'primary';
 
   return (
-    <View style={[styles.card, isPrimary && styles.cardPrimary]}>
-      <View style={styles.header}>
-        <View style={[styles.iconCircle, isPrimary ? styles.iconCirclePrimary : styles.iconCircleDefault]}>
-          <Ionicons name={icon} size={16} color={colors.textDark} />
-        </View>
-        <Text style={[styles.label, isPrimary && styles.labelPrimary]}>{label}</Text>
+    <View style={[styles.container, isPrimary && styles.primaryContainer]}>
+      <View style={[styles.iconContainer, isPrimary && styles.primaryIcon]}>
+        <Ionicons
+          name={icon}
+          size={16}
+          color={isPrimary ? colors.textDark : colors.primary}
+        />
       </View>
-      <View style={styles.valueContainer}>
+      <Text style={styles.label}>{label}</Text>
+      <View style={styles.valueRow}>
         <Text style={styles.value}>{value}</Text>
-        <Text style={styles.unit}>{unit}</Text>
+        {unit && <Text style={styles.unit}>{unit}</Text>}
       </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  card: {
+  container: {
     flex: 1,
-    height: 80,
-    borderRadius: borderRadius.md,
-    backgroundColor: colors.white,
-    padding: spacing.lg,
-    justifyContent: 'space-between',
+    backgroundColor: colors.cardDark,
+    borderRadius: 12,
+    padding: spacing.md,
+    minHeight: 72,
   },
-  cardPrimary: {
+  primaryContainer: {
     backgroundColor: colors.primary,
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-  },
-  iconCircle: {
+  iconContainer: {
     width: 28,
     height: 28,
     borderRadius: 14,
+    backgroundColor: 'rgba(69, 255, 183, 0.15)',
     alignItems: 'center',
     justifyContent: 'center',
+    marginBottom: spacing.sm,
   },
-  iconCirclePrimary: {
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
-  },
-  iconCircleDefault: {
-    backgroundColor: colors.gray200,
+  primaryIcon: {
+    backgroundColor: 'rgba(0, 0, 0, 0.1)',
   },
   label: {
-    fontSize: typography.fontSize.md,
+    fontSize: typography.fontSize.xs,
     fontFamily: typography.fontFamily.medium,
-    color: colors.gray400,
+    color: colors.textMuted,
+    marginBottom: 2,
   },
-  labelPrimary: {
-    color: colors.gray500,
-  },
-  valueContainer: {
+  valueRow: {
     flexDirection: 'row',
     alignItems: 'baseline',
     gap: 3,
@@ -76,11 +69,11 @@ const styles = StyleSheet.create({
   value: {
     fontSize: typography.fontSize.title2,
     fontFamily: typography.fontFamily.bold,
-    color: colors.textDark,
+    color: colors.white,
   },
   unit: {
-    fontSize: typography.fontSize.sm,
-    fontFamily: typography.fontFamily.medium,
-    color: colors.textDark,
+    fontSize: typography.fontSize.xs,
+    fontFamily: typography.fontFamily.regular,
+    color: colors.textMuted,
   },
 });

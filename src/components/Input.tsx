@@ -1,45 +1,54 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, StyleSheet, TextInputProps, TouchableOpacity } from 'react-native';
+import { View, Text, TextInput, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, typography, spacing } from '../theme/colors';
+import { colors, typography, spacing, borderRadius } from '../theme/colors';
 
-interface InputProps extends TextInputProps {
-  label: string;
-  placeholder?: string;
+interface InputProps {
+  placeholder: string;
+  value: string;
+  onChangeText: (text: string) => void;
+  secureTextEntry?: boolean;
+  keyboardType?: 'default' | 'email-address' | 'numeric' | 'phone-pad';
+  autoCapitalize?: 'none' | 'sentences' | 'words' | 'characters';
   error?: string;
+  editable?: boolean;
 }
 
-export default function Input({ label, placeholder, error, secureTextEntry, ...props }: InputProps) {
-  const [isPasswordVisible, setIsPasswordVisible] = useState(false);
-
-  const togglePasswordVisibility = () => {
-    setIsPasswordVisible(!isPasswordVisible);
-  };
+export default function Input({
+  placeholder,
+  value,
+  onChangeText,
+  secureTextEntry,
+  keyboardType = 'default',
+  autoCapitalize = 'none',
+  error,
+  editable = true,
+}: InputProps) {
+  const [showPassword, setShowPassword] = useState(false);
+  const isPassword = secureTextEntry !== undefined;
 
   return (
     <View style={styles.container}>
-      <Text style={styles.label}>{label}</Text>
-      <View style={[styles.inputWrapper, error && styles.inputWrapperError]}>
+      <Text style={styles.placeholder}>{placeholder}</Text>
+      <View style={styles.inputRow}>
         <TextInput
-          style={styles.input}
-          placeholder={placeholder}
+          style={[styles.input, !editable && styles.inputDisabled]}
+          value={value}
+          onChangeText={onChangeText}
+          secureTextEntry={isPassword && !showPassword}
+          keyboardType={keyboardType}
+          autoCapitalize={autoCapitalize}
           placeholderTextColor={colors.gray400}
-          secureTextEntry={secureTextEntry && !isPasswordVisible}
-          {...props}
+          editable={editable}
         />
-        {secureTextEntry && (
-          <TouchableOpacity onPress={togglePasswordVisibility} style={styles.eyeButton}>
+        {isPassword && (
+          <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
             <Ionicons
-              name={isPasswordVisible ? 'eye-off-outline' : 'eye-outline'}
-              size={18}
+              name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+              size={20}
               color={colors.gray400}
             />
           </TouchableOpacity>
-        )}
-        {error && !secureTextEntry && (
-          <View style={styles.errorIndicator}>
-            <Ionicons name="alert-circle" size={14} color={colors.error} />
-          </View>
         )}
       </View>
       {error && <Text style={styles.error}>{error}</Text>}
@@ -49,44 +58,36 @@ export default function Input({ label, placeholder, error, secureTextEntry, ...p
 
 const styles = StyleSheet.create({
   container: {
-    width: '100%',
-    gap: spacing.sm,
+    backgroundColor: colors.white,
+    borderRadius: borderRadius.lg,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    marginBottom: spacing.md,
   },
-  label: {
-    fontSize: typography.fontSize.md,
+  placeholder: {
+    fontSize: typography.fontSize.xs,
     fontFamily: typography.fontFamily.medium,
-    color: colors.textDark,
+    color: colors.gray400,
+    marginBottom: 4,
   },
-  inputWrapper: {
-    backgroundColor: colors.gray200,
-    height: 44,
-    borderRadius: 22,
-    paddingHorizontal: spacing.xl,
-    justifyContent: 'center',
+  inputRow: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  inputWrapperError: {
-    borderWidth: 1,
-    borderColor: colors.error,
-  },
   input: {
     flex: 1,
-    fontSize: typography.fontSize.xl,
-    fontFamily: typography.fontFamily.regular,
+    fontSize: typography.fontSize.md,
+    fontFamily: typography.fontFamily.medium,
     color: colors.textDark,
     padding: 0,
   },
-  eyeButton: {
-    padding: spacing.sm,
-    marginLeft: spacing.sm,
-  },
-  errorIndicator: {
-    marginLeft: spacing.sm,
+  inputDisabled: {
+    color: colors.gray400,
   },
   error: {
     fontSize: typography.fontSize.xs,
     fontFamily: typography.fontFamily.regular,
     color: colors.error,
+    marginTop: 4,
   },
 });

@@ -1,25 +1,23 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { colors, typography } from '../theme/colors';
+import { TouchableOpacity, Text, StyleSheet } from 'react-native';
+import { colors, typography, spacing } from '../theme/colors';
 
 interface WeekDayProps {
   day: string;
   date: string;
-  isSelected: boolean;
+  isSelected?: boolean;
   onPress?: () => void;
 }
 
 export default function WeekDay({ day, date, isSelected, onPress }: WeekDayProps) {
   return (
     <TouchableOpacity
-      style={[styles.container, isSelected && styles.containerSelected]}
+      style={[styles.container, isSelected && styles.selected]}
       onPress={onPress}
-      activeOpacity={0.8}
+      activeOpacity={0.7}
     >
-      <Text style={[styles.dayName, isSelected && styles.dayNameSelected]}>{day}</Text>
-      <View style={[styles.dateCircle, isSelected && styles.dateCircleSelected]}>
-        <Text style={[styles.dateNumber, isSelected && styles.dateNumberSelected]}>{date}</Text>
-      </View>
+      <Text style={[styles.day, isSelected && styles.selectedText]}>{day}</Text>
+      <Text style={[styles.date, isSelected && styles.selectedText]}>{date}</Text>
     </TouchableOpacity>
   );
 }
@@ -27,43 +25,28 @@ export default function WeekDay({ day, date, isSelected, onPress }: WeekDayProps
 const styles = StyleSheet.create({
   container: {
     width: 40,
-    height: 64,
+    height: 56,
     borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.18)',
+    backgroundColor: colors.cardDark,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 6,
+    gap: 2,
   },
-  containerSelected: {
-    backgroundColor: colors.white,
-  },
-  dayName: {
-    fontSize: typography.fontSize.sm,
-    fontFamily: typography.fontFamily.medium,
-    lineHeight: typography.lineHeight.sm,
-    color: colors.white,
-    marginBottom: 4,
-  },
-  dayNameSelected: {
-    color: colors.textDark,
-  },
-  dateCircle: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  dateCircleSelected: {
+  selected: {
     backgroundColor: colors.primary,
   },
-  dateNumber: {
-    fontSize: typography.fontSize.md,
-    fontFamily: typography.fontFamily.semibold,
+  day: {
+    fontSize: typography.fontSize.xs,
+    fontFamily: typography.fontFamily.medium,
+    color: colors.textMuted,
+    textTransform: 'uppercase',
+  },
+  date: {
+    fontSize: typography.fontSize.lg,
+    fontFamily: typography.fontFamily.bold,
     color: colors.white,
   },
-  dateNumberSelected: {
+  selectedText: {
     color: colors.textDark,
   },
 });

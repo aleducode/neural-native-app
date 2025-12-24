@@ -22,6 +22,13 @@ export const authApi = {
     return api.patch<User>('/auth/me/', data);
   },
 
+  uploadPhoto: async (imageUri: string, fileName?: string, mimeType?: string) => {
+    const name = fileName || imageUri.split('/').pop() || `photo_${Date.now()}.jpg`;
+    const type = mimeType || 'image/jpeg';
+
+    return api.uploadFile<User>('/auth/me/', imageUri, name, type);
+  },
+
   resetPassword: async (email: string) => {
     return api.post('/auth/password-reset/', { email });
   },

@@ -8,6 +8,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
+  Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -16,6 +17,9 @@ import { colors, typography } from '../theme/colors';
 import Input from '../components/Input';
 import Button from '../components/Button';
 import { useAuth } from '../context/AuthContext';
+
+const CONTENT_PADDING = 20;
+const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 interface FormErrors {
   first_name?: string;
@@ -111,155 +115,149 @@ export default function RegisterScreen() {
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
+    <View style={styles.container}>
+      {/* Background Decorative Elements */}
+      <View style={styles.backgroundContainer}>
+        <LinearGradient
+          colors={['rgba(69, 255, 183, 0.4)', 'transparent']}
+          style={styles.gradientTop}
+        />
+        <LinearGradient
+          colors={['rgba(69, 255, 183, 0.4)', 'transparent']}
+          style={styles.gradientBottom}
+        />
+      </View>
+
       <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
-        {/* Background Decorative Elements */}
-        <View style={styles.backgroundContainer}>
-          <LinearGradient
-            colors={['rgba(69, 255, 183, 0.4)', 'transparent']}
-            style={styles.gradientTop}
-          />
-          <LinearGradient
-            colors={['rgba(69, 255, 183, 0.4)', 'transparent']}
-            style={styles.gradientBottom}
-          />
-        </View>
-
-        <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
+        <KeyboardAvoidingView
+          style={styles.keyboardAvoid}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
         >
-          {/* Header Title */}
-          <Text style={styles.headerTitle}>REGISTRO</Text>
+          <ScrollView
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
+            <View style={styles.centerContainer}>
+              {/* Header Title */}
+              <Text style={styles.headerTitle}>REGISTRO</Text>
 
-          {/* Main Container */}
-          <View style={styles.mainContainer}>
-            {/* Card Background */}
-            <View style={styles.card} />
-
-            {/* Form Container */}
-            <View style={styles.formContainer}>
-              {/* General Error */}
-              {errors.general && (
-                <View style={styles.errorBanner}>
-                  <Text style={styles.errorBannerText}>{errors.general}</Text>
-                </View>
-              )}
-
-              {/* Input Fields Container */}
-              <View style={styles.inputsContainer}>
-                <View style={styles.nameRow}>
-                  <View style={styles.nameInput}>
-                    <Input
-                      label="Nombre"
-                      placeholder="Juan"
-                      value={formData.first_name}
-                      onChangeText={(text) => updateField('first_name', text)}
-                      autoCapitalize="words"
-                      error={errors.first_name}
-                      editable={!isLoading}
-                    />
+              {/* Card */}
+              <View style={styles.card}>
+                {/* General Error */}
+                {errors.general && (
+                  <View style={styles.errorBanner}>
+                    <Text style={styles.errorBannerText}>{errors.general}</Text>
                   </View>
-                  <View style={styles.nameInput}>
-                    <Input
-                      label="Apellido"
-                      placeholder="Pérez"
-                      value={formData.last_name}
-                      onChangeText={(text) => updateField('last_name', text)}
-                      autoCapitalize="words"
-                      error={errors.last_name}
-                      editable={!isLoading}
-                    />
+                )}
+
+                {/* Input Fields */}
+                <View style={styles.inputsContainer}>
+                  <View style={styles.nameRow}>
+                    <View style={styles.nameInput}>
+                      <Input
+                        label="Nombre"
+                        placeholder="Juan"
+                        value={formData.first_name}
+                        onChangeText={(text) => updateField('first_name', text)}
+                        autoCapitalize="words"
+                        error={errors.first_name}
+                        editable={!isLoading}
+                      />
+                    </View>
+                    <View style={styles.nameInput}>
+                      <Input
+                        label="Apellido"
+                        placeholder="Pérez"
+                        value={formData.last_name}
+                        onChangeText={(text) => updateField('last_name', text)}
+                        autoCapitalize="words"
+                        error={errors.last_name}
+                        editable={!isLoading}
+                      />
+                    </View>
                   </View>
+
+                  <Input
+                    label="Email"
+                    placeholder="juan@email.com"
+                    value={formData.email}
+                    onChangeText={(text) => updateField('email', text)}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    autoComplete="email"
+                    error={errors.email}
+                    editable={!isLoading}
+                  />
+
+                  <Input
+                    label="Teléfono"
+                    placeholder="+57 300 123 4567"
+                    value={formData.phone_number}
+                    onChangeText={(text) => updateField('phone_number', text)}
+                    keyboardType="phone-pad"
+                    error={errors.phone_number}
+                    editable={!isLoading}
+                  />
+
+                  <Input
+                    label="Contraseña"
+                    placeholder="Mínimo 8 caracteres"
+                    value={formData.password}
+                    onChangeText={(text) => updateField('password', text)}
+                    secureTextEntry
+                    autoCapitalize="none"
+                    error={errors.password}
+                    editable={!isLoading}
+                  />
+
+                  <Input
+                    label="Confirmar contraseña"
+                    placeholder="Repite tu contraseña"
+                    value={formData.password_confirmation}
+                    onChangeText={(text) => updateField('password_confirmation', text)}
+                    secureTextEntry
+                    autoCapitalize="none"
+                    error={errors.password_confirmation}
+                    editable={!isLoading}
+                  />
                 </View>
 
-                <Input
-                  label="Email"
-                  placeholder="juan@email.com"
-                  value={formData.email}
-                  onChangeText={(text) => updateField('email', text)}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  autoComplete="email"
-                  error={errors.email}
-                  editable={!isLoading}
-                />
+                {/* Register Button */}
+                <View style={styles.buttonContainer}>
+                  <Button
+                    title={isLoading ? '' : 'Registrarse'}
+                    onPress={handleRegister}
+                    disabled={isLoading}
+                  />
+                  {isLoading && (
+                    <ActivityIndicator
+                      style={styles.loadingIndicator}
+                      color={colors.textDark}
+                      size="small"
+                    />
+                  )}
+                </View>
 
-                <Input
-                  label="Teléfono"
-                  placeholder="+57 300 123 4567"
-                  value={formData.phone_number}
-                  onChangeText={(text) => updateField('phone_number', text)}
-                  keyboardType="phone-pad"
-                  error={errors.phone_number}
-                  editable={!isLoading}
-                />
-
-                <Input
-                  label="Contraseña"
-                  placeholder="Mínimo 8 caracteres"
-                  value={formData.password}
-                  onChangeText={(text) => updateField('password', text)}
-                  secureTextEntry
-                  autoCapitalize="none"
-                  error={errors.password}
-                  editable={!isLoading}
-                />
-
-                <Input
-                  label="Confirmar contraseña"
-                  placeholder="Repite tu contraseña"
-                  value={formData.password_confirmation}
-                  onChangeText={(text) => updateField('password_confirmation', text)}
-                  secureTextEntry
-                  autoCapitalize="none"
-                  error={errors.password_confirmation}
-                  editable={!isLoading}
-                />
+                {/* Sign In Link */}
+                <TouchableOpacity
+                  onPress={handleSignIn}
+                  style={styles.signInContainer}
+                  disabled={isLoading}
+                >
+                  <Text style={styles.signInText}>
+                    ¿Ya tienes cuenta? <Text style={styles.signInLink}>Inicia sesión</Text>
+                  </Text>
+                </TouchableOpacity>
               </View>
             </View>
-
-            {/* Register Button */}
-            <View style={styles.registerButtonContainer}>
-              <Button
-                title={isLoading ? '' : 'Registrarse'}
-                onPress={handleRegister}
-                disabled={isLoading}
-              />
-              {isLoading && (
-                <ActivityIndicator
-                  style={styles.loadingIndicator}
-                  color={colors.textDark}
-                  size="small"
-                />
-              )}
-            </View>
-
-            {/* Sign In Link */}
-            <TouchableOpacity
-              onPress={handleSignIn}
-              style={styles.signInContainer}
-              disabled={isLoading}
-            >
-              <Text style={styles.signInText}>
-                ¿Ya tienes cuenta? <Text style={styles.signInLink}>Inicia sesión</Text>
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </ScrollView>
+          </ScrollView>
+        </KeyboardAvoidingView>
       </SafeAreaView>
-    </KeyboardAvoidingView>
+    </View>
   );
 }
-
-const CARD_LEFT_OFFSET = 20;
-const CARD_WIDTH = 388;
-const CONTENT_WIDTH = 364;
-const CONTENT_CENTER_X = 32;
 
 const styles = StyleSheet.create({
   container: {
@@ -269,10 +267,19 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
   },
+  keyboardAvoid: {
+    flex: 1,
+  },
   scrollContent: {
-    width: 428,
-    minHeight: '100%',
-    paddingBottom: 40,
+    flexGrow: 1,
+    paddingHorizontal: CONTENT_PADDING,
+    justifyContent: 'center',
+    minHeight: SCREEN_HEIGHT * 0.9,
+  },
+  centerContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    paddingVertical: 20,
   },
   backgroundContainer: {
     position: 'absolute',
@@ -283,89 +290,63 @@ const styles = StyleSheet.create({
   },
   gradientTop: {
     position: 'absolute',
-    top: 74,
-    left: -240,
-    width: 336,
-    height: 336,
-    borderRadius: 168,
+    top: 50,
+    left: -150,
+    width: 250,
+    height: 250,
+    borderRadius: 125,
   },
   gradientBottom: {
     position: 'absolute',
-    top: 555,
-    right: -240,
-    width: 336,
-    height: 336,
-    borderRadius: 168,
+    bottom: 80,
+    right: -150,
+    width: 250,
+    height: 250,
+    borderRadius: 125,
   },
   headerTitle: {
-    fontSize: typography.fontSize.xxxl,
-    fontWeight: typography.fontWeight.bold,
-    lineHeight: typography.lineHeight.xxxl,
+    fontSize: typography.fontSize.title1,
+    fontFamily: typography.fontFamily.bold,
+    lineHeight: typography.lineHeight.title1,
     color: colors.white,
     textTransform: 'uppercase',
-    position: 'absolute',
-    left: 61,
-    top: 80,
-    fontFamily: typography.fontFamily.bold,
-  },
-  mainContainer: {
-    position: 'absolute',
-    left: 0,
-    top: 140,
-    width: 428,
-    height: 620,
+    marginBottom: 16,
+    textAlign: 'center',
   },
   card: {
-    position: 'absolute',
-    left: CARD_LEFT_OFFSET,
-    top: 0,
-    width: CARD_WIDTH,
-    height: 620,
     backgroundColor: colors.white,
     borderRadius: 26,
+    padding: 24,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
-    shadowRadius: 20,
-    elevation: 10,
-  },
-  formContainer: {
-    position: 'absolute',
-    left: 32,
-    top: 24,
-    width: CONTENT_WIDTH,
-    gap: 4,
+    shadowRadius: 16,
+    elevation: 8,
   },
   errorBanner: {
-    width: '100%',
     backgroundColor: 'rgba(255, 59, 48, 0.1)',
-    borderRadius: 12,
+    borderRadius: 10,
     padding: 12,
-    marginBottom: 8,
+    marginBottom: 12,
   },
   errorBannerText: {
-    color: '#FF3B30',
+    color: colors.error,
     fontSize: typography.fontSize.sm,
+    fontFamily: typography.fontFamily.medium,
     textAlign: 'center',
   },
   inputsContainer: {
-    width: '100%',
-    alignItems: 'flex-start',
-    gap: 10,
+    gap: 12,
   },
   nameRow: {
     flexDirection: 'row',
-    width: '100%',
     gap: 12,
   },
   nameInput: {
     flex: 1,
   },
-  registerButtonContainer: {
-    position: 'absolute',
-    left: CONTENT_CENTER_X,
-    top: 500,
-    width: CONTENT_WIDTH,
+  buttonContainer: {
+    marginTop: 24,
     justifyContent: 'center',
   },
   loadingIndicator: {
@@ -373,22 +354,15 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
   },
   signInContainer: {
-    position: 'absolute',
-    left: CONTENT_CENTER_X,
-    top: 570,
-    width: CONTENT_WIDTH,
+    marginTop: 16,
     alignItems: 'center',
-    justifyContent: 'center',
   },
   signInText: {
-    fontSize: typography.fontSize.md,
-    fontWeight: typography.fontWeight.medium,
-    lineHeight: typography.lineHeight.md,
-    color: colors.textDark,
+    fontSize: typography.fontSize.sm,
     fontFamily: typography.fontFamily.medium,
+    color: colors.textDark,
   },
   signInLink: {
-    fontWeight: typography.fontWeight.bold,
     fontFamily: typography.fontFamily.bold,
     color: colors.primary,
   },

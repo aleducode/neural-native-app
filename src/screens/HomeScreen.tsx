@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -6,15 +6,20 @@ import {
   ScrollView,
   Image,
   TouchableOpacity,
+  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
 import { colors, typography, spacing } from '../theme/colors';
 import WeekDay from '../components/WeekDay';
 import StatCard from '../components/StatCard';
-import ActivityCard from '../components/ActivityCard';
+import MenuCard from '../components/MenuCard';
+import { dashboardApi, DashboardResponse } from '../api/dashboard';
+import { notificationsApi } from '../api/notifications';
+import pushNotificationService from '../services/pushNotifications';
 
 const CONTENT_PADDING = 16;
 
@@ -38,10 +43,14 @@ function getWeekDates() {
 }
 
 export default function HomeScreen() {
+  const navigation = useNavigation<any>();
   const { user } = useAuth();
   const weekDates = getWeekDates();
   const today = new Date();
   const [selectedDay, setSelectedDay] = useState(today.getDay());
+  const [dashboardData, setDashboardData] = useState<DashboardResponse | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
 
   const userName = user ? `${user.first_name} ${user.last_name}`.trim() : 'Usuario';
   const userInitials = user
@@ -49,32 +58,54 @@ export default function HomeScreen() {
     : 'U';
   const userPhoto = user?.photo_url;
 
-  // Mock data - will be replaced with API data
-  const mockStats = {
-    distance: '5.2',
-    steps: '5000',
-    calories: '130',
-    heartrate: '150',
+  const fetchDashboard = useCallback(async () => {
+    const { data } = await dashboardApi.getDashboard();
+    if (data) {
+      setDashboardData(data);
+    }
+  }, []);
+
+  const fetchNotificationCount = useCallback(async () => {
+    const { data } = await notificationsApi.getCount();
+    if (data) {
+      setUnreadNotifications(data.unread);
+    }
+  }, []);
+
+  // Setup push notifications on mount
+  useEffect(() => {
+    pushNotificationService.setup();
+  }, []);
+
+  // Fetch on focus
+  useFocusEffect(
+    useCallback(() => {
+      fetchDashboard();
+      fetchNotificationCount();
+    }, [fetchDashboard, fetchNotificationCount])
+  );
+
+  const onRefresh = async () => {
+    setIsRefreshing(true);
+    await Promise.all([fetchDashboard(), fetchNotificationCount()]);
+    setIsRefreshing(false);
   };
 
-  const activities = [
-    {
-      id: 1,
-      title: 'Squats',
-      image: 'https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?w=200',
-      calories: '80',
-      difficulty: 'Principiante',
-      duration: '10 min',
-    },
-    {
-      id: 2,
-      title: 'Flutter Kicks',
-      image: 'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?w=200',
-      calories: '50',
-      difficulty: 'Intermedio',
-      duration: '20 min',
-    },
-  ];
+  // Stats from API or defaults
+  const stats = {
+    strike: dashboardData?.strike?.weeks ?? 0,
+    calories: dashboardData?.stats?.calories ?? 0,
+    trainings: dashboardData?.stats?.trainings ?? 0,
+    hours: dashboardData?.stats?.hours ?? 0,
+  };
+
+  const handleScheduleTraining = () => {
+    navigation.navigate('Calendar');
+  };
+
+  const handleViewAgenda = () => {
+    navigation.navigate('Trainings');
+  };
 
   return (
     <View style={styles.container}>
@@ -94,6 +125,13 @@ export default function HomeScreen() {
         <ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.scrollContent}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefreshing}
+              onRefresh={onRefresh}
+              tintColor={colors.primary}
+            />
+          }
         >
           {/* Header: User Info + Notification */}
           <View style={styles.header}>
@@ -110,8 +148,18 @@ export default function HomeScreen() {
                 <Text style={styles.userName}>{userName}</Text>
               </View>
             </View>
-            <TouchableOpacity style={styles.notificationBtn}>
+            <TouchableOpacity
+              style={styles.notificationBtn}
+              onPress={() => navigation.navigate('Notifications')}
+            >
               <Ionicons name="notifications-outline" size={18} color={colors.textDark} />
+              {unreadNotifications > 0 && (
+                <View style={styles.notificationBadge}>
+                  <Text style={styles.notificationBadgeText}>
+                    {unreadNotifications > 9 ? '9+' : unreadNotifications}
+                  </Text>
+                </View>
+              )}
             </TouchableOpacity>
           </View>
 
@@ -134,56 +182,57 @@ export default function HomeScreen() {
             <View style={styles.statsGrid}>
               <View style={styles.statRow}>
                 <StatCard
-                  label="Distancia"
-                  value={mockStats.distance}
-                  unit="km"
-                  icon="location-outline"
+                  label="Racha"
+                  value={stats.strike.toString()}
+                  unit="semanas"
+                  icon="star"
                   variant="primary"
                 />
                 <StatCard
-                  label="Pasos"
-                  value={mockStats.steps}
-                  unit="pasos"
-                  icon="footsteps-outline"
+                  label="Calorías"
+                  value={stats.calories.toString()}
+                  unit="kcal"
+                  icon="flame-outline"
                 />
               </View>
               <View style={styles.statRow}>
                 <StatCard
-                  label="Calorías"
-                  value={mockStats.calories}
-                  unit="cal"
-                  icon="flame-outline"
+                  label="Entrenos"
+                  value={stats.trainings.toString()}
+                  unit="veces"
+                  icon="fitness-outline"
                 />
                 <StatCard
-                  label="Ritmo"
-                  value={mockStats.heartrate}
-                  unit="bpm"
-                  icon="heart-outline"
+                  label="Horas"
+                  value={stats.hours.toString()}
+                  unit="hrs"
+                  icon="time-outline"
                 />
               </View>
             </View>
           </View>
 
-          {/* Latest Activity Section */}
+          {/* Menu Section */}
           <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>ÚLTIMA ACTIVIDAD</Text>
-              <TouchableOpacity>
-                <Text style={styles.viewAll}>Ver todo</Text>
-              </TouchableOpacity>
-            </View>
-            <View style={styles.activitiesList}>
-              {activities.map((activity) => (
-                <ActivityCard
-                  key={activity.id}
-                  title={activity.title}
-                  image={activity.image}
-                  calories={activity.calories}
-                  difficulty={activity.difficulty}
-                  duration={activity.duration}
-                />
-              ))}
-            </View>
+            <Text style={styles.sectionTitle}>MENÚ</Text>
+            <MenuCard
+              title="Agendar Entrenamiento funcional"
+              subtitle="Reserva tu próximo entrenamiento"
+              badge="Funcional"
+              badgeColor="#00BCD4"
+              badgeIcon="fitness"
+              image={require('../../assets/a.jpg')}
+              onPress={handleScheduleTraining}
+            />
+            <MenuCard
+              title="Ver mi agenda"
+              subtitle="Revisa tus entrenamientos agendados"
+              badge="Calendario"
+              badgeColor={colors.primary}
+              badgeIcon="calendar"
+              image={require('../../assets/d.jpg')}
+              onPress={handleViewAgenda}
+            />
           </View>
 
           {/* Bottom Spacer for Tab Bar */}
@@ -284,6 +333,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  notificationBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: colors.error,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  notificationBadgeText: {
+    fontSize: 10,
+    fontFamily: typography.fontFamily.bold,
+    color: colors.white,
+  },
 
   // Week Selector
   weekSelector: {
@@ -321,11 +387,6 @@ const styles = StyleSheet.create({
   },
   statRow: {
     flexDirection: 'row',
-    gap: spacing.md,
-  },
-
-  // Activities List
-  activitiesList: {
     gap: spacing.md,
   },
 });
