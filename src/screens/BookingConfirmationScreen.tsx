@@ -120,7 +120,8 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: typography.fontSize.title1,
-    fontFamily: typography.fontFamily.bold,
+    fontFamily: typography.fontFamily,
+    fontWeight: typography.fontWeight.bold,
     color: colors.white,
     textAlign: 'center',
     marginBottom: spacing.md,
@@ -155,7 +156,8 @@ const styles = StyleSheet.create({
   },
   detailText: {
     fontSize: typography.fontSize.lg,
-    fontFamily: typography.fontFamily.medium,
+    fontFamily: typography.fontFamily,
+    fontWeight: typography.fontWeight.medium,
     color: colors.textDark,
     flex: 1,
   },
@@ -166,7 +168,8 @@ const styles = StyleSheet.create({
   },
   motivationalText: {
     fontSize: typography.fontSize.md,
-    fontFamily: typography.fontFamily.medium,
+    fontFamily: typography.fontFamily,
+    fontWeight: typography.fontWeight.medium,
     color: colors.gray400,
     textAlign: 'center',
   },

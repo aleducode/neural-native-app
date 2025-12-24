@@ -1,6 +1,8 @@
 // Neural App - Figma Design Colors (Pixel Perfect)
 // Source: https://www.figma.com/design/3pKI0AQarLogRrOnglU50N/FitZone
 
+import { Platform } from 'react-native';
+
 export const colors = {
   // Primary
   primary: '#45FFB7',
@@ -31,6 +33,10 @@ export const colors = {
   primaryTransparent: 'rgba(69, 255, 183, 0.4)',
   whiteTransparent: 'rgba(255, 255, 255, 0.18)',
   whiteTransparent30: 'rgba(255, 255, 255, 0.3)',
+
+  // Status colors
+  error: '#FF4D4D',
+  success: '#45FFB7',
 };
 
 export const spacing = {
@@ -53,29 +59,41 @@ export const borderRadius = {
   full: 100,
 };
 
+const systemFontFamily = Platform.select({
+  ios: 'System',
+  android: 'Roboto',
+  default: 'System',
+});
+
 export const typography = {
-  // Mona Sans Condensed equivalent
-  fontFamily: {
-    regular: 'System',
-    medium: 'System',
-    bold: 'System',
+  // System fonts nativas para mejor rendimiento y experiencia nativa
+  // iOS usa SF Pro, Android usa Roboto
+  fontFamily: systemFontFamily,
+  fontWeight: {
+    regular: '400' as const,
+    medium: '500' as const,
+    semiBold: '600' as const,
+    bold: '700' as const,
+    extraBold: '800' as const,
   },
   fontSize: {
     xs: 13,
-    sm: 14,
+    sm: 15,
     md: 16,
     lg: 18,
     xl: 20,
     xxl: 22,
+    title2: 22,
+    title1: 38,
     xxxl: 30,
   },
   lineHeight: {
     xs: 16,
-    sm: 18,
+    sm: 20,
     md: 20,
-    lg: 22,
+    lg: 24,
     xl: 24,
     xxl: 30,
-    xxxl: 36,
+    xxxl: 48,
   },
 };

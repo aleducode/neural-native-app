@@ -95,7 +95,8 @@ const styles = StyleSheet.create({
   },
   badgeText: {
     fontSize: typography.fontSize.xs,
-    fontFamily: typography.fontFamily.medium,
+    fontFamily: typography.fontFamily,
+    fontWeight: typography.fontWeight.medium,
     color: colors.white,
   },
   heartButton: {
@@ -109,7 +110,8 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontSize: typography.fontSize.sm,
-    fontFamily: typography.fontFamily.regular,
+    fontFamily: typography.fontFamily,
+    fontWeight: typography.fontWeight.regular,
     color: colors.gray400,
   },
   footer: {
@@ -128,7 +130,8 @@ const styles = StyleSheet.create({
   },
   viewText: {
     fontSize: typography.fontSize.sm,
-    fontFamily: typography.fontFamily.medium,
+    fontFamily: typography.fontFamily,
+    fontWeight: typography.fontWeight.medium,
     color: colors.primary,
   },
 });

@@ -116,7 +116,8 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: typography.fontSize.xxl,
-    fontFamily: typography.fontFamily.bold,
+    fontFamily: typography.fontFamily,
+    fontWeight: typography.fontWeight.bold,
     color: colors.textDark,
     textAlign: 'center',
     textTransform: 'uppercase',
@@ -124,7 +125,8 @@ const styles = StyleSheet.create({
   },
   message: {
     fontSize: typography.fontSize.md,
-    fontFamily: typography.fontFamily.regular,
+    fontFamily: typography.fontFamily,
+    fontWeight: typography.fontWeight.regular,
     color: colors.textDark,
     textAlign: 'center',
     lineHeight: 20,

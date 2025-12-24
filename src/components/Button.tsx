@@ -73,7 +73,8 @@ const styles = StyleSheet.create({
   },
   text: {
     fontSize: typography.fontSize.lg,
-    fontFamily: typography.fontFamily.bold,
+    fontFamily: typography.fontFamily,
+    fontWeight: typography.fontWeight.bold,
     textTransform: 'uppercase',
   },
   textPrimary: {

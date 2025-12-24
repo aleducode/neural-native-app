@@ -389,7 +389,8 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: typography.fontSize.title1,
-    fontFamily: typography.fontFamily.bold,
+    fontFamily: typography.fontFamily,
+    fontWeight: typography.fontWeight.bold,
     color: colors.white,
     textTransform: 'uppercase',
   },
@@ -432,7 +433,8 @@ const styles = StyleSheet.create({
   },
   avatarText: {
     fontSize: 36,
-    fontFamily: typography.fontFamily.bold,
+    fontFamily: typography.fontFamily,
+    fontWeight: typography.fontWeight.bold,
     color: colors.textDark,
   },
   cameraIconContainer: {
@@ -476,7 +478,8 @@ const styles = StyleSheet.create({
   },
   statLabel: {
     fontSize: typography.fontSize.md,
-    fontFamily: typography.fontFamily.medium,
+    fontFamily: typography.fontFamily,
+    fontWeight: typography.fontWeight.medium,
     color: colors.gray400,
     marginBottom: 4,
   },
@@ -486,12 +489,14 @@ const styles = StyleSheet.create({
   },
   statValue: {
     fontSize: typography.fontSize.title1,
-    fontFamily: typography.fontFamily.bold,
+    fontFamily: typography.fontFamily,
+    fontWeight: typography.fontWeight.bold,
     color: colors.textDark,
   },
   statUnit: {
     fontSize: typography.fontSize.md,
-    fontFamily: typography.fontFamily.medium,
+    fontFamily: typography.fontFamily,
+    fontWeight: typography.fontWeight.medium,
     color: colors.textDark,
   },
   formContainer: {
@@ -505,7 +510,8 @@ const styles = StyleSheet.create({
   },
   inputLabel: {
     fontSize: typography.fontSize.lg,
-    fontFamily: typography.fontFamily.medium,
+    fontFamily: typography.fontFamily,
+    fontWeight: typography.fontWeight.medium,
     color: colors.textDark,
   },
   inputWrapper: {
@@ -521,7 +527,8 @@ const styles = StyleSheet.create({
   },
   input: {
     fontSize: typography.fontSize.lg,
-    fontFamily: typography.fontFamily.medium,
+    fontFamily: typography.fontFamily,
+    fontWeight: typography.fontWeight.medium,
     color: colors.textDark,
   },
   bottomButtonContainer: {

@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, typography, spacing } from '../theme/colors';
+import { colors, typography, spacing, borderRadius } from '../theme/colors';
 
 interface StatCardProps {
   label: string;
@@ -16,17 +16,19 @@ export default function StatCard({ label, value, unit, icon, variant = 'default'
 
   return (
     <View style={[styles.container, isPrimary && styles.primaryContainer]}>
-      <View style={[styles.iconContainer, isPrimary && styles.primaryIcon]}>
-        <Ionicons
-          name={icon}
-          size={16}
-          color={isPrimary ? colors.textDark : colors.primary}
-        />
+      <View style={styles.headerRow}>
+        <View style={[styles.iconContainer, isPrimary && styles.primaryIconContainer]}>
+          <Ionicons
+            name={icon}
+            size={16}
+            color={isPrimary ? colors.textDark : colors.gray400}
+          />
+        </View>
+        <Text style={[styles.label, isPrimary && styles.labelPrimary]}>{label}</Text>
       </View>
-      <Text style={styles.label}>{label}</Text>
       <View style={styles.valueRow}>
-        <Text style={styles.value}>{value}</Text>
-        {unit && <Text style={styles.unit}>{unit}</Text>}
+        <Text style={[styles.value, isPrimary && styles.valuePrimary]}>{value}</Text>
+        {unit && <Text style={[styles.unit, isPrimary && styles.unitPrimary]}> {unit}</Text>}
       </View>
     </View>
   );
@@ -35,45 +37,60 @@ export default function StatCard({ label, value, unit, icon, variant = 'default'
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.cardDark,
-    borderRadius: 12,
-    padding: spacing.md,
-    minHeight: 72,
+    backgroundColor: colors.white,
+    borderRadius: borderRadius.lg,
+    padding: spacing.lg,
+    minHeight: 100,
   },
   primaryContainer: {
     backgroundColor: colors.primary,
   },
-  iconContainer: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: 'rgba(69, 255, 183, 0.15)',
+  headerRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: spacing.sm,
     marginBottom: spacing.sm,
   },
-  primaryIcon: {
-    backgroundColor: 'rgba(0, 0, 0, 0.1)',
+  iconContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.gray200,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  primaryIconContainer: {
+    backgroundColor: colors.white,
   },
   label: {
-    fontSize: typography.fontSize.xs,
-    fontFamily: typography.fontFamily.medium,
-    color: colors.textMuted,
-    marginBottom: 2,
+    fontSize: typography.fontSize.sm,
+    fontFamily: typography.fontFamily,
+    fontWeight: typography.fontWeight.medium,
+    color: colors.gray400,
+  },
+  labelPrimary: {
+    color: colors.textDark,
   },
   valueRow: {
     flexDirection: 'row',
     alignItems: 'baseline',
-    gap: 3,
   },
   value: {
-    fontSize: typography.fontSize.title2,
-    fontFamily: typography.fontFamily.bold,
-    color: colors.white,
+    fontSize: 28,
+    fontFamily: typography.fontFamily,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.textDark,
+  },
+  valuePrimary: {
+    color: colors.textDark,
   },
   unit: {
-    fontSize: typography.fontSize.xs,
-    fontFamily: typography.fontFamily.regular,
-    color: colors.textMuted,
+    fontSize: typography.fontSize.md,
+    fontFamily: typography.fontFamily,
+    fontWeight: typography.fontWeight.regular,
+    color: colors.gray400,
+  },
+  unitPrimary: {
+    color: colors.textDark,
   },
 });

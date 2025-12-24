@@ -272,7 +272,8 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: typography.fontSize.title1,
-    fontFamily: typography.fontFamily.bold,
+    fontFamily: typography.fontFamily,
+    fontWeight: typography.fontWeight.bold,
     color: colors.white,
     textTransform: 'uppercase',
   },
@@ -290,7 +291,8 @@ const styles = StyleSheet.create({
   },
   mainTitle: {
     fontSize: typography.fontSize.title1,
-    fontFamily: typography.fontFamily.bold,
+    fontFamily: typography.fontFamily,
+    fontWeight: typography.fontWeight.bold,
     color: colors.white,
     textAlign: 'center',
     textTransform: 'uppercase',
@@ -305,13 +307,15 @@ const styles = StyleSheet.create({
   },
   membershipStatusText: {
     fontSize: typography.fontSize.md,
-    fontFamily: typography.fontFamily.medium,
+    fontFamily: typography.fontFamily,
+    fontWeight: typography.fontWeight.medium,
     color: colors.white,
     marginBottom: spacing.sm,
   },
   daysLeftText: {
     fontSize: typography.fontSize.xxl,
-    fontFamily: typography.fontFamily.bold,
+    fontFamily: typography.fontFamily,
+    fontWeight: typography.fontWeight.bold,
     color: colors.primary,
   },
   benefitsContainer: {
@@ -338,7 +342,8 @@ const styles = StyleSheet.create({
   benefitText: {
     flex: 1,
     fontSize: typography.fontSize.lg,
-    fontFamily: typography.fontFamily.medium,
+    fontFamily: typography.fontFamily,
+    fontWeight: typography.fontWeight.medium,
     color: colors.textDark,
     lineHeight: 22,
   },
@@ -359,12 +364,14 @@ const styles = StyleSheet.create({
   },
   planTitle: {
     fontSize: typography.fontSize.lg,
-    fontFamily: typography.fontFamily.medium,
+    fontFamily: typography.fontFamily,
+    fontWeight: typography.fontWeight.medium,
     color: colors.textDark,
   },
   planPrice: {
     fontSize: typography.fontSize.xxl,
-    fontFamily: typography.fontFamily.bold,
+    fontFamily: typography.fontFamily,
+    fontWeight: typography.fontWeight.bold,
     color: colors.textDark,
     textTransform: 'uppercase',
   },

@@ -143,7 +143,8 @@ const styles = StyleSheet.create({
   },
   infoText: {
     fontSize: typography.fontSize.sm,
-    fontFamily: typography.fontFamily.medium,
+    fontFamily: typography.fontFamily,
+    fontWeight: typography.fontWeight.medium,
     color: colors.gray400,
   },
   fullBadge: {
@@ -156,7 +157,8 @@ const styles = StyleSheet.create({
   },
   fullBadgeText: {
     fontSize: typography.fontSize.xs,
-    fontFamily: typography.fontFamily.medium,
+    fontFamily: typography.fontFamily,
+    fontWeight: typography.fontWeight.medium,
     color: colors.error,
   },
   arrowContainer: {

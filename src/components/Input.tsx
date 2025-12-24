@@ -58,17 +58,20 @@ export default function Input({
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: colors.white,
+    backgroundColor: colors.gray200,
     borderRadius: borderRadius.lg,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     marginBottom: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.gray200,
   },
   placeholder: {
     fontSize: typography.fontSize.xs,
-    fontFamily: typography.fontFamily.medium,
+    fontFamily: typography.fontFamily,
+    fontWeight: typography.fontWeight.medium,
     color: colors.gray400,
-    marginBottom: 4,
+    marginBottom: spacing.xs,
   },
   inputRow: {
     flexDirection: 'row',
@@ -77,17 +80,20 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     fontSize: typography.fontSize.md,
-    fontFamily: typography.fontFamily.medium,
+    fontFamily: typography.fontFamily,
+    fontWeight: typography.fontWeight.medium,
     color: colors.textDark,
     padding: 0,
+    minHeight: 24,
   },
   inputDisabled: {
     color: colors.gray400,
   },
   error: {
     fontSize: typography.fontSize.xs,
-    fontFamily: typography.fontFamily.regular,
+    fontFamily: typography.fontFamily,
+    fontWeight: typography.fontWeight.regular,
     color: colors.error,
-    marginTop: 4,
+    marginTop: spacing.xs,
   },
 });

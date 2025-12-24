@@ -252,7 +252,8 @@ const styles = StyleSheet.create({
   },
   errorText: {
     fontSize: typography.fontSize.md,
-    fontFamily: typography.fontFamily.medium,
+    fontFamily: typography.fontFamily,
+    fontWeight: typography.fontWeight.medium,
     color: colors.gray400,
     textAlign: 'center',
   },
@@ -273,7 +274,8 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: typography.fontSize.title2,
-    fontFamily: typography.fontFamily.bold,
+    fontFamily: typography.fontFamily,
+    fontWeight: typography.fontWeight.bold,
     color: colors.white,
     textTransform: 'uppercase',
   },
@@ -301,7 +303,8 @@ const styles = StyleSheet.create({
   },
   infoText: {
     fontSize: typography.fontSize.lg,
-    fontFamily: typography.fontFamily.medium,
+    fontFamily: typography.fontFamily,
+    fontWeight: typography.fontWeight.medium,
     color: colors.textDark,
   },
   spotsCard: {
@@ -313,7 +316,8 @@ const styles = StyleSheet.create({
   },
   spotsNumber: {
     fontSize: 64,
-    fontFamily: typography.fontFamily.bold,
+    fontFamily: typography.fontFamily,
+    fontWeight: typography.fontWeight.bold,
     color: colors.textDark,
     lineHeight: 72,
   },
@@ -324,7 +328,8 @@ const styles = StyleSheet.create({
   },
   spotsTotal: {
     fontSize: typography.fontSize.sm,
-    fontFamily: typography.fontFamily.medium,
+    fontFamily: typography.fontFamily,
+    fontWeight: typography.fontWeight.medium,
     color: colors.textDark,
     opacity: 0.7,
   },
@@ -339,7 +344,8 @@ const styles = StyleSheet.create({
   },
   bookedText: {
     fontSize: typography.fontSize.sm,
-    fontFamily: typography.fontFamily.medium,
+    fontFamily: typography.fontFamily,
+    fontWeight: typography.fontWeight.medium,
     color: colors.primary,
     flex: 1,
   },
@@ -354,7 +360,8 @@ const styles = StyleSheet.create({
   },
   warningText: {
     fontSize: typography.fontSize.sm,
-    fontFamily: typography.fontFamily.medium,
+    fontFamily: typography.fontFamily,
+    fontWeight: typography.fontWeight.medium,
     color: colors.warning,
     flex: 1,
   },
@@ -395,7 +402,8 @@ const styles = StyleSheet.create({
   },
   userName: {
     fontSize: typography.fontSize.md,
-    fontFamily: typography.fontFamily.medium,
+    fontFamily: typography.fontFamily,
+    fontWeight: typography.fontWeight.medium,
     color: colors.textDark,
   },
   buttonContainer: {

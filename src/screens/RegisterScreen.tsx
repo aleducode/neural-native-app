@@ -306,7 +306,8 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: typography.fontSize.title1,
-    fontFamily: typography.fontFamily.bold,
+    fontFamily: typography.fontFamily,
+    fontWeight: typography.fontWeight.bold,
     lineHeight: typography.lineHeight.title1,
     color: colors.white,
     textTransform: 'uppercase',
@@ -332,7 +333,8 @@ const styles = StyleSheet.create({
   errorBannerText: {
     color: colors.error,
     fontSize: typography.fontSize.sm,
-    fontFamily: typography.fontFamily.medium,
+    fontFamily: typography.fontFamily,
+    fontWeight: typography.fontWeight.medium,
     textAlign: 'center',
   },
   inputsContainer: {
@@ -359,11 +361,13 @@ const styles = StyleSheet.create({
   },
   signInText: {
     fontSize: typography.fontSize.sm,
-    fontFamily: typography.fontFamily.medium,
+    fontFamily: typography.fontFamily,
+    fontWeight: typography.fontWeight.medium,
     color: colors.textDark,
   },
   signInLink: {
-    fontFamily: typography.fontFamily.bold,
+    fontFamily: typography.fontFamily,
+    fontWeight: typography.fontWeight.bold,
     color: colors.primary,
   },
 });

@@ -276,7 +276,8 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: typography.fontSize.title1,
-    fontFamily: typography.fontFamily.bold,
+    fontFamily: typography.fontFamily,
+    fontWeight: typography.fontWeight.bold,
     color: colors.white,
     textTransform: 'uppercase',
   },
@@ -292,12 +293,14 @@ const styles = StyleSheet.create({
   },
   currentValue: {
     fontSize: 80,
-    fontFamily: typography.fontFamily.bold,
+    fontFamily: typography.fontFamily,
+    fontWeight: typography.fontWeight.bold,
     color: colors.white,
   },
   currentUnit: {
     fontSize: typography.fontSize.title1,
-    fontFamily: typography.fontFamily.medium,
+    fontFamily: typography.fontFamily,
+    fontWeight: typography.fontWeight.medium,
     color: colors.gray400,
     marginLeft: spacing.sm,
   },
@@ -340,7 +343,8 @@ const styles = StyleSheet.create({
   tickLabel: {
     marginTop: spacing.sm,
     fontSize: typography.fontSize.sm,
-    fontFamily: typography.fontFamily.medium,
+    fontFamily: typography.fontFamily,
+    fontWeight: typography.fontWeight.medium,
     color: colors.gray400,
   },
   bottomButtonContainer: {

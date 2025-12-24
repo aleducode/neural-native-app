@@ -274,7 +274,8 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: typography.fontSize.lg,
-    fontFamily: typography.fontFamily.bold,
+    fontFamily: typography.fontFamily,
+    fontWeight: typography.fontWeight.bold,
     color: colors.white,
     textTransform: 'uppercase',
   },
@@ -307,13 +308,15 @@ const styles = StyleSheet.create({
   },
   statLabel: {
     fontSize: typography.fontSize.sm,
-    fontFamily: typography.fontFamily.medium,
+    fontFamily: typography.fontFamily,
+    fontWeight: typography.fontWeight.medium,
     color: colors.gray400,
     marginBottom: spacing.xs,
   },
   statValue: {
     fontSize: typography.fontSize.xxl,
-    fontFamily: typography.fontFamily.bold,
+    fontFamily: typography.fontFamily,
+    fontWeight: typography.fontWeight.bold,
     color: colors.white,
   },
   statPositive: {
@@ -360,7 +363,8 @@ const styles = StyleSheet.create({
   },
   emptySubtext: {
     fontSize: typography.fontSize.md,
-    fontFamily: typography.fontFamily.regular,
+    fontFamily: typography.fontFamily,
+    fontWeight: typography.fontWeight.regular,
     color: colors.gray400,
     marginTop: spacing.xs,
     textAlign: 'center',
@@ -387,12 +391,14 @@ const styles = StyleSheet.create({
   },
   historyDate: {
     fontSize: typography.fontSize.md,
-    fontFamily: typography.fontFamily.medium,
+    fontFamily: typography.fontFamily,
+    fontWeight: typography.fontWeight.medium,
     color: colors.white,
   },
   historyWeight: {
     fontSize: typography.fontSize.lg,
-    fontFamily: typography.fontFamily.bold,
+    fontFamily: typography.fontFamily,
+    fontWeight: typography.fontWeight.bold,
     color: colors.white,
   },
 });

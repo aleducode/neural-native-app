@@ -13,7 +13,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
-import { colors, typography, spacing } from '../theme/colors';
+import { colors, typography, spacing, borderRadius } from '../theme/colors';
 import WeekDay from '../components/WeekDay';
 import StatCard from '../components/StatCard';
 import MenuCard from '../components/MenuCard';
@@ -284,7 +284,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: spacing.md,
+    marginTop: spacing.lg,
     marginBottom: spacing.xl,
   },
   userInfo: {
@@ -293,36 +293,41 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   avatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    borderWidth: 2,
+    borderColor: colors.primary,
   },
   avatarPlaceholder: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
   avatarText: {
-    fontSize: typography.fontSize.xxl,
-    fontFamily: typography.fontFamily.bold,
+    fontSize: typography.fontSize.lg,
+    fontFamily: typography.fontFamily,
+    fontWeight: typography.fontWeight.bold,
     color: colors.textDark,
   },
   userText: {
-    gap: 1,
+    gap: 2,
   },
   welcomeText: {
     fontSize: typography.fontSize.xs,
-    fontFamily: typography.fontFamily.bold,
+    fontFamily: typography.fontFamily,
+    fontWeight: typography.fontWeight.bold,
     color: colors.white,
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: 1,
   },
   userName: {
-    fontSize: typography.fontSize.xxl,
-    fontFamily: typography.fontFamily.medium,
+    fontSize: typography.fontSize.lg,
+    fontFamily: typography.fontFamily,
+    fontWeight: typography.fontWeight.medium,
     color: colors.white,
   },
   notificationBtn: {
@@ -347,7 +352,8 @@ const styles = StyleSheet.create({
   },
   notificationBadgeText: {
     fontSize: 10,
-    fontFamily: typography.fontFamily.bold,
+    fontFamily: typography.fontFamily,
+    fontWeight: typography.fontWeight.bold,
     color: colors.white,
   },
 
@@ -360,7 +366,7 @@ const styles = StyleSheet.create({
 
   // Sections
   section: {
-    marginBottom: spacing.xl,
+    marginBottom: spacing.xxl,
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -369,15 +375,18 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   sectionTitle: {
-    fontSize: typography.fontSize.xxl,
-    fontFamily: typography.fontFamily.bold,
+    fontSize: typography.fontSize.lg,
+    fontFamily: typography.fontFamily,
+    fontWeight: typography.fontWeight.bold,
     color: colors.white,
     textTransform: 'uppercase',
+    letterSpacing: 1,
     marginBottom: spacing.md,
   },
   viewAll: {
     fontSize: typography.fontSize.sm,
-    fontFamily: typography.fontFamily.medium,
+    fontFamily: typography.fontFamily,
+    fontWeight: typography.fontWeight.medium,
     color: colors.primary,
   },
 

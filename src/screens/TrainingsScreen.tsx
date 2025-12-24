@@ -241,7 +241,8 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: typography.fontSize.xxl,
-    fontFamily: typography.fontFamily.bold,
+    fontFamily: typography.fontFamily,
+    fontWeight: typography.fontWeight.bold,
     color: colors.white,
   },
   scrollView: {
@@ -262,7 +263,8 @@ const styles = StyleSheet.create({
   },
   dividerText: {
     fontSize: typography.fontSize.sm,
-    fontFamily: typography.fontFamily.regular,
+    fontFamily: typography.fontFamily,
+    fontWeight: typography.fontWeight.regular,
     color: colors.gray400,
     paddingHorizontal: spacing.lg,
   },
@@ -274,7 +276,8 @@ const styles = StyleSheet.create({
   },
   trainingDateTime: {
     fontSize: typography.fontSize.sm,
-    fontFamily: typography.fontFamily.medium,
+    fontFamily: typography.fontFamily,
+    fontWeight: typography.fontWeight.medium,
     color: colors.gray400,
     marginBottom: spacing.md,
   },
@@ -301,7 +304,8 @@ const styles = StyleSheet.create({
   },
   trainingDay: {
     fontSize: typography.fontSize.sm,
-    fontFamily: typography.fontFamily.regular,
+    fontFamily: typography.fontFamily,
+    fontWeight: typography.fontWeight.regular,
     color: colors.gray400,
   },
   cancelButton: {
@@ -317,7 +321,8 @@ const styles = StyleSheet.create({
   },
   cancelButtonText: {
     fontSize: typography.fontSize.sm,
-    fontFamily: typography.fontFamily.medium,
+    fontFamily: typography.fontFamily,
+    fontWeight: typography.fontWeight.medium,
     color: colors.primary,
   },
   emptyContainer: {
@@ -345,14 +350,16 @@ const styles = StyleSheet.create({
   },
   emptyTitle: {
     fontSize: typography.fontSize.title1,
-    fontFamily: typography.fontFamily.bold,
+    fontFamily: typography.fontFamily,
+    fontWeight: typography.fontWeight.bold,
     color: colors.white,
     textTransform: 'uppercase',
     textAlign: 'center',
   },
   emptySubtitle: {
     fontSize: typography.fontSize.md,
-    fontFamily: typography.fontFamily.medium,
+    fontFamily: typography.fontFamily,
+    fontWeight: typography.fontWeight.medium,
     color: colors.gray200,
     textAlign: 'center',
     lineHeight: 20,

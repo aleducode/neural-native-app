@@ -36,6 +36,7 @@ function RootNavigator() {
 }
 
 export default function App() {
+  // System fonts nativas - no necesitan carga, están disponibles inmediatamente
   return (
     <SafeAreaProvider>
       <AuthProvider>

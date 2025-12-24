@@ -9,7 +9,8 @@ import {
   ScrollView,
   Alert,
   Image,
-  TextInput,
+  ActivityIndicator,
+  Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -17,81 +18,11 @@ import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
 import { colors, typography, spacing, borderRadius } from '../theme/colors';
 import { Ionicons } from '@expo/vector-icons';
+import Input from '../components/Input';
+import Button from '../components/Button';
 
-function FormInput({
-  label,
-  placeholder,
-  value,
-  onChangeText,
-  secureTextEntry,
-  keyboardType = 'default',
-  autoCapitalize = 'none',
-}: {
-  label: string;
-  placeholder?: string;
-  value: string;
-  onChangeText: (text: string) => void;
-  secureTextEntry?: boolean;
-  keyboardType?: 'default' | 'email-address';
-  autoCapitalize?: 'none' | 'sentences';
-}) {
-  const [showPassword, setShowPassword] = useState(false);
-  const isPassword = secureTextEntry !== undefined;
-
-  return (
-    <View style={inputStyles.container}>
-      <Text style={inputStyles.label}>{label}</Text>
-      <View style={inputStyles.inputWrapper}>
-        <TextInput
-          style={inputStyles.input}
-          value={value}
-          onChangeText={onChangeText}
-          placeholder={placeholder}
-          secureTextEntry={isPassword && !showPassword}
-          keyboardType={keyboardType}
-          autoCapitalize={autoCapitalize}
-          placeholderTextColor="#727272"
-        />
-        {isPassword && (
-          <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
-            <Ionicons
-              name={showPassword ? 'eye-off-outline' : 'eye-outline'}
-              size={20}
-              color="#727272"
-            />
-          </TouchableOpacity>
-        )}
-      </View>
-    </View>
-  );
-}
-
-const inputStyles = StyleSheet.create({
-  container: {
-    marginBottom: spacing.lg,
-  },
-  label: {
-    fontSize: typography.fontSize.lg,
-    fontFamily: typography.fontFamily.medium,
-    color: colors.textDark,
-    marginBottom: 4,
-  },
-  inputWrapper: {
-    backgroundColor: '#F5F5F5',
-    borderRadius: 30,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    height: 50,
-  },
-  input: {
-    flex: 1,
-    fontSize: typography.fontSize.lg,
-    fontFamily: typography.fontFamily.medium,
-    color: colors.textDark,
-    padding: 0,
-  },
-});
+const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+const CONTENT_PADDING = spacing.xxl;
 
 export default function LoginScreen() {
   const navigation = useNavigation<any>();
@@ -129,119 +60,142 @@ export default function LoginScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Background Gradients */}
+      {/* Subtle Background Gradients */}
       <View style={styles.backgroundContainer}>
         <LinearGradient
-          colors={['rgba(69, 255, 183, 0.4)', 'transparent']}
+          colors={['rgba(69, 255, 183, 0.15)', 'transparent']}
           style={styles.gradientTop}
         />
         <LinearGradient
-          colors={['rgba(69, 255, 183, 0.4)', 'transparent']}
+          colors={['rgba(69, 255, 183, 0.15)', 'transparent']}
           style={styles.gradientBottom}
         />
       </View>
 
-      <SafeAreaView style={styles.safeArea}>
+      <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.keyboardView}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
         >
           <ScrollView
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
           >
-            {/* Title */}
-            <Text style={styles.title}>Iniciar Sesión</Text>
+            <View style={styles.centerContainer}>
+              {/* Header Title */}
+              <Text style={styles.title}>INICIAR SESIÓN</Text>
 
-            {/* White Card Container */}
-            <View style={styles.card}>
-              {/* Logo inside card */}
-              <View style={styles.logoContainer}>
-                <Image
-                  source={require('../../assets/neural.png')}
-                  style={styles.logo}
-                  resizeMode="contain"
-                />
-              </View>
-
-              {/* Form */}
-              <View style={styles.form}>
-                <FormInput
-                  label="Email"
-                  placeholder="Ingresa tu email"
-                  value={email}
-                  onChangeText={setEmail}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                />
-
-                <FormInput
-                  label="Contraseña"
-                  placeholder="Ingresa tu contraseña"
-                  value={password}
-                  onChangeText={setPassword}
-                  secureTextEntry
-                />
-
-                {/* Forgot Password */}
-                <TouchableOpacity style={styles.forgotPassword}>
-                  <Text style={styles.forgotPasswordText}>¿Olvidaste tu contraseña?</Text>
-                </TouchableOpacity>
-              </View>
-
-              {/* Login Button */}
-              <TouchableOpacity
-                style={[styles.button, isLoading && styles.buttonDisabled]}
-                onPress={handleLogin}
-                disabled={isLoading}
-              >
-                <Text style={styles.buttonText}>
-                  {isLoading ? 'Ingresando...' : 'Ingresar'}
-                </Text>
-              </TouchableOpacity>
-
-              {/* Biometric Checkbox */}
-              {biometricAvailable && (
-                <TouchableOpacity
-                  style={styles.biometricCheckbox}
-                  onPress={() => setRememberBiometric(!rememberBiometric)}
-                >
-                  <View style={[styles.checkbox, rememberBiometric && styles.checkboxChecked]}>
-                    {rememberBiometric && (
-                      <Ionicons name="checkmark" size={14} color={colors.white} />
-                    )}
-                  </View>
-                  <Text style={styles.biometricCheckboxText}>
-                    Recordar con {biometricType}
-                  </Text>
-                </TouchableOpacity>
-              )}
-
-              {/* Biometric Login */}
-              {biometricEnabled && (
-                <TouchableOpacity
-                  style={styles.biometricButton}
-                  onPress={handleBiometricLogin}
-                  disabled={isLoading}
-                >
-                  <Ionicons
-                    name={biometricType === 'Face ID' ? 'scan-outline' : 'finger-print-outline'}
-                    size={24}
-                    color={colors.primary}
+              {/* Premium Card */}
+              <View style={styles.card}>
+                {/* Logo */}
+                <View style={styles.logoContainer}>
+                  <Image
+                    source={require('../../assets/neural.png')}
+                    style={styles.logo}
+                    resizeMode="contain"
                   />
-                  <Text style={styles.biometricButtonText}>
-                    Ingresar con {biometricType}
-                  </Text>
-                </TouchableOpacity>
-              )}
+                </View>
 
-              {/* Register Link */}
-              <View style={styles.registerContainer}>
-                <Text style={styles.registerText}>¿No tienes cuenta? </Text>
-                <TouchableOpacity onPress={() => navigation.navigate('Register')}>
-                  <Text style={styles.registerLink}>Regístrate</Text>
-                </TouchableOpacity>
+                {/* Form */}
+                <View style={styles.form}>
+                  <Input
+                    placeholder="Email"
+                    value={email}
+                    onChangeText={setEmail}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    editable={!isLoading}
+                  />
+
+                  <Input
+                    placeholder="Contraseña"
+                    value={password}
+                    onChangeText={setPassword}
+                    secureTextEntry
+                    autoCapitalize="none"
+                    editable={!isLoading}
+                  />
+
+                  {/* Forgot Password */}
+                  <TouchableOpacity
+                    style={styles.forgotPassword}
+                    onPress={() => {}}
+                    disabled={isLoading}
+                  >
+                    <Text style={styles.forgotPasswordText}>¿Olvidaste tu contraseña?</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Login Button */}
+                <View style={styles.buttonContainer}>
+                  <Button
+                    title={isLoading ? '' : 'Ingresar'}
+                    onPress={handleLogin}
+                    disabled={isLoading}
+                    loading={isLoading}
+                  />
+                </View>
+
+                {/* Divider */}
+                {biometricEnabled && (
+                  <View style={styles.dividerContainer}>
+                    <View style={styles.dividerLine} />
+                    <Text style={styles.dividerText}>o</Text>
+                    <View style={styles.dividerLine} />
+                  </View>
+                )}
+
+                {/* Biometric Checkbox */}
+                {biometricAvailable && (
+                  <TouchableOpacity
+                    style={styles.biometricCheckbox}
+                    onPress={() => setRememberBiometric(!rememberBiometric)}
+                    disabled={isLoading}
+                    activeOpacity={0.7}
+                  >
+                    <View style={[styles.checkbox, rememberBiometric && styles.checkboxChecked]}>
+                      {rememberBiometric && (
+                        <Ionicons name="checkmark" size={12} color={colors.textDark} />
+                      )}
+                    </View>
+                    <Text style={styles.biometricCheckboxText}>
+                      Recordar con {biometricType}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+
+                {/* Biometric Login Button */}
+                {biometricEnabled && (
+                  <TouchableOpacity
+                    style={styles.biometricButton}
+                    onPress={handleBiometricLogin}
+                    disabled={isLoading}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons
+                      name={biometricType === 'Face ID' ? 'scan-outline' : 'finger-print-outline'}
+                      size={20}
+                      color={colors.primary}
+                    />
+                    <Text style={styles.biometricButtonText}>
+                      Ingresar con {biometricType}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+
+                {/* Register Link */}
+                <View style={styles.registerContainer}>
+                  <Text style={styles.registerText}>¿No tienes cuenta? </Text>
+                  <TouchableOpacity
+                    onPress={() => navigation.navigate('Register')}
+                    disabled={isLoading}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.registerLink}>Regístrate</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             </View>
           </ScrollView>
@@ -256,6 +210,23 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.bgDark,
   },
+  safeArea: {
+    flex: 1,
+  },
+  keyboardView: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    paddingHorizontal: CONTENT_PADDING,
+    justifyContent: 'center',
+    minHeight: SCREEN_HEIGHT * 0.9,
+  },
+  centerContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    paddingVertical: spacing.xxl,
+  },
   backgroundContainer: {
     position: 'absolute',
     top: 0,
@@ -265,91 +236,98 @@ const styles = StyleSheet.create({
   },
   gradientTop: {
     position: 'absolute',
-    top: 50,
-    left: -150,
-    width: 300,
-    height: 300,
-    borderRadius: 150,
+    top: 80,
+    left: -120,
+    width: 240,
+    height: 240,
+    borderRadius: 120,
   },
   gradientBottom: {
     position: 'absolute',
-    bottom: 100,
-    right: -150,
-    width: 300,
-    height: 300,
-    borderRadius: 150,
-  },
-  safeArea: {
-    flex: 1,
-  },
-  keyboardView: {
-    flex: 1,
-  },
-  scrollContent: {
-    flexGrow: 1,
-    paddingHorizontal: 20,
-    justifyContent: 'center',
-    paddingVertical: spacing.xxl,
-  },
-  logoContainer: {
-    alignItems: 'center',
-    marginBottom: spacing.xl,
-  },
-  logo: {
-    width: 140,
-    height: 50,
+    bottom: 120,
+    right: -120,
+    width: 240,
+    height: 240,
+    borderRadius: 120,
   },
   title: {
-    fontSize: 32,
-    fontFamily: typography.fontFamily.bold,
+    fontSize: 38,
+    fontFamily: typography.fontFamily,
+    fontWeight: typography.fontWeight.bold,
+    lineHeight: 48,
     color: colors.white,
     textTransform: 'uppercase',
-    marginBottom: spacing.lg,
+    marginBottom: spacing.xxl,
+    textAlign: 'center',
+    letterSpacing: 0.5,
   },
   card: {
     backgroundColor: colors.white,
-    borderRadius: 26,
-    padding: 20,
-    paddingTop: 24,
+    borderRadius: borderRadius.xxl,
+    padding: spacing.xxl,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.12,
+    shadowRadius: 24,
+    elevation: 12,
+  },
+  logoContainer: {
+    alignItems: 'center',
+    marginBottom: spacing.xxl,
+    paddingTop: spacing.md,
+  },
+  logo: {
+    width: 120,
+    height: 43,
   },
   form: {
-    marginBottom: spacing.md,
+    marginBottom: spacing.xl,
+    gap: spacing.md,
   },
   forgotPassword: {
     alignItems: 'flex-end',
+    marginTop: spacing.xs,
+    marginBottom: spacing.xs,
   },
   forgotPasswordText: {
-    fontSize: typography.fontSize.lg,
-    fontFamily: typography.fontFamily.medium,
-    color: colors.textDark,
+    fontSize: typography.fontSize.sm,
+    fontFamily: typography.fontFamily,
+    fontWeight: typography.fontWeight.medium,
+    color: colors.gray400,
   },
-  button: {
-    backgroundColor: colors.primary,
-    borderRadius: 1000,
-    paddingVertical: 14,
+  buttonContainer: {
+    marginTop: spacing.lg,
+    marginBottom: spacing.md,
+  },
+  dividerContainer: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: spacing.lg,
+    marginVertical: spacing.xl,
   },
-  buttonDisabled: {
-    opacity: 0.7,
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: colors.gray200,
   },
-  buttonText: {
-    fontSize: typography.fontSize.lg,
-    fontFamily: typography.fontFamily.semiBold,
-    color: colors.textDark,
-    textTransform: 'uppercase',
+  dividerText: {
+    fontSize: typography.fontSize.sm,
+    fontFamily: typography.fontFamily,
+    fontWeight: typography.fontWeight.regular,
+    color: colors.gray400,
+    paddingHorizontal: spacing.lg,
   },
   biometricCheckbox: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: spacing.md,
+    marginBottom: spacing.lg,
+    paddingVertical: spacing.xs,
   },
   checkbox: {
-    width: 20,
-    height: 20,
+    width: 18,
+    height: 18,
     borderRadius: 4,
-    borderWidth: 2,
+    borderWidth: 1.5,
     borderColor: colors.gray400,
     alignItems: 'center',
     justifyContent: 'center',
@@ -360,8 +338,9 @@ const styles = StyleSheet.create({
     borderColor: colors.primary,
   },
   biometricCheckboxText: {
-    fontSize: typography.fontSize.md,
-    fontFamily: typography.fontFamily.medium,
+    fontSize: typography.fontSize.sm,
+    fontFamily: typography.fontFamily,
+    fontWeight: typography.fontWeight.medium,
     color: colors.textDark,
   },
   biometricButton: {
@@ -370,11 +349,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: spacing.md,
     gap: spacing.sm,
-    marginBottom: spacing.md,
+    marginBottom: spacing.lg,
   },
   biometricButtonText: {
-    fontSize: typography.fontSize.lg,
-    fontFamily: typography.fontFamily.medium,
+    fontSize: typography.fontSize.md,
+    fontFamily: typography.fontFamily,
+    fontWeight: typography.fontWeight.medium,
     color: colors.primary,
   },
   registerContainer: {
@@ -382,15 +362,18 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     paddingTop: spacing.md,
+    marginTop: spacing.sm,
   },
   registerText: {
-    fontSize: typography.fontSize.lg,
-    fontFamily: typography.fontFamily.medium,
+    fontSize: typography.fontSize.sm,
+    fontFamily: typography.fontFamily,
+    fontWeight: typography.fontWeight.medium,
     color: colors.textDark,
   },
   registerLink: {
-    fontSize: typography.fontSize.lg,
-    fontFamily: typography.fontFamily.bold,
+    fontSize: typography.fontSize.sm,
+    fontFamily: typography.fontFamily,
+    fontWeight: typography.fontWeight.bold,
     color: colors.primary,
   },
 });

@@ -199,14 +199,16 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: typography.fontSize.title1,
-    fontFamily: typography.fontFamily.bold,
+    fontFamily: typography.fontFamily,
+    fontWeight: typography.fontWeight.bold,
     lineHeight: typography.lineHeight.title1,
     color: colors.white,
     textTransform: 'uppercase',
   },
   monthYear: {
     fontSize: typography.fontSize.md,
-    fontFamily: typography.fontFamily.medium,
+    fontFamily: typography.fontFamily,
+    fontWeight: typography.fontWeight.medium,
     color: colors.gray400,
     marginTop: spacing.xs,
   },
@@ -240,7 +242,8 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: typography.fontSize.md,
-    fontFamily: typography.fontFamily.medium,
+    fontFamily: typography.fontFamily,
+    fontWeight: typography.fontWeight.medium,
     color: colors.gray400,
     textAlign: 'center',
   },
@@ -252,7 +255,8 @@ const styles = StyleSheet.create({
   },
   scheduledText: {
     fontSize: typography.fontSize.sm,
-    fontFamily: typography.fontFamily.medium,
+    fontFamily: typography.fontFamily,
+    fontWeight: typography.fontWeight.medium,
     color: colors.primary,
     textAlign: 'center',
   },
