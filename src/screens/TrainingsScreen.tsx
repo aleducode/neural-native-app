@@ -9,9 +9,6 @@ import {
   RefreshControl,
   Alert,
   Image,
-  Modal,
-  TextInput,
-  KeyboardAvoidingView,
   Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -22,7 +19,6 @@ import { slotsApi } from '../api/slots';
 import { Training } from '../types';
 import ConfirmModal from '../components/ConfirmModal';
 import Button from '../components/Button';
-import { saveTrainingToHealthKit } from '../utils/healthKitHelpers';
 
 export default function TrainingsScreen() {
   const navigation = useNavigation<any>();
@@ -38,12 +34,6 @@ export default function TrainingsScreen() {
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [trainingToCancel, setTrainingToCancel] = useState<Training | null>(null);
-  
-  // HealthKit modal state
-  const [showHealthKitModal, setShowHealthKitModal] = useState(false);
-  const [trainingForHealthKit, setTrainingForHealthKit] = useState<Training | null>(null);
-  const [caloriesInput, setCaloriesInput] = useState('');
-  const [isSavingToHealthKit, setIsSavingToHealthKit] = useState(false);
 
   const LIMIT = 50;
 
@@ -221,69 +211,6 @@ export default function TrainingsScreen() {
     }
   };
 
-  const handleSaveToHealthKit = (training: Training) => {
-    console.log('[TrainingsScreen] handleSaveToHealthKit called with training:', training.id);
-    setTrainingForHealthKit(training);
-    setCaloriesInput('400');
-    setShowHealthKitModal(true);
-    console.log('[TrainingsScreen] HealthKit modal should be visible now');
-  };
-
-  const confirmSaveToHealthKit = async () => {
-    console.log('[TrainingsScreen] confirmSaveToHealthKit called');
-    
-    if (!trainingForHealthKit) {
-      console.error('[TrainingsScreen] ❌ No training selected for HealthKit');
-      return;
-    }
-
-    console.log('[TrainingsScreen] Starting to save to HealthKit:', {
-      trainingId: trainingForHealthKit.id,
-      caloriesInput: caloriesInput,
-    });
-
-    setIsSavingToHealthKit(true);
-    
-    const calories = caloriesInput.trim() ? parseInt(caloriesInput.trim(), 10) : undefined;
-    console.log('[TrainingsScreen] Parsed calories:', calories);
-    
-    if (calories !== undefined && (isNaN(calories) || calories <= 0)) {
-      console.error('[TrainingsScreen] ❌ Invalid calories:', calories);
-      Alert.alert('Error', 'Por favor ingresa un número válido de calorías');
-      setIsSavingToHealthKit(false);
-      return;
-    }
-
-    console.log('[TrainingsScreen] Calling saveTrainingToHealthKit...');
-    const workoutUUID = await saveTrainingToHealthKit(trainingForHealthKit, calories);
-    console.log('[TrainingsScreen] saveTrainingToHealthKit returned:', workoutUUID);
-    
-    setIsSavingToHealthKit(false);
-
-    if (workoutUUID) {
-      console.log('[TrainingsScreen] ✅ Successfully saved to HealthKit');
-      Alert.alert(
-        '¡Éxito!',
-        'Tu entrenamiento se ha guardado en Apple Health',
-        [{ text: 'OK', onPress: () => setShowHealthKitModal(false) }]
-      );
-      setShowHealthKitModal(false);
-      setTrainingForHealthKit(null);
-      setCaloriesInput('');
-    } else {
-      console.error('[TrainingsScreen] ❌ Failed to save to HealthKit');
-      Alert.alert(
-        'Error',
-        'No se pudo guardar el entrenamiento en Apple Health. Asegúrate de tener los permisos habilitados.'
-      );
-    }
-  };
-
-  const closeHealthKitModal = () => {
-    setShowHealthKitModal(false);
-    setTrainingForHealthKit(null);
-    setCaloriesInput('');
-  };
 
   if (isLoading) {
     return (
@@ -410,17 +337,6 @@ export default function TrainingsScreen() {
                           )}
                         </TouchableOpacity>
                       )}
-                      
-                      {isPast && Platform.OS === 'ios' && (
-                        <TouchableOpacity
-                          style={styles.healthKitButton}
-                          onPress={() => handleSaveToHealthKit(training)}
-                          activeOpacity={0.6}
-                        >
-                          <Ionicons name="heart-outline" size={16} color={colors.primary} />
-                          <Text style={styles.healthKitButtonText}>Guardar en Health</Text>
-                        </TouchableOpacity>
-                      )}
                     </View>
                   </View>
                 );
@@ -478,61 +394,6 @@ export default function TrainingsScreen() {
           singleButton
         />
 
-        {/* HealthKit Modal */}
-        <Modal
-          visible={showHealthKitModal}
-          transparent
-          animationType="fade"
-          onRequestClose={closeHealthKitModal}
-        >
-          <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            style={styles.modalOverlay}
-          >
-            <View style={styles.modalContent}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Guardar en Apple Health</Text>
-                <TouchableOpacity onPress={closeHealthKitModal}>
-                  <Ionicons name="close" size={24} color={colors.textDark} />
-                </TouchableOpacity>
-              </View>
-
-              <Text style={styles.modalSubtitle}>
-                {trainingForHealthKit?.training_type?.name || trainingForHealthKit?.slot.training_type?.name}
-              </Text>
-
-              <Text style={styles.modalDescription}>
-                Opcional: Ingresa las calorías quemadas. Si no las ingresas, se estimarán automáticamente.
-              </Text>
-
-              <TextInput
-                style={styles.caloriesInput}
-                placeholder="Calorías (opcional)"
-                placeholderTextColor={colors.gray400}
-                value={caloriesInput}
-                onChangeText={setCaloriesInput}
-                keyboardType="number-pad"
-                autoFocus={false}
-              />
-
-              <View style={styles.modalButtons}>
-                <TouchableOpacity
-                  style={styles.modalCancelButton}
-                  onPress={closeHealthKitModal}
-                  disabled={isSavingToHealthKit}
-                >
-                  <Text style={styles.modalCancelButtonText}>Cancelar</Text>
-                </TouchableOpacity>
-                <Button
-                  title={isSavingToHealthKit ? 'Guardando...' : 'Guardar'}
-                  onPress={confirmSaveToHealthKit}
-                  loading={isSavingToHealthKit}
-                  disabled={isSavingToHealthKit}
-                />
-              </View>
-            </View>
-          </KeyboardAvoidingView>
-        </Modal>
       </SafeAreaView>
     </View>
   );
@@ -716,25 +577,6 @@ const styles = StyleSheet.create({
     color: colors.error,
     letterSpacing: 0.3,
   },
-  healthKitButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.xs,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.md,
-    borderRadius: borderRadius.full,
-    backgroundColor: colors.primaryTransparent15,
-    minHeight: 44,
-  },
-  healthKitButtonText: {
-    fontSize: typography.fontSize.sm,
-    fontFamily: typography.fontFamily,
-    fontWeight: typography.fontWeight.medium,
-    color: colors.primary,
-    letterSpacing: 0.3,
-  },
   emptyContainer: {
     flex: 1,
     alignItems: 'center',
@@ -789,85 +631,5 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xl,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  // HealthKit Modal Styles
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: spacing.xxl,
-  },
-  modalContent: {
-    backgroundColor: colors.white,
-    borderRadius: borderRadius.xl,
-    padding: spacing.xxl,
-    width: '100%',
-    maxWidth: 400,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.15,
-    shadowRadius: 24,
-    elevation: 8,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.xl,
-  },
-  modalTitle: {
-    fontSize: typography.fontSize.xl,
-    fontFamily: typography.fontFamily,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.textDark,
-    letterSpacing: -0.5,
-  },
-  modalSubtitle: {
-    fontSize: typography.fontSize.lg,
-    fontFamily: typography.fontFamily,
-    fontWeight: typography.fontWeight.semiBold,
-    color: colors.primary,
-    marginBottom: spacing.lg,
-    letterSpacing: -0.3,
-  },
-  modalDescription: {
-    fontSize: typography.fontSize.sm,
-    fontFamily: typography.fontFamily,
-    color: colors.gray400,
-    marginBottom: spacing.xl,
-    lineHeight: typography.lineHeight.md,
-  },
-  caloriesInput: {
-    backgroundColor: colors.gray200,
-    borderRadius: borderRadius.md,
-    padding: spacing.lg,
-    fontSize: typography.fontSize.md,
-    fontFamily: typography.fontFamily,
-    color: colors.textDark,
-    marginBottom: spacing.xl,
-    borderWidth: 1,
-    borderColor: colors.gray200,
-    minHeight: 48,
-  },
-  modalButtons: {
-    flexDirection: 'row',
-    gap: spacing.md,
-  },
-  modalCancelButton: {
-    flex: 1,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
-    borderRadius: borderRadius.full,
-    backgroundColor: colors.gray200,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 48,
-  },
-  modalCancelButtonText: {
-    fontSize: typography.fontSize.md,
-    fontFamily: typography.fontFamily,
-    fontWeight: typography.fontWeight.medium,
-    color: colors.textDark,
   },
 });

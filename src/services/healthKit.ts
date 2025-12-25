@@ -111,7 +111,7 @@ export interface WorkoutData {
 }
 
 export interface SaveWorkoutOptions {
-  type: string; // Workout type (e.g., 'Running', 'Cycling', 'StrengthTraining')
+  type: number; // Workout type constant from HealthKit ActivityType (e.g., ActivityType.Running)
   startDate: Date;
   endDate: Date;
   energyBurned?: number; // calories
@@ -473,56 +473,86 @@ class HealthKitServiceImpl implements HealthKitService {
 
   async saveWorkout(options: SaveWorkoutOptions): Promise<string | null> {
     console.log('[HealthKit] saveWorkout called, initialized:', this.initialized);
+    console.log('[HealthKit] Options received:', {
+      type: options.type,
+      startDate: options.startDate.toISOString(),
+      endDate: options.endDate.toISOString(),
+      energyBurned: options.energyBurned,
+    });
     
     if (!this.initialized) {
       console.error('[HealthKit] ❌ Not initialized, cannot save workout');
       return null;
     }
 
-    if (typeof AppleHealthKit.saveWorkout !== 'function') {
-      console.error('[HealthKit] ❌ saveWorkout is not a function');
-      console.error('[HealthKit] Available methods:', Object.keys(AppleHealthKit).filter(k => typeof AppleHealthKit[k] === 'function').slice(0, 20));
+    // Check for saveWorkout method - try different possible names
+    const saveMethod = AppleHealthKit.saveWorkout || 
+                      AppleHealthKit.saveWorkoutSample ||
+                      AppleHealthKit.saveWorkoutData;
+    
+    if (!saveMethod || typeof saveMethod !== 'function') {
+      console.error('[HealthKit] ❌ saveWorkout method not found');
+      console.error('[HealthKit] Available methods:', Object.keys(AppleHealthKit).filter(k => typeof AppleHealthKit[k] === 'function').slice(0, 30));
+      console.error('[HealthKit] Looking for methods with "workout" in name:', 
+        Object.keys(AppleHealthKit).filter(k => k.toLowerCase().includes('workout')));
       return null;
     }
 
+    console.log('[HealthKit] ✅ Found saveWorkout method');
+
     return new Promise((resolve) => {
+      // Format dates as ISO strings
+      const startDateISO = options.startDate.toISOString();
+      const endDateISO = options.endDate.toISOString();
+      
       const workoutOptions: any = {
         type: options.type,
-        startDate: options.startDate.toISOString(),
-        endDate: options.endDate.toISOString(),
+        startDate: startDateISO,
+        endDate: endDateISO,
       };
 
       // Add optional energy burned
-      if (options.energyBurned !== undefined) {
+      if (options.energyBurned !== undefined && options.energyBurned > 0) {
         workoutOptions.energyBurned = options.energyBurned;
         workoutOptions.energyBurnedUnit = options.energyBurnedUnit || 'calorie';
       }
 
       // Add optional distance
-      if (options.distance !== undefined) {
+      if (options.distance !== undefined && options.distance > 0) {
         workoutOptions.distance = options.distance;
         workoutOptions.distanceUnit = options.distanceUnit || 'meter';
       }
 
       console.log('[HealthKit] Calling native saveWorkout with options:', JSON.stringify(workoutOptions, null, 2));
+      console.log('[HealthKit] Workout type value:', workoutOptions.type, 'type:', typeof workoutOptions.type);
 
-      AppleHealthKit.saveWorkout(workoutOptions, (err: string, result: any) => {
-        console.log('[HealthKit] saveWorkout callback called');
-        console.log('[HealthKit] Error:', err);
-        console.log('[HealthKit] Result:', result);
-        console.log('[HealthKit] Result type:', typeof result);
-        
-        if (err) {
-          console.error('[HealthKit] ❌ Error saving workout:', err);
-          resolve(null);
-          return;
+      try {
+        saveMethod(workoutOptions, (err: string, result: any) => {
+          console.log('[HealthKit] saveWorkout callback called');
+          console.log('[HealthKit] Error:', err);
+          console.log('[HealthKit] Result:', result);
+          console.log('[HealthKit] Result type:', typeof result);
+          
+          if (err) {
+            console.error('[HealthKit] ❌ Error saving workout:', err);
+            console.error('[HealthKit] Error details:', JSON.stringify(err, null, 2));
+            resolve(null);
+            return;
+          }
+          
+          // Result can be the workout UUID string or an object with UUID
+          const workoutUUID = typeof result === 'string' ? result : (result?.uuid || result?.id || result);
+          console.log('[HealthKit] ✅ Workout saved successfully, UUID:', workoutUUID);
+          resolve(workoutUUID || null);
+        });
+      } catch (error) {
+        console.error('[HealthKit] ❌ Exception calling saveWorkout:', error);
+        if (error instanceof Error) {
+          console.error('[HealthKit] Exception message:', error.message);
+          console.error('[HealthKit] Exception stack:', error.stack);
         }
-        
-        // Result can be the workout UUID string or an object with UUID
-        const workoutUUID = typeof result === 'string' ? result : (result?.uuid || result?.id || result);
-        console.log('[HealthKit] ✅ Workout saved successfully, UUID:', workoutUUID);
-        resolve(workoutUUID || null);
-      });
+        resolve(null);
+      }
     });
   }
 }

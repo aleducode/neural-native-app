@@ -2,28 +2,45 @@ import healthKitService from '../services/healthKit';
 import { Training } from '../types';
 
 /**
- * Maps training type names to HealthKit workout types
+ * Gets HealthKit workout type constant from training type name
+ * Returns the ActivityType constant from HealthKit
  */
-const TRAINING_TYPE_TO_HEALTHKIT: Record<string, string> = {
-  'Grupal': 'TraditionalStrengthTraining', // Group training -> Strength training
-  'Individual': 'TraditionalStrengthTraining', // Individual training -> Strength training
-  'Funcional': 'CrossTraining', // Functional training -> Cross training
-  'Cardio': 'Running', // Cardio -> Running
-  'Yoga': 'Yoga',
-  'Pilates': 'Pilates',
-  'Spinning': 'Cycling', // Spinning -> Cycling
-  'Crossfit': 'CrossTraining',
-  'HIIT': 'HighIntensityIntervalTraining',
-  'Boxing': 'Boxing',
-  'Natación': 'Swimming',
-  'Running': 'Running',
-  'Ciclismo': 'Cycling',
-};
+function getWorkoutTypeConstant(trainingTypeName: string): number {
+  // Import HealthKit module to access Constants
+  let AppleHealthKit: any;
+  try {
+    AppleHealthKit = require('react-native-health');
+  } catch (e) {
+    console.error('[HealthKit] Failed to import react-native-health:', e);
+    return 13; // Default: TraditionalStrengthTraining
+  }
 
-/**
- * Default workout type if training type is not found
- */
-const DEFAULT_WORKOUT_TYPE = 'TraditionalStrengthTraining';
+  if (!AppleHealthKit?.Constants?.ActivityType) {
+    console.warn('[HealthKit] ActivityType constants not available, using default');
+    return 13; // Default: TraditionalStrengthTraining
+  }
+
+  const ActivityType = AppleHealthKit.Constants.ActivityType;
+  
+  // Map training types to HealthKit ActivityType constants
+  const typeMap: Record<string, number> = {
+    'Grupal': ActivityType.TraditionalStrengthTraining,
+    'Individual': ActivityType.TraditionalStrengthTraining,
+    'Funcional': ActivityType.CrossTraining,
+    'Cardio': ActivityType.Running,
+    'Yoga': ActivityType.Yoga,
+    'Pilates': ActivityType.Pilates,
+    'Spinning': ActivityType.Cycling,
+    'Crossfit': ActivityType.CrossTraining,
+    'HIIT': ActivityType.HighIntensityIntervalTraining,
+    'Boxing': ActivityType.Boxing,
+    'Natación': ActivityType.Swimming,
+    'Running': ActivityType.Running,
+    'Ciclismo': ActivityType.Cycling,
+  };
+
+  return typeMap[trainingTypeName] || ActivityType.TraditionalStrengthTraining;
+}
 
 /**
  * Estimates calories burned based on training type and duration
@@ -150,8 +167,8 @@ export async function saveTrainingToHealthKit(
     const trainingTypeName = training.training_type?.name || training.slot.training_type?.name || 'Grupal';
     console.log('[HealthKit] Training type name:', trainingTypeName);
     
-    const workoutType = TRAINING_TYPE_TO_HEALTHKIT[trainingTypeName] || DEFAULT_WORKOUT_TYPE;
-    console.log('[HealthKit] Mapped workout type:', workoutType);
+    const workoutType = getWorkoutTypeConstant(trainingTypeName);
+    console.log('[HealthKit] Mapped workout type constant:', workoutType);
 
     // Calculate or use provided calories
     const caloriesBurned = calories || estimateCalories(trainingTypeName, durationMinutes);

@@ -1,6 +1,8 @@
 // Neural App Configuration
 
-export const API_URL = 'https://app.neural.com.co';
+// Para desarrollo local usar la IP de tu máquina (no localhost en dispositivo físico)
+// Ejemplo: 'http://192.168.1.X:8000'
+export const API_URL = 'http://localhost:8000';
 export const API_BASE = `${API_URL}/api/v1`;
 
 export const STORAGE_KEYS = {

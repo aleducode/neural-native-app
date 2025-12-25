@@ -19,7 +19,6 @@ import { colors, typography, spacing, borderRadius } from '../theme/colors';
 import { dashboardApi, DashboardResponse } from '../api/dashboard';
 import { authApi } from '../api/auth';
 import ConfirmModal from '../components/ConfirmModal';
-import { useHealthKit } from '../hooks/useHealthKit';
 
 interface MenuItemProps {
   icon: string;
@@ -45,7 +44,6 @@ export default function ProfileScreen() {
   const [dashboardData, setDashboardData] = useState<DashboardResponse | null>(null);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
-  const { isAvailable, isAuthorized, requestPermissions, healthData } = useHealthKit();
 
   const fetchDashboard = useCallback(async () => {
     const { data } = await dashboardApi.getDashboard();
@@ -130,32 +128,6 @@ export default function ProfileScreen() {
 
   const handleNotifications = () => {
     navigation.navigate('Notifications');
-  };
-
-  const handleHealthKit = async () => {
-    console.log('[ProfileScreen] handleHealthKit called', { isAvailable, isAuthorized });
-    
-    if (!isAvailable) {
-      Alert.alert('No disponible', 'HealthKit solo está disponible en dispositivos iOS.');
-      return;
-    }
-
-    try {
-      if (!isAuthorized) {
-        console.log('[ProfileScreen] Requesting HealthKit permissions...');
-        await requestPermissions();
-        console.log('[ProfileScreen] Permissions requested');
-      } else {
-        console.log('[ProfileScreen] Showing health data', healthData);
-        Alert.alert(
-          'HealthKit Conectado',
-          `Pasos hoy: ${healthData?.steps || 0}\nDistancia: ${((healthData?.distance || 0) / 1000).toFixed(2)} km\nCalorías: ${healthData?.calories || 0}`
-        );
-      }
-    } catch (error) {
-      console.error('[ProfileScreen] Error in handleHealthKit:', error);
-      Alert.alert('Error', error instanceof Error ? error.message : 'Error al conectar con HealthKit');
-    }
   };
 
   const handleMyCalendar = () => {
@@ -263,13 +235,6 @@ export default function ProfileScreen() {
               title="Notificaciones"
               onPress={handleNotifications}
             />
-            {isAvailable && (
-              <MenuItem
-                icon={isAuthorized ? "checkmark-circle" : "fitness-outline"}
-                title={isAuthorized ? "Apple Health Conectado" : "Conectar Apple Health"}
-                onPress={handleHealthKit}
-              />
-            )}
           </View>
 
           {/* Logout Button */}
