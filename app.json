@@ -19,9 +19,7 @@
         "UIBackgroundModes": [
           "remote-notification"
         ],
-        "ITSAppUsesNonExemptEncryption": false,
-        "NSHealthShareUsageDescription": "Neural necesita acceso a tus datos de salud para sincronizar tus entrenamientos, pasos, calorías y actividad física con tu cuenta.",
-        "NSHealthUpdateUsageDescription": "Neural necesita escribir datos de entrenamiento en la app Salud para mantener tus registros actualizados."
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
@@ -51,14 +49,6 @@
           "color": "#45FFB7",
           "sounds": [],
           "defaultChannel": "default"
-        }
-      ],
-      [
-        "react-native-health",
-        {
-          "healthSharePermission": "Neural necesita acceso a tus datos de salud para sincronizar tus entrenamientos, pasos, calorías y actividad física con tu cuenta.",
-          "healthUpdatePermission": "Neural necesita escribir datos de entrenamiento en la app Salud para mantener tus registros actualizados.",
-          "isClinicalDataEnabled": true
         }
       ]
     ],
