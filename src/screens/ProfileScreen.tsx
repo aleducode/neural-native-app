@@ -29,11 +29,11 @@ interface MenuItemProps {
 function MenuItem({ icon, title, onPress }: MenuItemProps) {
   return (
     <TouchableOpacity style={styles.menuItem} onPress={onPress} activeOpacity={0.7}>
-      <View style={styles.menuIconContainer}>
-        <Ionicons name={icon as any} size={20} color={colors.textDark} />
+      <View style={styles.menuIconWrapper}>
+        <Ionicons name={icon as any} size={22} color={colors.textDark} />
       </View>
       <Text style={styles.menuTitle}>{title}</Text>
-      <Ionicons name="chevron-forward" size={20} color={colors.textDark} />
+      <Ionicons name="chevron-forward" size={18} color={colors.gray400} />
     </TouchableOpacity>
   );
 }
@@ -127,19 +127,31 @@ export default function ProfileScreen() {
   };
 
   const handleNotifications = () => {
-    // TODO: Navigate to notifications settings
-  };
-
-  const handleMore = () => {
-    // TODO: Navigate to more options
+    navigation.navigate('Notifications');
   };
 
   return (
     <View style={styles.container}>
+      {/* Subtle Background Gradients */}
+      <View style={styles.backgroundContainer}>
+        <LinearGradient
+          colors={['rgba(69, 255, 183, 0.15)', 'transparent']}
+          style={styles.gradientTop}
+        />
+        <LinearGradient
+          colors={['rgba(69, 255, 183, 0.15)', 'transparent']}
+          style={styles.gradientBottom}
+        />
+      </View>
+
       <SafeAreaView style={styles.safeArea} edges={['top']}>
         {/* Header */}
         <View style={styles.header}>
+          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+            <Ionicons name="chevron-back" size={24} color={colors.textDark} />
+          </TouchableOpacity>
           <Text style={styles.headerTitle}>Perfil</Text>
+          <View style={styles.headerSpacer} />
         </View>
 
         <ScrollView
@@ -147,9 +159,9 @@ export default function ProfileScreen() {
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
-          {/* Profile Card */}
-          <View style={styles.profileCardContainer}>
-            {/* Avatar - positioned above the card */}
+          {/* Profile Section */}
+          <View style={styles.profileSection}>
+            {/* Avatar */}
             <TouchableOpacity
               style={styles.avatarContainer}
               onPress={handleChangePhoto}
@@ -169,44 +181,32 @@ export default function ProfileScreen() {
                 </View>
               ) : (
                 <View style={styles.cameraIconContainer}>
-                  <Ionicons name="camera" size={16} color={colors.white} />
+                  <Ionicons name="camera" size={14} color={colors.white} />
                 </View>
               )}
             </TouchableOpacity>
 
-            {/* Gradient Card */}
-            <LinearGradient
-              colors={['#45FFB7', '#A8FFD9', '#FFFFFF']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.profileCard}
-            >
-              <View style={styles.statsContainer}>
-                <View style={styles.statItem}>
-                  <Text style={styles.statLabel}>Membresía</Text>
-                  <View style={styles.statValueContainer}>
-                    <Text style={styles.statValue}>{membershipDays}</Text>
-                    <Text style={styles.statUnit}> días</Text>
-                  </View>
-                </View>
+            {/* User Info */}
+            <Text style={styles.userName}>{userName}</Text>
+            <Text style={styles.userEmail}>{userEmail}</Text>
+          </View>
 
-                <View style={styles.statItem}>
-                  <Text style={styles.statLabel}>Entrenos</Text>
-                  <View style={styles.statValueContainer}>
-                    <Text style={styles.statValue}>{trainingsCount}</Text>
-                    <Text style={styles.statUnit}> sem</Text>
-                  </View>
-                </View>
-
-                <View style={styles.statItem}>
-                  <Text style={styles.statLabel}>Racha</Text>
-                  <View style={styles.statValueContainer}>
-                    <Text style={styles.statValue}>{strikeWeeks}</Text>
-                    <Text style={styles.statUnit}> sem</Text>
-                  </View>
-                </View>
-              </View>
-            </LinearGradient>
+          {/* Stats Card */}
+          <View style={styles.statsCard}>
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>{membershipDays}</Text>
+              <Text style={styles.statLabel}>Días de Membresía</Text>
+            </View>
+            <View style={styles.statDivider} />
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>{trainingsCount}</Text>
+              <Text style={styles.statLabel}>Entrenos</Text>
+            </View>
+            <View style={styles.statDivider} />
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>{strikeWeeks}</Text>
+              <Text style={styles.statLabel}>Racha (semanas)</Text>
+            </View>
           </View>
 
           {/* Menu Items */}
@@ -226,21 +226,16 @@ export default function ProfileScreen() {
               title="Notificaciones"
               onPress={handleNotifications}
             />
-            <MenuItem
-              icon="ellipsis-horizontal"
-              title="Más"
-              onPress={handleMore}
-            />
           </View>
 
           {/* Logout Button */}
-          <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-            <Ionicons name="log-out-outline" size={24} color="#F94848" />
+          <TouchableOpacity style={styles.logoutButton} onPress={handleLogout} activeOpacity={0.7}>
+            <Ionicons name="log-out-outline" size={20} color={colors.error} />
             <Text style={styles.logoutText}>Cerrar Sesión</Text>
           </TouchableOpacity>
 
           {/* Bottom Spacer */}
-          <View style={{ height: 100 }} />
+          <View style={styles.bottomSpacer} />
         </ScrollView>
 
         {/* Logout Modal */}
@@ -263,20 +258,57 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.bgDark,
   },
+  backgroundContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  gradientTop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 300,
+  },
+  gradientBottom: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 300,
+    transform: [{ rotate: '180deg' }],
+  },
   safeArea: {
     flex: 1,
   },
   header: {
-    paddingHorizontal: spacing.xxl,
-    paddingVertical: spacing.lg,
+    flexDirection: 'row',
     alignItems: 'center',
+    paddingHorizontal: spacing.xxl,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.xl,
+  },
+  backButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: colors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: spacing.md,
   },
   headerTitle: {
-    fontSize: typography.fontSize.title1,
+    flex: 1,
+    fontSize: typography.fontSize.xxl,
     fontFamily: typography.fontFamily,
     fontWeight: typography.fontWeight.bold,
     color: colors.white,
-    textTransform: 'uppercase',
+    textAlign: 'center',
+  },
+  headerSpacer: {
+    width: 48,
   },
   scrollView: {
     flex: 1,
@@ -284,36 +316,34 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: spacing.xxl,
   },
-  profileCardContainer: {
-    marginTop: 50,
+  profileSection: {
+    alignItems: 'center',
+    marginTop: spacing.xl,
     marginBottom: spacing.xxl,
   },
   avatarContainer: {
-    position: 'absolute',
-    top: -50,
-    left: '50%',
-    marginLeft: -50,
-    zIndex: 10,
+    position: 'relative',
+    marginBottom: spacing.lg,
   },
   avatar: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    borderWidth: 3,
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    borderWidth: 4,
     borderColor: colors.white,
   },
   avatarPlaceholder: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
+    width: 120,
+    height: 120,
+    borderRadius: 60,
     backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 3,
+    borderWidth: 4,
     borderColor: colors.white,
   },
   avatarText: {
-    fontSize: 36,
+    fontSize: 42,
     fontFamily: typography.fontFamily,
     fontWeight: typography.fontWeight.bold,
     color: colors.textDark,
@@ -322,13 +352,13 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 0,
     right: 0,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 2,
+    borderWidth: 3,
     borderColor: colors.white,
   },
   avatarOverlay: {
@@ -337,51 +367,61 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    borderRadius: 50,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    borderRadius: 60,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  profileCard: {
-    borderRadius: borderRadius.xl,
-    paddingTop: 70,
-    paddingBottom: spacing.xxl,
-    paddingHorizontal: spacing.xxl,
-    borderWidth: 2,
-    borderColor: 'rgba(255, 255, 255, 0.5)',
+  userName: {
+    fontSize: typography.fontSize.xxl,
+    fontFamily: typography.fontFamily,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.white,
+    marginTop: spacing.md,
+    marginBottom: spacing.xs,
   },
-  statsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  statItem: {
-    alignItems: 'flex-start',
-  },
-  statLabel: {
+  userEmail: {
     fontSize: typography.fontSize.md,
     fontFamily: typography.fontFamily,
-    fontWeight: typography.fontWeight.medium,
+    fontWeight: typography.fontWeight.regular,
     color: colors.gray400,
-    marginBottom: 4,
   },
-  statValueContainer: {
+  statsCard: {
+    backgroundColor: colors.white,
+    borderRadius: borderRadius.xxl,
+    paddingVertical: spacing.xxl,
+    paddingHorizontal: spacing.xxl,
+    marginBottom: spacing.xxl,
     flexDirection: 'row',
-    alignItems: 'baseline',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+  },
+  statItem: {
+    alignItems: 'center',
+    flex: 1,
   },
   statValue: {
-    fontSize: typography.fontSize.title1,
+    fontSize: typography.fontSize.xxxl,
     fontFamily: typography.fontFamily,
     fontWeight: typography.fontWeight.bold,
     color: colors.textDark,
+    marginBottom: spacing.xs,
   },
-  statUnit: {
-    fontSize: typography.fontSize.md,
+  statLabel: {
+    fontSize: typography.fontSize.sm,
     fontFamily: typography.fontFamily,
     fontWeight: typography.fontWeight.medium,
-    color: colors.textDark,
+    color: colors.gray400,
+    textAlign: 'center',
+  },
+  statDivider: {
+    width: 1,
+    height: 50,
+    backgroundColor: colors.gray200,
   },
   menuContainer: {
-    gap: spacing.xl,
+    gap: spacing.md,
+    marginBottom: spacing.xl,
   },
   menuItem: {
     flexDirection: 'row',
@@ -390,12 +430,12 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.xl,
     paddingVertical: spacing.lg,
     paddingHorizontal: spacing.xxl,
-    height: 64,
+    minHeight: 64,
   },
-  menuIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+  menuIconWrapper: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: colors.gray200,
     alignItems: 'center',
     justifyContent: 'center',
@@ -405,22 +445,24 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: typography.fontSize.lg,
     fontFamily: typography.fontFamily,
-    fontWeight: typography.fontWeight.bold,
+    fontWeight: typography.fontWeight.semiBold,
     color: colors.textDark,
-    textTransform: 'uppercase',
   },
   logoutButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: spacing.xxl,
-    gap: spacing.md,
+    marginTop: spacing.lg,
+    marginBottom: spacing.xl,
+    gap: spacing.sm,
   },
   logoutText: {
-    fontSize: typography.fontSize.lg,
+    fontSize: typography.fontSize.md,
     fontFamily: typography.fontFamily,
-    fontWeight: typography.fontWeight.bold,
-    color: '#F94848',
-    textTransform: 'uppercase',
+    fontWeight: typography.fontWeight.semiBold,
+    color: colors.error,
+  },
+  bottomSpacer: {
+    height: 100,
   },
 });

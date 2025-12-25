@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,12 +9,11 @@ import {
   ScrollView,
   Alert,
   Image,
-  ActivityIndicator,
   Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
 import { colors, typography, spacing, borderRadius } from '../theme/colors';
 import { Ionicons } from '@expo/vector-icons';
@@ -26,12 +25,35 @@ const CONTENT_PADDING = spacing.xxl;
 
 export default function LoginScreen() {
   const navigation = useNavigation<any>();
-  const { login, biometricAvailable, biometricEnabled, biometricType, loginWithBiometric } = useAuth();
+  const { login, biometricAvailable, biometricEnabled, biometricType, loginWithBiometric, enableBiometric, isAuthenticated } = useAuth();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [rememberBiometric, setRememberBiometric] = useState(false);
+
+  const handleBiometricLogin = React.useCallback(async () => {
+    setIsLoading(true);
+    const { success, error } = await loginWithBiometric();
+    setIsLoading(false);
+
+    if (!success && error) {
+      // Don't show alert if user cancelled - it's expected behavior
+      if (error !== 'Autenticación cancelada') {
+        Alert.alert('Error', error);
+      }
+    }
+  }, [loginWithBiometric]);
+
+  // Auto-trigger biometric login if enabled when screen loads (only if not authenticated)
+  useEffect(() => {
+    if (!isAuthenticated && biometricEnabled && biometricAvailable) {
+      // Small delay to let the screen render first
+      const timer = setTimeout(() => {
+        handleBiometricLogin();
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [isAuthenticated, biometricEnabled, biometricAvailable, handleBiometricLogin]);
 
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
@@ -40,21 +62,40 @@ export default function LoginScreen() {
     }
 
     setIsLoading(true);
-    const { success, error } = await login({ email, password }, rememberBiometric);
-    setIsLoading(false);
-
-    if (!success && error) {
-      Alert.alert('Error', error);
-    }
-  };
-
-  const handleBiometricLogin = async () => {
-    setIsLoading(true);
-    const { success, error } = await loginWithBiometric();
-    setIsLoading(false);
-
-    if (!success && error) {
-      Alert.alert('Error', error);
+    const { success, error } = await login({ email, password }, false);
+    
+    if (success) {
+      // After successful login, ask user if they want to enable biometric login
+      // Only ask if biometric is available and not already enabled
+      if (biometricAvailable && !biometricEnabled) {
+        setIsLoading(false);
+        Alert.alert(
+          `¿Habilitar ${biometricType}?`,
+          `¿Quieres usar ${biometricType} para iniciar sesión más rápido la próxima vez?`,
+          [
+            {
+              text: 'No',
+              style: 'cancel',
+            },
+            {
+              text: 'Sí',
+              onPress: async () => {
+                const enabled = await enableBiometric(email, password);
+                if (enabled) {
+                  Alert.alert('Éxito', `${biometricType} habilitado correctamente`);
+                }
+              },
+            },
+          ]
+        );
+      } else {
+        setIsLoading(false);
+      }
+    } else {
+      setIsLoading(false);
+      if (error) {
+        Alert.alert('Error', error);
+      }
     }
   };
 
@@ -138,51 +179,30 @@ export default function LoginScreen() {
                   />
                 </View>
 
-                {/* Divider */}
+                {/* Biometric Login Button - Only show if biometric is enabled */}
                 {biometricEnabled && (
-                  <View style={styles.dividerContainer}>
-                    <View style={styles.dividerLine} />
-                    <Text style={styles.dividerText}>o</Text>
-                    <View style={styles.dividerLine} />
-                  </View>
-                )}
-
-                {/* Biometric Checkbox */}
-                {biometricAvailable && (
-                  <TouchableOpacity
-                    style={styles.biometricCheckbox}
-                    onPress={() => setRememberBiometric(!rememberBiometric)}
-                    disabled={isLoading}
-                    activeOpacity={0.7}
-                  >
-                    <View style={[styles.checkbox, rememberBiometric && styles.checkboxChecked]}>
-                      {rememberBiometric && (
-                        <Ionicons name="checkmark" size={12} color={colors.textDark} />
-                      )}
+                  <>
+                    <View style={styles.dividerContainer}>
+                      <View style={styles.dividerLine} />
+                      <Text style={styles.dividerText}>o</Text>
+                      <View style={styles.dividerLine} />
                     </View>
-                    <Text style={styles.biometricCheckboxText}>
-                      Recordar con {biometricType}
-                    </Text>
-                  </TouchableOpacity>
-                )}
-
-                {/* Biometric Login Button */}
-                {biometricEnabled && (
-                  <TouchableOpacity
-                    style={styles.biometricButton}
-                    onPress={handleBiometricLogin}
-                    disabled={isLoading}
-                    activeOpacity={0.7}
-                  >
-                    <Ionicons
-                      name={biometricType === 'Face ID' ? 'scan-outline' : 'finger-print-outline'}
-                      size={20}
-                      color={colors.primary}
-                    />
-                    <Text style={styles.biometricButtonText}>
-                      Ingresar con {biometricType}
-                    </Text>
-                  </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.biometricButton}
+                      onPress={handleBiometricLogin}
+                      disabled={isLoading}
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons
+                        name={biometricType === 'Face ID' ? 'scan-outline' : 'finger-print-outline'}
+                        size={20}
+                        color={colors.primary}
+                      />
+                      <Text style={styles.biometricButtonText}>
+                        Ingresar con {biometricType}
+                      </Text>
+                    </TouchableOpacity>
+                  </>
                 )}
 
                 {/* Register Link */}
@@ -315,33 +335,6 @@ const styles = StyleSheet.create({
     fontWeight: typography.fontWeight.regular,
     color: colors.gray400,
     paddingHorizontal: spacing.lg,
-  },
-  biometricCheckbox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.lg,
-    paddingVertical: spacing.xs,
-  },
-  checkbox: {
-    width: 18,
-    height: 18,
-    borderRadius: 4,
-    borderWidth: 1.5,
-    borderColor: colors.gray400,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: spacing.sm,
-  },
-  checkboxChecked: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
-  },
-  biometricCheckboxText: {
-    fontSize: typography.fontSize.sm,
-    fontFamily: typography.fontFamily,
-    fontWeight: typography.fontWeight.medium,
-    color: colors.textDark,
   },
   biometricButton: {
     flexDirection: 'row',

@@ -11,6 +11,7 @@ import {
   Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, typography, spacing, borderRadius } from '../theme/colors';
@@ -102,10 +103,26 @@ export default function TrainingsScreen() {
 
   return (
     <View style={styles.container}>
+      {/* Subtle Background Gradients */}
+      <View style={styles.backgroundContainer}>
+        <LinearGradient
+          colors={['rgba(69, 255, 183, 0.15)', 'transparent']}
+          style={styles.gradientTop}
+        />
+        <LinearGradient
+          colors={['rgba(69, 255, 183, 0.15)', 'transparent']}
+          style={styles.gradientBottom}
+        />
+      </View>
+
       <SafeAreaView style={styles.safeArea} edges={['top']}>
         {/* Header */}
         <View style={styles.header}>
+          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+            <Ionicons name="chevron-back" size={24} color={colors.textDark} />
+          </TouchableOpacity>
           <Text style={styles.headerTitle}>Mi calendario</Text>
+          <View style={styles.headerSpacer} />
         </View>
 
         <ScrollView
@@ -120,54 +137,67 @@ export default function TrainingsScreen() {
             />
           }
         >
-          {/* Divider */}
-          <View style={styles.dividerContainer}>
-            <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>Mis entrenos</Text>
-            <View style={styles.dividerLine} />
-          </View>
-
           {trainings.length > 0 ? (
-            trainings.map((training) => (
-              <View key={training.id} style={styles.trainingCard}>
-                <Text style={styles.trainingDateTime}>
-                  {formatDate(training.slot.date)} | {training.slot.hour_init} - {training.slot.hour_end}
-                  <Text style={styles.calendarIcon}> </Text>
-                  <Ionicons name="calendar" size={14} color={colors.primary} />
-                </Text>
-
-                <View style={styles.trainingContent}>
-                  <Image
-                    source={require('../../assets/a.jpg')}
-                    style={styles.trainingImage}
-                  />
-                  <View style={styles.trainingInfo}>
-                    <Text style={styles.trainingType}>
-                      {training.training_type?.name || training.slot.training_type?.name}
-                    </Text>
-                    <Text style={styles.trainingDay}>
-                      {training.is_today ? 'Hoy' : formatDate(training.slot.date)}
-                    </Text>
-                    {training.can_cancel && (
-                      <TouchableOpacity
-                        style={styles.cancelButton}
-                        onPress={() => handleCancel(training)}
-                        disabled={cancellingId === training.id}
-                      >
-                        {cancellingId === training.id ? (
-                          <ActivityIndicator size="small" color={colors.primary} />
-                        ) : (
-                          <>
-                            <Text style={styles.cancelButtonText}>Cancelar</Text>
-                            <Ionicons name="arrow-forward" size={14} color={colors.primary} />
-                          </>
-                        )}
-                      </TouchableOpacity>
-                    )}
+            <View style={styles.trainingsList}>
+              {trainings.map((training) => (
+                <View key={training.id} style={styles.trainingCard}>
+                  {/* Date and Time Header */}
+                  <View style={styles.trainingHeader}>
+                    <View style={styles.dateTimeContainer}>
+                      <Ionicons name="calendar-outline" size={16} color={colors.gray400} />
+                      <Text style={styles.trainingDateTime}>
+                        {formatDate(training.slot.date)}
+                      </Text>
+                    </View>
+                    <View style={styles.timeContainer}>
+                      <Ionicons name="time-outline" size={16} color={colors.gray400} />
+                      <Text style={styles.trainingTime}>
+                        {training.slot.hour_init} - {training.slot.hour_end}
+                      </Text>
+                    </View>
                   </View>
+
+                  {/* Training Content */}
+                  <View style={styles.trainingContent}>
+                    <View style={styles.trainingImageContainer}>
+                      <Image
+                        source={require('../../assets/a.jpg')}
+                        style={styles.trainingImage}
+                      />
+                    </View>
+                    <View style={styles.trainingInfo}>
+                      <Text style={styles.trainingType}>
+                        {training.training_type?.name || training.slot.training_type?.name}
+                      </Text>
+                      {training.is_today && (
+                        <View style={styles.todayBadge}>
+                          <Text style={styles.todayBadgeText}>Hoy</Text>
+                        </View>
+                      )}
+                    </View>
+                  </View>
+
+                  {/* Cancel Button */}
+                  {training.can_cancel && (
+                    <TouchableOpacity
+                      style={styles.cancelButton}
+                      onPress={() => handleCancel(training)}
+                      disabled={cancellingId === training.id}
+                      activeOpacity={0.7}
+                    >
+                      {cancellingId === training.id ? (
+                        <ActivityIndicator size="small" color={colors.error} />
+                      ) : (
+                        <>
+                          <Ionicons name="close-circle-outline" size={18} color={colors.error} />
+                          <Text style={styles.cancelButtonText}>Cancelar</Text>
+                        </>
+                      )}
+                    </TouchableOpacity>
+                  )}
                 </View>
-              </View>
-            ))
+              ))}
+            </View>
           ) : (
             <View style={styles.emptyContainer}>
               {/* Icon Container */}
@@ -193,7 +223,7 @@ export default function TrainingsScreen() {
           )}
 
           {/* Bottom Spacer for Tab Bar */}
-          <View style={{ height: 100 }} />
+          <View style={styles.bottomSpacer} />
         </ScrollView>
 
         {/* Cancel Confirmation Modal */}
@@ -227,6 +257,28 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.bgDark,
   },
+  backgroundContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  gradientTop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 300,
+  },
+  gradientBottom: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 300,
+    transform: [{ rotate: '180deg' }],
+  },
   safeArea: {
     flex: 1,
   },
@@ -236,101 +288,143 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   header: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: spacing.xxl,
     paddingVertical: spacing.lg,
   },
+  backButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: colors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: spacing.md,
+  },
   headerTitle: {
+    flex: 1,
     fontSize: typography.fontSize.xxl,
     fontFamily: typography.fontFamily,
     fontWeight: typography.fontWeight.bold,
     color: colors.white,
+  },
+  headerSpacer: {
+    width: 48,
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
     paddingHorizontal: spacing.xxl,
+    paddingTop: spacing.lg,
   },
-  dividerContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: spacing.xl,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: colors.gray400,
-  },
-  dividerText: {
-    fontSize: typography.fontSize.sm,
-    fontFamily: typography.fontFamily,
-    fontWeight: typography.fontWeight.regular,
-    color: colors.gray400,
-    paddingHorizontal: spacing.lg,
+  trainingsList: {
+    gap: spacing.lg,
   },
   trainingCard: {
     backgroundColor: colors.white,
-    borderRadius: borderRadius.xl,
-    padding: spacing.lg,
+    borderRadius: borderRadius.xxl,
+    padding: spacing.xxl,
+    marginBottom: 0,
+  },
+  trainingHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: spacing.lg,
+    paddingBottom: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.gray200,
+  },
+  dateTimeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
   },
   trainingDateTime: {
     fontSize: typography.fontSize.sm,
     fontFamily: typography.fontFamily,
     fontWeight: typography.fontWeight.medium,
-    color: colors.gray400,
-    marginBottom: spacing.md,
+    color: colors.textDark,
   },
-  calendarIcon: {
-    marginLeft: spacing.sm,
+  timeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  trainingTime: {
+    fontSize: typography.fontSize.sm,
+    fontFamily: typography.fontFamily,
+    fontWeight: typography.fontWeight.medium,
+    color: colors.gray400,
   },
   trainingContent: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginBottom: spacing.md,
+  },
+  trainingImageContainer: {
+    width: 64,
+    height: 64,
+    borderRadius: borderRadius.md,
+    overflow: 'hidden',
+    backgroundColor: colors.gray200,
   },
   trainingImage: {
-    width: 40,
-    height: 40,
-    borderRadius: borderRadius.md,
+    width: '100%',
+    height: '100%',
   },
   trainingInfo: {
     flex: 1,
-    marginLeft: spacing.md,
+    marginLeft: spacing.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   trainingType: {
     fontSize: typography.fontSize.lg,
-    fontFamily: typography.fontFamily.semibold,
-    color: colors.textDark,
-  },
-  trainingDay: {
-    fontSize: typography.fontSize.sm,
     fontFamily: typography.fontFamily,
-    fontWeight: typography.fontWeight.regular,
-    color: colors.gray400,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.textDark,
+    flex: 1,
+  },
+  todayBadge: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.sm,
+    marginLeft: spacing.md,
+  },
+  todayBadgeText: {
+    fontSize: typography.fontSize.xs,
+    fontFamily: typography.fontFamily,
+    fontWeight: typography.fontWeight.semiBold,
+    color: colors.textDark,
   },
   cancelButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.8)',
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
+    justifyContent: 'center',
+    backgroundColor: colors.gray200,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
     borderRadius: borderRadius.md,
+    gap: spacing.sm,
     marginTop: spacing.sm,
-    alignSelf: 'flex-start',
-    gap: 4,
   },
   cancelButtonText: {
     fontSize: typography.fontSize.sm,
     fontFamily: typography.fontFamily,
-    fontWeight: typography.fontWeight.medium,
-    color: colors.primary,
+    fontWeight: typography.fontWeight.semiBold,
+    color: colors.error,
   },
   emptyContainer: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 60,
-    gap: 22,
+    paddingVertical: spacing.xxxl * 2,
+    gap: spacing.xxl,
   },
   emptyIconContainer: {
     alignItems: 'center',
@@ -346,35 +440,37 @@ const styles = StyleSheet.create({
   },
   emptyMessageContainer: {
     alignItems: 'center',
-    gap: 12,
+    gap: spacing.md,
   },
   emptyTitle: {
-    fontSize: typography.fontSize.title1,
+    fontSize: typography.fontSize.xxl,
     fontFamily: typography.fontFamily,
     fontWeight: typography.fontWeight.bold,
     color: colors.white,
-    textTransform: 'uppercase',
     textAlign: 'center',
   },
   emptySubtitle: {
     fontSize: typography.fontSize.md,
     fontFamily: typography.fontFamily,
-    fontWeight: typography.fontWeight.medium,
-    color: colors.gray200,
+    fontWeight: typography.fontWeight.regular,
+    color: colors.gray400,
     textAlign: 'center',
-    lineHeight: 20,
+    lineHeight: typography.lineHeight.md,
   },
   emptyButton: {
     backgroundColor: colors.primary,
-    paddingHorizontal: 32,
-    paddingVertical: 14,
-    borderRadius: 1000,
-    marginTop: 10,
+    paddingHorizontal: spacing.xxxl,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.full,
+    marginTop: spacing.md,
   },
   emptyButtonText: {
     fontSize: typography.fontSize.md,
-    fontFamily: typography.fontFamily.semibold,
+    fontFamily: typography.fontFamily,
+    fontWeight: typography.fontWeight.semiBold,
     color: colors.textDark,
-    textTransform: 'uppercase',
+  },
+  bottomSpacer: {
+    height: 100,
   },
 });

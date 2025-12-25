@@ -20,7 +20,7 @@ interface AuthContextType {
   biometricType: string;
   login: (credentials: LoginRequest, saveForBiometric?: boolean) => Promise<{ success: boolean; error?: string }>;
   loginWithBiometric: () => Promise<{ success: boolean; error?: string }>;
-  register: (data: RegisterRequest) => Promise<{ success: boolean; error?: string }>;
+  register: (data: RegisterRequest) => Promise<{ success: boolean; error?: string; errors?: Record<string, string[]> }>;
   logout: () => Promise<void>;
   updateUser: (user: User) => void;
   enableBiometric: (email: string, password: string) => Promise<boolean>;
@@ -176,26 +176,24 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setBiometricEnabled(false);
   };
 
-  const register = async (data: RegisterRequest): Promise<{ success: boolean; error?: string }> => {
+  const register = async (data: RegisterRequest): Promise<{ success: boolean; error?: string; errors?: Record<string, string[]> }> => {
     const { data: responseData, error, errors } = await authApi.register(data);
 
+    // Backend returns success message but NO token - user must login separately
     if (responseData) {
-      await setToken(responseData.token);
-      await setUser(responseData.user);
-      setUserState(responseData.user);
+      // Registration successful - but user is NOT authenticated yet
+      // They need to login separately
       return { success: true };
     }
 
-    // Format error message
-    let errorMessage = error || 'Error al registrarse';
-    if (errors) {
-      const firstError = Object.values(errors)[0];
-      if (firstError && firstError.length > 0) {
-        errorMessage = firstError[0];
-      }
+    // Return field-specific errors if they exist, otherwise return general error
+    if (errors && Object.keys(errors).length > 0) {
+      // Don't return general error when there are field-specific errors
+      return { success: false, errors };
     }
 
-    return { success: false, error: errorMessage };
+    // Return general error only if no field-specific errors exist
+    return { success: false, error: error || 'Error al registrarse' };
   };
 
   const logout = async () => {

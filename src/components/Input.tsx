@@ -28,11 +28,11 @@ export default function Input({
   const isPassword = secureTextEntry !== undefined;
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, error && styles.containerError]}>
       <Text style={styles.placeholder}>{placeholder}</Text>
       <View style={styles.inputRow}>
         <TextInput
-          style={[styles.input, !editable && styles.inputDisabled]}
+          style={[styles.input, !editable && styles.inputDisabled, error && styles.inputError]}
           value={value}
           onChangeText={onChangeText}
           secureTextEntry={isPassword && !showPassword}
@@ -46,12 +46,17 @@ export default function Input({
             <Ionicons
               name={showPassword ? 'eye-off-outline' : 'eye-outline'}
               size={20}
-              color={colors.gray400}
+              color={error ? colors.error : colors.gray400}
             />
           </TouchableOpacity>
         )}
       </View>
-      {error && <Text style={styles.error}>{error}</Text>}
+      {error && (
+        <View style={styles.errorContainer}>
+          <Ionicons name="alert-circle" size={14} color={colors.error} />
+          <Text style={styles.error}>{error}</Text>
+        </View>
+      )}
     </View>
   );
 }
@@ -65,6 +70,13 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
     borderWidth: 1,
     borderColor: colors.gray200,
+  },
+  containerError: {
+    borderColor: colors.error,
+    backgroundColor: colors.white,
+  },
+  inputError: {
+    color: colors.textDark,
   },
   placeholder: {
     fontSize: typography.fontSize.xs,
@@ -89,11 +101,18 @@ const styles = StyleSheet.create({
   inputDisabled: {
     color: colors.gray400,
   },
+  errorContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginTop: spacing.xs,
+    gap: spacing.xs,
+  },
   error: {
+    flex: 1,
     fontSize: typography.fontSize.xs,
     fontFamily: typography.fontFamily,
     fontWeight: typography.fontWeight.regular,
     color: colors.error,
-    marginTop: spacing.xs,
+    lineHeight: typography.lineHeight.xs,
   },
 });

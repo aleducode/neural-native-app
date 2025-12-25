@@ -6,10 +6,12 @@ import {
   ScrollView,
   ActivityIndicator,
   RefreshControl,
+  TouchableOpacity,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
+import { Ionicons } from '@expo/vector-icons';
 import { colors, typography, spacing } from '../theme/colors';
 import WeekDay from '../components/WeekDay';
 import TrainingCard from '../components/TrainingCard';
@@ -18,6 +20,7 @@ import { Slot } from '../types';
 import { RootStackParamList } from '../navigation/RootNavigator';
 
 type CalendarNavigationProp = StackNavigationProp<RootStackParamList>;
+type CalendarRouteProp = RouteProp<RootStackParamList, 'Calendar'>;
 
 interface WeekDayData {
   date: Date;
@@ -58,8 +61,49 @@ function formatMonthYear(date: Date): string {
 
 export default function CalendarScreen() {
   const navigation = useNavigation<CalendarNavigationProp>();
-  const [weekDays] = useState<WeekDayData[]>(getWeekDays);
-  const [selectedDate, setSelectedDate] = useState<string>(weekDays[0].fullDate);
+  const route = useRoute<CalendarRouteProp>();
+  const initialDate = route.params?.initialDate;
+  
+  // Calculate week days starting from initialDate if provided, otherwise from today
+  const getInitialWeekDays = useCallback((): WeekDayData[] => {
+    if (initialDate) {
+      const startDate = new Date(initialDate + 'T00:00:00');
+      const days: WeekDayData[] = [];
+      
+      // Find the start of the week (Sunday) for the given date
+      const dayOfWeek = startDate.getDay();
+      const startOfWeek = new Date(startDate);
+      startOfWeek.setDate(startDate.getDate() - dayOfWeek);
+      
+      for (let i = 0; i < 7; i++) {
+        const date = new Date(startOfWeek);
+        date.setDate(startOfWeek.getDate() + i);
+        
+        const dayName = DAY_NAMES[date.getDay()];
+        const dayNumber = date.getDate().toString();
+        const fullDate = date.toISOString().split('T')[0];
+        
+        days.push({ date, dayName, dayNumber, fullDate });
+      }
+      
+      return days;
+    }
+    return getWeekDays();
+  }, [initialDate]);
+  
+  const [weekDays, setWeekDays] = useState<WeekDayData[]>(getInitialWeekDays);
+  const [selectedDate, setSelectedDate] = useState<string>(
+    initialDate || weekDays[0]?.fullDate || getWeekDays()[0].fullDate
+  );
+  
+  // Update week days when initialDate changes
+  useEffect(() => {
+    if (initialDate) {
+      const newWeekDays = getInitialWeekDays();
+      setWeekDays(newWeekDays);
+      setSelectedDate(initialDate);
+    }
+  }, [initialDate, getInitialWeekDays]);
   const [slots, setSlots] = useState<Slot[]>([]);
   const [alreadyScheduled, setAlreadyScheduled] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -112,10 +156,16 @@ export default function CalendarScreen() {
       <SafeAreaView style={styles.safeArea} edges={['top']}>
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>CALENDARIO</Text>
-          <Text style={styles.monthYear}>
-            {selectedDayData ? formatMonthYear(selectedDayData.date) : ''}
-          </Text>
+          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+            <Ionicons name="chevron-back" size={24} color={colors.textDark} />
+          </TouchableOpacity>
+          <View style={styles.headerTitleContainer}>
+            <Text style={styles.headerTitle}>Calendario</Text>
+            <Text style={styles.monthYear}>
+              {selectedDayData ? formatMonthYear(selectedDayData.date) : ''}
+            </Text>
+          </View>
+          <View style={styles.headerSpacer} />
         </View>
 
         {/* Week Day Selector */}
@@ -193,17 +243,29 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: spacing.xxl,
     paddingTop: spacing.lg,
     paddingBottom: spacing.md,
   },
+  backButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: colors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: spacing.md,
+  },
+  headerTitleContainer: {
+    flex: 1,
+  },
   headerTitle: {
-    fontSize: typography.fontSize.title1,
+    fontSize: typography.fontSize.xxl,
     fontFamily: typography.fontFamily,
     fontWeight: typography.fontWeight.bold,
-    lineHeight: typography.lineHeight.title1,
     color: colors.white,
-    textTransform: 'uppercase',
   },
   monthYear: {
     fontSize: typography.fontSize.md,
@@ -211,6 +273,9 @@ const styles = StyleSheet.create({
     fontWeight: typography.fontWeight.medium,
     color: colors.gray400,
     marginTop: spacing.xs,
+  },
+  headerSpacer: {
+    width: 48,
   },
   weekSelector: {
     flexDirection: 'row',

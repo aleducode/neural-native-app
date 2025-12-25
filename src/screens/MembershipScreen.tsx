@@ -21,8 +21,8 @@ interface BenefitItemProps {
 function BenefitItem({ text }: BenefitItemProps) {
   return (
     <View style={styles.benefitItem}>
-      <View style={styles.benefitIcon}>
-        <Ionicons name="checkmark" size={16} color={colors.textDark} />
+      <View style={styles.benefitIconContainer}>
+        <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
       </View>
       <Text style={styles.benefitText}>{text}</Text>
     </View>
@@ -47,15 +47,16 @@ function PlanCard({ title, price, isSelected, onPress }: PlanCardProps) {
     <TouchableOpacity
       style={[styles.planCard, isSelected && styles.planCardSelected]}
       onPress={onPress}
-      activeOpacity={0.8}
+      activeOpacity={0.7}
     >
-      <Text style={styles.planTitle}>{title}</Text>
-      <Text style={styles.planPrice}>{formattedPrice}</Text>
       {isSelected && (
-        <View style={styles.selectedIndicator}>
-          <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
+        <View style={styles.selectedBadge}>
+          <Ionicons name="checkmark-circle" size={18} color={colors.primary} />
         </View>
       )}
+      <Text style={styles.planTitle}>{title}</Text>
+      <Text style={styles.planPrice}>{formattedPrice}</Text>
+      <Text style={styles.planPeriod}>mensual</Text>
     </TouchableOpacity>
   );
 }
@@ -122,14 +123,14 @@ export default function MembershipScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Background Gradients */}
+      {/* Subtle Background Gradients */}
       <View style={styles.backgroundContainer}>
         <LinearGradient
-          colors={['rgba(69, 255, 183, 0.4)', 'transparent']}
+          colors={['rgba(69, 255, 183, 0.15)', 'transparent']}
           style={styles.gradientTop}
         />
         <LinearGradient
-          colors={['rgba(69, 255, 183, 0.4)', 'transparent']}
+          colors={['rgba(69, 255, 183, 0.15)', 'transparent']}
           style={styles.gradientBottom}
         />
       </View>
@@ -151,27 +152,36 @@ export default function MembershipScreen() {
         >
           {/* Current Membership Info */}
           {currentMembership ? (
-            <View style={styles.currentMembershipContainer}>
-              <Text style={styles.mainTitle}>
-                Tu membresía {currentPlanName}
-              </Text>
-              <View style={styles.membershipStatus}>
-                <Text style={styles.membershipStatusText}>
-                  Activa hasta: {new Date(currentMembership.expiration_date).toLocaleDateString('es-CO', {
-                    day: 'numeric',
-                    month: 'long',
-                    year: 'numeric',
-                  })}
-                </Text>
-                <Text style={styles.daysLeftText}>
-                  {currentMembership.days_left} días restantes
-                </Text>
+            <View style={styles.currentMembershipCard}>
+              <View style={styles.membershipHeader}>
+                <Ionicons name="checkmark-circle" size={32} color={colors.primary} />
+                <Text style={styles.membershipTitle}>Membresía Activa</Text>
+              </View>
+              <Text style={styles.planName}>{currentPlanName}</Text>
+              <View style={styles.membershipDetails}>
+                <View style={styles.detailRow}>
+                  <Ionicons name="calendar-outline" size={18} color={colors.gray400} />
+                  <Text style={styles.detailText}>
+                    Vence: {new Date(currentMembership.expiration_date).toLocaleDateString('es-CO', {
+                      day: 'numeric',
+                      month: 'long',
+                      year: 'numeric',
+                    })}
+                  </Text>
+                </View>
+                <View style={styles.daysLeftContainer}>
+                  <Text style={styles.daysLeftValue}>{currentMembership.days_left}</Text>
+                  <Text style={styles.daysLeftLabel}>días restantes</Text>
+                </View>
               </View>
             </View>
           ) : (
-            <Text style={styles.mainTitle}>
-              ¡Obtén la experiencia completa de tu plan {currentPlanName}!
-            </Text>
+            <View style={styles.welcomeSection}>
+              <Text style={styles.welcomeTitle}>Elige tu plan</Text>
+              <Text style={styles.welcomeSubtitle}>
+                Accede a entrenos personalizados y seguimiento de tu progreso
+              </Text>
+            </View>
           )}
 
           {/* Benefits Container */}
@@ -197,7 +207,7 @@ export default function MembershipScreen() {
           )}
 
           {/* Bottom Spacer */}
-          <View style={{ height: 120 }} />
+          <View style={styles.bottomSpacer} />
         </ScrollView>
 
         {/* Bottom Button */}
@@ -241,26 +251,24 @@ const styles = StyleSheet.create({
   },
   gradientTop: {
     position: 'absolute',
-    top: 50,
-    left: -150,
-    width: 250,
-    height: 250,
-    borderRadius: 125,
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 300,
   },
   gradientBottom: {
     position: 'absolute',
-    bottom: 80,
-    right: -150,
-    width: 250,
-    height: 250,
-    borderRadius: 125,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 300,
+    transform: [{ rotate: '180deg' }],
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.xxl,
+    paddingVertical: spacing.lg,
   },
   backButton: {
     width: 48,
@@ -269,13 +277,14 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
     alignItems: 'center',
     justifyContent: 'center',
+    marginRight: spacing.md,
   },
   headerTitle: {
-    fontSize: typography.fontSize.title1,
+    flex: 1,
+    fontSize: typography.fontSize.xxl,
     fontFamily: typography.fontFamily,
     fontWeight: typography.fontWeight.bold,
     color: colors.white,
-    textTransform: 'uppercase',
   },
   headerSpacer: {
     width: 48,
@@ -284,114 +293,162 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: spacing.lg,
+    paddingHorizontal: spacing.xxl,
+    paddingTop: spacing.lg,
   },
-  currentMembershipContainer: {
-    marginBottom: spacing.xl,
+  welcomeSection: {
+    marginBottom: spacing.xxl,
+    alignItems: 'center',
   },
-  mainTitle: {
-    fontSize: typography.fontSize.title1,
+  welcomeTitle: {
+    fontSize: typography.fontSize.xxl,
     fontFamily: typography.fontFamily,
     fontWeight: typography.fontWeight.bold,
     color: colors.white,
+    marginBottom: spacing.md,
     textAlign: 'center',
-    textTransform: 'uppercase',
-    marginBottom: spacing.xl,
-    lineHeight: 34,
   },
-  membershipStatus: {
-    backgroundColor: 'rgba(69, 255, 183, 0.2)',
-    borderRadius: borderRadius.lg,
-    padding: spacing.lg,
-    alignItems: 'center',
-  },
-  membershipStatusText: {
+  welcomeSubtitle: {
     fontSize: typography.fontSize.md,
     fontFamily: typography.fontFamily,
-    fontWeight: typography.fontWeight.medium,
-    color: colors.white,
-    marginBottom: spacing.sm,
+    fontWeight: typography.fontWeight.regular,
+    color: colors.gray400,
+    textAlign: 'center',
+    lineHeight: typography.lineHeight.md,
   },
-  daysLeftText: {
-    fontSize: typography.fontSize.xxl,
+  currentMembershipCard: {
+    backgroundColor: colors.white,
+    borderRadius: borderRadius.xxl,
+    padding: spacing.xxl,
+    marginBottom: spacing.xxl,
+  },
+  membershipHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.lg,
+    gap: spacing.md,
+  },
+  membershipTitle: {
+    fontSize: typography.fontSize.lg,
+    fontFamily: typography.fontFamily,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.textDark,
+  },
+  planName: {
+    fontSize: typography.fontSize.xxxl,
+    fontFamily: typography.fontFamily,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.textDark,
+    marginBottom: spacing.lg,
+  },
+  membershipDetails: {
+    gap: spacing.md,
+  },
+  detailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  detailText: {
+    fontSize: typography.fontSize.md,
+    fontFamily: typography.fontFamily,
+    fontWeight: typography.fontWeight.regular,
+    color: colors.gray400,
+  },
+  daysLeftContainer: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    marginTop: spacing.sm,
+    gap: spacing.xs,
+  },
+  daysLeftValue: {
+    fontSize: typography.fontSize.xxxl,
     fontFamily: typography.fontFamily,
     fontWeight: typography.fontWeight.bold,
     color: colors.primary,
   },
+  daysLeftLabel: {
+    fontSize: typography.fontSize.md,
+    fontFamily: typography.fontFamily,
+    fontWeight: typography.fontWeight.regular,
+    color: colors.gray400,
+  },
   benefitsContainer: {
     backgroundColor: colors.white,
-    borderRadius: borderRadius.xl,
-    padding: spacing.lg,
+    borderRadius: borderRadius.xxl,
+    padding: spacing.xxl,
     gap: spacing.lg,
-    marginBottom: spacing.xl,
+    marginBottom: spacing.xxl,
   },
   benefitItem: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: spacing.md,
   },
-  benefitIcon: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: colors.textDark,
-    alignItems: 'center',
-    justifyContent: 'center',
+  benefitIconContainer: {
+    marginTop: 2,
   },
   benefitText: {
     flex: 1,
-    fontSize: typography.fontSize.lg,
+    fontSize: typography.fontSize.md,
     fontFamily: typography.fontFamily,
-    fontWeight: typography.fontWeight.medium,
+    fontWeight: typography.fontWeight.regular,
     color: colors.textDark,
-    lineHeight: 22,
+    lineHeight: typography.lineHeight.md,
   },
   plansContainer: {
-    flexDirection: 'row',
-    gap: spacing.md,
+    gap: spacing.lg,
+    marginBottom: spacing.xl,
   },
   planCard: {
-    flex: 1,
     backgroundColor: colors.white,
-    borderRadius: borderRadius.lg,
-    padding: spacing.lg,
-    gap: spacing.md,
+    borderRadius: borderRadius.xxl,
+    padding: spacing.xxl,
+    position: 'relative',
   },
   planCardSelected: {
     borderWidth: 2,
     borderColor: colors.primary,
+    backgroundColor: colors.gray200,
+  },
+  selectedBadge: {
+    position: 'absolute',
+    top: spacing.lg,
+    right: spacing.lg,
   },
   planTitle: {
     fontSize: typography.fontSize.lg,
     fontFamily: typography.fontFamily,
-    fontWeight: typography.fontWeight.medium,
+    fontWeight: typography.fontWeight.bold,
     color: colors.textDark,
+    marginBottom: spacing.md,
   },
   planPrice: {
-    fontSize: typography.fontSize.xxl,
+    fontSize: typography.fontSize.xxxl,
     fontFamily: typography.fontFamily,
     fontWeight: typography.fontWeight.bold,
     color: colors.textDark,
-    textTransform: 'uppercase',
+    marginBottom: spacing.xs,
   },
-  selectedIndicator: {
-    position: 'absolute',
-    top: spacing.sm,
-    right: spacing.sm,
+  planPeriod: {
+    fontSize: typography.fontSize.sm,
+    fontFamily: typography.fontFamily,
+    fontWeight: typography.fontWeight.regular,
+    color: colors.gray400,
   },
   bottomButtonContainer: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    paddingHorizontal: spacing.lg,
+    paddingHorizontal: spacing.xxl,
     paddingBottom: spacing.xxl,
     paddingTop: spacing.lg,
+    backgroundColor: colors.bgDark,
   },
   subscribeButton: {
     backgroundColor: colors.primary,
-    borderRadius: 1000,
+    borderRadius: borderRadius.full,
     paddingVertical: spacing.lg,
     alignItems: 'center',
     justifyContent: 'center',
@@ -401,8 +458,11 @@ const styles = StyleSheet.create({
   },
   subscribeButtonText: {
     fontSize: typography.fontSize.lg,
-    fontFamily: typography.fontFamily.semibold,
+    fontFamily: typography.fontFamily,
+    fontWeight: typography.fontWeight.semiBold,
     color: colors.textDark,
-    textTransform: 'uppercase',
+  },
+  bottomSpacer: {
+    height: 120,
   },
 });

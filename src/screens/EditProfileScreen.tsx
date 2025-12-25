@@ -388,7 +388,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   headerTitle: {
-    fontSize: typography.fontSize.title1,
+    fontSize: typography.fontSize.xxl,
     fontFamily: typography.fontFamily,
     fontWeight: typography.fontWeight.bold,
     color: colors.white,

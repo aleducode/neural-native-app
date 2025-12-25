@@ -27,6 +27,11 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
+      "splash": {
+        "image": "./assets/neural.png",
+        "resizeMode": "contain",
+        "backgroundColor": "#FFFFFF"
+      },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "package": "com.ducode.neural",

@@ -11,16 +11,22 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors, typography } from '../theme/colors';
 import Button from '../components/Button';
 import { useAuth } from '../context/AuthContext';
+import { NEURAL_PHONE } from '../constants/config';
 
 export default function PendingScreen() {
   const { logout, user } = useAuth();
 
   const handleContactWhatsApp = () => {
-    const phone = '573001234567'; // Replace with actual support number
-    const message = `Hola, soy ${user?.first_name} ${user?.last_name} y necesito verificar mi cuenta en Neural.`;
-    const url = `whatsapp://send?phone=${phone}&text=${encodeURIComponent(message)}`;
-    Linking.openURL(url).catch(() => {
-      Linking.openURL(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`);
+    // Use the same WhatsApp link format as Django backend
+    // Format: https://wa.me/57{NEURAL_PHONE}?text=Hola+Neural+estoy+listo+para+iniciar+mis+entrenos+mi+nombre+es+{first_name}+{last_name}.
+    const phone = `57${NEURAL_PHONE}`;
+    const message = `Hola Neural estoy listo para iniciar mis entrenos mi nombre es ${user?.first_name} ${user?.last_name}.`;
+    const url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+    
+    Linking.openURL(url).catch((err) => {
+      console.error('Error opening WhatsApp:', err);
+      // Fallback to web version
+      Linking.openURL(url);
     });
   };
 

@@ -73,9 +73,56 @@ class ApiClient {
       }
 
       if (!response.ok) {
+        // Check if errors are in data.errors or directly in data (Django REST framework format)
+        // Django REST framework returns errors directly in the response object like:
+        // { "email": ["error1"], "password": ["error2"] }
+        let errors: Record<string, string[]> | undefined;
+        
+        // Fields that are NOT field-specific errors (general error fields)
+        const generalErrorFields = ['detail', 'message', 'non_field_errors', 'error'];
+        
+        if (data.errors) {
+          // Errors are in data.errors
+          errors = data.errors;
+        } else {
+          // Check if there are field-specific errors directly in data object
+          // Django REST Framework validation errors come as field names with array/string values
+          const fieldErrors: Record<string, string[]> = {};
+          let hasFieldErrors = false;
+          
+          Object.keys(data).forEach((key) => {
+            // Skip general error fields
+            if (generalErrorFields.includes(key)) {
+              return;
+            }
+            
+            // Check if this looks like a field error (array or string)
+            if (Array.isArray(data[key]) && data[key].length > 0) {
+              // All array items should be strings
+              if (data[key].every(item => typeof item === 'string')) {
+                fieldErrors[key] = data[key];
+                hasFieldErrors = true;
+              }
+            } else if (typeof data[key] === 'string' && data[key].length > 0) {
+              // Single string error
+              fieldErrors[key] = [data[key]];
+              hasFieldErrors = true;
+            }
+          });
+          
+          if (hasFieldErrors) {
+            errors = fieldErrors;
+          }
+        }
+        
+        // Only set general error if no field-specific errors exist
+        const generalError = errors && Object.keys(errors).length > 0 
+          ? undefined 
+          : (data.message || data.detail || data.error || 'Error en la solicitud');
+        
         return {
-          error: data.message || data.detail || 'Error en la solicitud',
-          errors: data.errors,
+          error: generalError,
+          errors,
         };
       }
 

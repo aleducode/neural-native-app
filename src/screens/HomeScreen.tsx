@@ -37,6 +37,7 @@ function getWeekDates() {
       name: weekDays[i],
       number: date.getDate().toString().padStart(2, '0'),
       isToday: i === currentDay,
+      fullDate: date.toISOString().split('T')[0], // YYYY-MM-DD format
     });
   }
   return dates;
@@ -107,6 +108,14 @@ export default function HomeScreen() {
     navigation.navigate('Trainings');
   };
 
+  const handleDayPress = (index: number) => {
+    setSelectedDay(index);
+    const selectedDate = weekDates[index];
+    if (selectedDate?.fullDate) {
+      navigation.navigate('Calendar', { initialDate: selectedDate.fullDate });
+    }
+  };
+
   return (
     <View style={styles.container}>
       {/* Background Gradients */}
@@ -171,7 +180,7 @@ export default function HomeScreen() {
                 day={day.name}
                 date={day.number}
                 isSelected={index === selectedDay}
-                onPress={() => setSelectedDay(index)}
+                onPress={() => handleDayPress(index)}
               />
             ))}
           </View>

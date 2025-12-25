@@ -7,18 +7,18 @@ import {
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
-  ActivityIndicator,
   Dimensions,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
-import { colors, typography } from '../theme/colors';
+import { colors, typography, spacing, borderRadius } from '../theme/colors';
 import Input from '../components/Input';
 import Button from '../components/Button';
 import { useAuth } from '../context/AuthContext';
 
-const CONTENT_PADDING = 20;
+const CONTENT_PADDING = spacing.xxl;
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 interface FormErrors {
@@ -94,7 +94,7 @@ export default function RegisterScreen() {
     setIsLoading(true);
     setErrors({});
 
-    const { success, error } = await register({
+    const { success, error, errors: apiErrors } = await register({
       first_name: formData.first_name.trim(),
       last_name: formData.last_name.trim(),
       email: formData.email.trim(),
@@ -105,9 +105,49 @@ export default function RegisterScreen() {
 
     setIsLoading(false);
 
-    if (!success) {
-      setErrors({ general: error });
+    if (success) {
+      // Registration successful - navigate to login
+      // In web, Alert might not work well, so navigate directly after a brief delay
+      setTimeout(() => {
+        navigation.navigate('Login');
+      }, 500);
+      return;
     }
+
+    // Handle registration errors
+    const newErrors: FormErrors = {};
+    
+    // Map API field errors to form errors first
+    if (apiErrors && Object.keys(apiErrors).length > 0) {
+      Object.keys(apiErrors).forEach((field) => {
+        const fieldErrors = apiErrors[field];
+        
+        if (fieldErrors && Array.isArray(fieldErrors) && fieldErrors.length > 0) {
+          // Map API field names to form field names
+          const formFieldMap: Record<string, keyof FormErrors> = {
+            email: 'email',
+            password: 'password',
+            first_name: 'first_name',
+            last_name: 'last_name',
+            phone_number: 'phone_number',
+            password_confirmation: 'password_confirmation',
+          };
+          
+          const formField = formFieldMap[field];
+          if (formField) {
+            // Join multiple errors with ". " (period and space)
+            newErrors[formField] = fieldErrors.join('. ');
+          }
+        }
+      });
+    }
+    
+    // Set general error only if no field-specific errors exist
+    if (error && Object.keys(newErrors).length === 0) {
+      newErrors.general = error;
+    }
+    
+    setErrors(newErrors);
   };
 
   const handleSignIn = () => {
@@ -116,14 +156,14 @@ export default function RegisterScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Background Decorative Elements */}
+      {/* Subtle Background Gradients */}
       <View style={styles.backgroundContainer}>
         <LinearGradient
-          colors={['rgba(69, 255, 183, 0.4)', 'transparent']}
+          colors={['rgba(69, 255, 183, 0.15)', 'transparent']}
           style={styles.gradientTop}
         />
         <LinearGradient
-          colors={['rgba(69, 255, 183, 0.4)', 'transparent']}
+          colors={['rgba(69, 255, 183, 0.15)', 'transparent']}
           style={styles.gradientBottom}
         />
       </View>
@@ -141,9 +181,9 @@ export default function RegisterScreen() {
           >
             <View style={styles.centerContainer}>
               {/* Header Title */}
-              <Text style={styles.headerTitle}>REGISTRO</Text>
+              <Text style={styles.headerTitle}>Registro</Text>
 
-              {/* Card */}
+              {/* Premium Card */}
               <View style={styles.card}>
                 {/* General Error */}
                 {errors.general && (
@@ -157,8 +197,7 @@ export default function RegisterScreen() {
                   <View style={styles.nameRow}>
                     <View style={styles.nameInput}>
                       <Input
-                        label="Nombre"
-                        placeholder="Juan"
+                        placeholder="Nombre"
                         value={formData.first_name}
                         onChangeText={(text) => updateField('first_name', text)}
                         autoCapitalize="words"
@@ -168,8 +207,7 @@ export default function RegisterScreen() {
                     </View>
                     <View style={styles.nameInput}>
                       <Input
-                        label="Apellido"
-                        placeholder="Pérez"
+                        placeholder="Apellido"
                         value={formData.last_name}
                         onChangeText={(text) => updateField('last_name', text)}
                         autoCapitalize="words"
@@ -180,20 +218,17 @@ export default function RegisterScreen() {
                   </View>
 
                   <Input
-                    label="Email"
-                    placeholder="juan@email.com"
+                    placeholder="Email"
                     value={formData.email}
                     onChangeText={(text) => updateField('email', text)}
                     keyboardType="email-address"
                     autoCapitalize="none"
-                    autoComplete="email"
                     error={errors.email}
                     editable={!isLoading}
                   />
 
                   <Input
-                    label="Teléfono"
-                    placeholder="+57 300 123 4567"
+                    placeholder="Teléfono"
                     value={formData.phone_number}
                     onChangeText={(text) => updateField('phone_number', text)}
                     keyboardType="phone-pad"
@@ -202,8 +237,7 @@ export default function RegisterScreen() {
                   />
 
                   <Input
-                    label="Contraseña"
-                    placeholder="Mínimo 8 caracteres"
+                    placeholder="Contraseña"
                     value={formData.password}
                     onChangeText={(text) => updateField('password', text)}
                     secureTextEntry
@@ -213,8 +247,7 @@ export default function RegisterScreen() {
                   />
 
                   <Input
-                    label="Confirmar contraseña"
-                    placeholder="Repite tu contraseña"
+                    placeholder="Confirmar contraseña"
                     value={formData.password_confirmation}
                     onChangeText={(text) => updateField('password_confirmation', text)}
                     secureTextEntry
@@ -227,17 +260,11 @@ export default function RegisterScreen() {
                 {/* Register Button */}
                 <View style={styles.buttonContainer}>
                   <Button
-                    title={isLoading ? '' : 'Registrarse'}
+                    title="Registrarse"
                     onPress={handleRegister}
                     disabled={isLoading}
+                    loading={isLoading}
                   />
-                  {isLoading && (
-                    <ActivityIndicator
-                      style={styles.loadingIndicator}
-                      color={colors.textDark}
-                      size="small"
-                    />
-                  )}
                 </View>
 
                 {/* Sign In Link */}
@@ -290,73 +317,64 @@ const styles = StyleSheet.create({
   },
   gradientTop: {
     position: 'absolute',
-    top: 50,
-    left: -150,
-    width: 250,
-    height: 250,
-    borderRadius: 125,
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 300,
   },
   gradientBottom: {
     position: 'absolute',
-    bottom: 80,
-    right: -150,
-    width: 250,
-    height: 250,
-    borderRadius: 125,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 300,
+    transform: [{ rotate: '180deg' }],
   },
   headerTitle: {
     fontSize: typography.fontSize.title1,
     fontFamily: typography.fontFamily,
     fontWeight: typography.fontWeight.bold,
-    lineHeight: typography.lineHeight.title1,
+    lineHeight: typography.lineHeight.xxxl,
     color: colors.white,
-    textTransform: 'uppercase',
-    marginBottom: 16,
+    marginBottom: spacing.xl,
     textAlign: 'center',
+    letterSpacing: 1,
   },
   card: {
     backgroundColor: colors.white,
-    borderRadius: 26,
-    padding: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 16,
-    elevation: 8,
+    borderRadius: borderRadius.xxl,
+    padding: spacing.xxl,
   },
   errorBanner: {
-    backgroundColor: 'rgba(255, 59, 48, 0.1)',
-    borderRadius: 10,
-    padding: 12,
-    marginBottom: 12,
+    backgroundColor: colors.gray200,
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    marginBottom: spacing.lg,
+    borderLeftWidth: 3,
+    borderLeftColor: colors.error,
   },
   errorBannerText: {
     color: colors.error,
     fontSize: typography.fontSize.sm,
     fontFamily: typography.fontFamily,
     fontWeight: typography.fontWeight.medium,
-    textAlign: 'center',
+    textAlign: 'left',
   },
   inputsContainer: {
-    gap: 12,
+    gap: spacing.lg,
   },
   nameRow: {
     flexDirection: 'row',
-    gap: 12,
+    gap: spacing.md,
   },
   nameInput: {
     flex: 1,
   },
   buttonContainer: {
-    marginTop: 24,
-    justifyContent: 'center',
-  },
-  loadingIndicator: {
-    position: 'absolute',
-    alignSelf: 'center',
+    marginTop: spacing.xxl,
   },
   signInContainer: {
-    marginTop: 16,
+    marginTop: spacing.lg,
     alignItems: 'center',
   },
   signInText: {

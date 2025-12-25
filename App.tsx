@@ -8,6 +8,17 @@ import { AuthProvider, useAuth } from './src/context/AuthContext';
 import BottomTabs from './src/navigation/BottomTabs';
 import LoginScreen from './src/screens/LoginScreen';
 import RegisterScreen from './src/screens/RegisterScreen';
+import PendingScreen from './src/screens/PendingScreen';
+import MembershipScreen from './src/screens/MembershipScreen';
+import EditProfileScreen from './src/screens/EditProfileScreen';
+import NotificationsScreen from './src/screens/NotificationsScreen';
+import CalendarScreen from './src/screens/CalendarScreen';
+import SlotDetailScreen from './src/screens/SlotDetailScreen';
+import BookingConfirmationScreen from './src/screens/BookingConfirmationScreen';
+import WeightInputScreen from './src/screens/WeightInputScreen';
+import WeightHistoryScreen from './src/screens/WeightHistoryScreen';
+import BirthdateInputScreen from './src/screens/BirthdateInputScreen';
+import HeightInputScreen from './src/screens/HeightInputScreen';
 import { colors } from './src/theme/colors';
 
 const Stack = createNativeStackNavigator();
@@ -21,8 +32,26 @@ function AuthStack() {
   );
 }
 
+function MainStack() {
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="MainTabs" component={BottomTabs} />
+      <Stack.Screen name="Calendar" component={CalendarScreen} />
+      <Stack.Screen name="Membership" component={MembershipScreen} />
+      <Stack.Screen name="EditProfile" component={EditProfileScreen} />
+      <Stack.Screen name="Notifications" component={NotificationsScreen} />
+      <Stack.Screen name="SlotDetail" component={SlotDetailScreen} />
+      <Stack.Screen name="BookingConfirmation" component={BookingConfirmationScreen} />
+      <Stack.Screen name="WeightInput" component={WeightInputScreen} />
+      <Stack.Screen name="WeightHistory" component={WeightHistoryScreen} />
+      <Stack.Screen name="BirthdateInput" component={BirthdateInputScreen} />
+      <Stack.Screen name="HeightInput" component={HeightInputScreen} />
+    </Stack.Navigator>
+  );
+}
+
 function RootNavigator() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
 
   if (isLoading) {
     return (
@@ -32,7 +61,20 @@ function RootNavigator() {
     );
   }
 
-  return isAuthenticated ? <BottomTabs /> : <AuthStack />;
+  if (!isAuthenticated) {
+    return <AuthStack />;
+  }
+
+  // Check if user is verified - if not, show PendingScreen
+  if (user && !user.is_verified) {
+    return (
+      <Stack.Navigator screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="Pending" component={PendingScreen} />
+      </Stack.Navigator>
+    );
+  }
+
+  return <MainStack />;
 }
 
 export default function App() {
