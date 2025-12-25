@@ -5,7 +5,12 @@ export type RootStackParamList = {
   EditProfile: undefined;
   Notifications: undefined;
   SlotDetail: { slotId: number };
-  BookingConfirmation: undefined;
+  BookingConfirmation: {
+    trainingType: string;
+    date: string;
+    hourInit: string;
+    hourEnd: string;
+  };
   WeightInput: undefined;
   WeightHistory: undefined;
   BirthdateInput: undefined;

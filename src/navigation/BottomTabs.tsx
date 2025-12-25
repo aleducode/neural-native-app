@@ -73,7 +73,7 @@ export default function BottomTabs() {
               color={focused ? colors.primary : color}
             />
           ),
-          tabBarLabel: 'Home',
+          tabBarLabel: 'Inicio',
         }}
       />
       <Tab.Screen
@@ -87,7 +87,7 @@ export default function BottomTabs() {
               color={focused ? colors.primary : color}
             />
           ),
-          tabBarLabel: 'Calendar',
+          tabBarLabel: 'Calendario',
         }}
       />
       <Tab.Screen
@@ -101,7 +101,7 @@ export default function BottomTabs() {
               color={focused ? colors.primary : color}
             />
           ),
-          tabBarLabel: 'Trainings',
+          tabBarLabel: 'Entrenos',
         }}
       />
       <Tab.Screen
@@ -115,7 +115,7 @@ export default function BottomTabs() {
               color={focused ? colors.primary : color}
             />
           ),
-          tabBarLabel: 'Profile',
+          tabBarLabel: 'Perfil',
         }}
       />
     </Tab.Navigator>

@@ -102,11 +102,11 @@ export default function WeightHistoryScreen() {
       {/* Background Gradients */}
       <View style={styles.backgroundContainer}>
         <LinearGradient
-          colors={['rgba(69, 255, 183, 0.4)', 'transparent']}
+          colors={['rgba(90, 107, 255, 0.15)', 'transparent']}
           style={styles.gradientTop}
         />
         <LinearGradient
-          colors={['rgba(69, 255, 183, 0.4)', 'transparent']}
+          colors={['rgba(90, 107, 255, 0.15)', 'transparent']}
           style={styles.gradientBottom}
         />
       </View>
@@ -175,7 +175,7 @@ export default function WeightHistoryScreen() {
                   backgroundGradientFrom: colors.cardDark,
                   backgroundGradientTo: colors.cardDark,
                   decimalPlaces: 0,
-                  color: (opacity = 1) => `rgba(69, 255, 183, ${opacity})`,
+                  color: (opacity = 1) => `rgba(90, 107, 255, ${opacity})`,
                   labelColor: (opacity = 1) => `rgba(255, 255, 255, ${opacity})`,
                   style: {
                     borderRadius: borderRadius.lg,

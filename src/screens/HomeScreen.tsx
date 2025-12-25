@@ -33,11 +33,13 @@ function getWeekDates() {
   for (let i = 0; i < 7; i++) {
     const date = new Date(today);
     date.setDate(today.getDate() - currentDay + i);
+    // Format as YYYY-MM-DD without timezone conversion to avoid day shifts
+    const fullDate = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
     dates.push({
       name: weekDays[i],
       number: date.getDate().toString().padStart(2, '0'),
       isToday: i === currentDay,
-      fullDate: date.toISOString().split('T')[0], // YYYY-MM-DD format
+      fullDate: fullDate, // YYYY-MM-DD format
     });
   }
   return dates;
@@ -121,11 +123,11 @@ export default function HomeScreen() {
       {/* Background Gradients */}
       <View style={styles.backgroundContainer}>
         <LinearGradient
-          colors={['rgba(69, 255, 183, 0.4)', 'transparent']}
+          colors={['rgba(90, 107, 255, 0.15)', 'transparent']}
           style={styles.gradientTop}
         />
         <LinearGradient
-          colors={['rgba(69, 255, 183, 0.4)', 'transparent']}
+          colors={['rgba(90, 107, 255, 0.15)', 'transparent']}
           style={styles.gradientBottom}
         />
       </View>

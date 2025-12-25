@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "455335855234",
+    "project_id": "neural-a151e",
+    "storage_bucket": "neural-a151e.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:455335855234:android:51dedc886ab63fd11be09b",
+        "android_client_info": {
+          "package_name": "com.ducode.neural"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCQKRwbh4EdacvpMoejd0J_eBbUHeF3t8I"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -39,11 +39,11 @@ export default function PendingScreen() {
       {/* Background Decorative Elements */}
       <View style={styles.backgroundContainer}>
         <LinearGradient
-          colors={['rgba(69, 255, 183, 0.4)', 'transparent']}
+          colors={['rgba(90, 107, 255, 0.15)', 'transparent']}
           style={styles.gradientTop}
         />
         <LinearGradient
-          colors={['rgba(69, 255, 183, 0.4)', 'transparent']}
+          colors={['rgba(90, 107, 255, 0.15)', 'transparent']}
           style={styles.gradientBottom}
         />
       </View>
@@ -128,7 +128,7 @@ const styles = StyleSheet.create({
     width: 140,
     height: 140,
     borderRadius: 70,
-    backgroundColor: 'rgba(69, 255, 183, 0.1)',
+    backgroundColor: 'rgba(90, 107, 255, 0.1)',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 32,

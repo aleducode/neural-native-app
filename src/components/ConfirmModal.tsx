@@ -26,7 +26,7 @@ export default function ConfirmModal({
   visible,
   title,
   message,
-  confirmText = 'Yes',
+  confirmText = 'Sí',
   cancelText = 'No',
   onConfirm,
   onCancel,

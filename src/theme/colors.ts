@@ -1,12 +1,13 @@
-// Neural App - Figma Design Colors (Pixel Perfect)
-// Source: https://www.figma.com/design/3pKI0AQarLogRrOnglU50N/FitZone
+// Neural App - Design Colors
+// Primary color: #5a6bff (Blue)
 
 import { Platform } from 'react-native';
 
 export const colors = {
   // Primary
-  primary: '#45FFB7',
-  primaryDark: '#3DE0A1',
+  primary: '#5a6bff',
+  primaryDark: '#4a5aee',
+  primaryLight: '#7a8aff',
 
   // Grayscale
   white: '#FFFFFF',
@@ -30,13 +31,14 @@ export const colors = {
   textMuted: '#303030',
 
   // Transparent variants
-  primaryTransparent: 'rgba(69, 255, 183, 0.4)',
+  primaryTransparent: 'rgba(90, 107, 255, 0.4)',
+  primaryTransparent15: 'rgba(90, 107, 255, 0.15)',
   whiteTransparent: 'rgba(255, 255, 255, 0.18)',
   whiteTransparent30: 'rgba(255, 255, 255, 0.3)',
 
   // Status colors
   error: '#FF4D4D',
-  success: '#45FFB7',
+  success: '#5a6bff',
 };
 
 export const spacing = {

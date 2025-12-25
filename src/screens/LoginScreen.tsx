@@ -104,11 +104,11 @@ export default function LoginScreen() {
       {/* Subtle Background Gradients */}
       <View style={styles.backgroundContainer}>
         <LinearGradient
-          colors={['rgba(69, 255, 183, 0.15)', 'transparent']}
+          colors={['rgba(90, 107, 255, 0.15)', 'transparent']}
           style={styles.gradientTop}
         />
         <LinearGradient
-          colors={['rgba(69, 255, 183, 0.15)', 'transparent']}
+          colors={['rgba(90, 107, 255, 0.15)', 'transparent']}
           style={styles.gradientBottom}
         />
       </View>

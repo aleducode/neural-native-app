@@ -39,7 +39,7 @@ yarn-error.*
 # generated native folders
 /ios
 /android
-google-services.json
+# google-services.json - now tracked for EAS builds
 package-lock.json
 .playwright*
 pushes/

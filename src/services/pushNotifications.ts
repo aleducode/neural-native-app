@@ -66,7 +66,7 @@ class PushNotificationService {
           name: 'default',
           importance: Notifications.AndroidImportance.MAX,
           vibrationPattern: [0, 250, 250, 250],
-          lightColor: '#45FFB7',
+          lightColor: '#5a6bff',
         });
       }
 

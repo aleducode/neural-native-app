@@ -53,6 +53,11 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
+    minWidth: 32,
+    minHeight: 32,
+    maxWidth: 32,
+    maxHeight: 32,
   },
   dateCircleSelected: {
     backgroundColor: colors.primary,
@@ -62,6 +67,8 @@ const styles = StyleSheet.create({
     fontFamily: typography.fontFamily,
     fontWeight: typography.fontWeight.bold,
     color: colors.white,
+    textAlign: 'center',
+    lineHeight: typography.fontSize.lg,
   },
   dateTextSelected: {
     color: colors.textDark,

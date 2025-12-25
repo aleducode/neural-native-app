@@ -8,10 +8,11 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { colors, typography, spacing, borderRadius } from '../theme/colors';
 import { slotsApi } from '../api/slots';
 import { Slot } from '../types';
@@ -35,6 +36,7 @@ export default function SlotDetailScreen() {
   const navigation = useNavigation<SlotDetailNavigationProp>();
   const route = useRoute<RouteProp<SlotDetailRouteParams, 'SlotDetail'>>();
   const { slotId } = route.params;
+  const insets = useSafeAreaInsets();
 
   const [slot, setSlot] = useState<Slot | null>(null);
   const [confirmedUsers, setConfirmedUsers] = useState<ConfirmedUser[]>([]);
@@ -107,7 +109,9 @@ export default function SlotDetailScreen() {
   };
 
   const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr + 'T00:00:00');
+    // Parse date string (YYYY-MM-DD) to avoid timezone issues
+    const [year, month, day] = dateStr.split('-').map(Number);
+    const date = new Date(year, month - 1, day);
     const dayNames = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
     const monthNames = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
 
@@ -117,7 +121,7 @@ export default function SlotDetailScreen() {
   if (isLoading) {
     return (
       <View style={styles.container}>
-        <SafeAreaView style={styles.safeArea}>
+        <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color={colors.primary} />
           </View>
@@ -129,13 +133,15 @@ export default function SlotDetailScreen() {
   if (error || !slot) {
     return (
       <View style={styles.container}>
-        <SafeAreaView style={styles.safeArea}>
+        <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
           <View style={styles.header}>
             <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-              <Ionicons name="arrow-back" size={24} color={colors.textDark} />
+              <Ionicons name="chevron-back" size={24} color={colors.textDark} />
             </TouchableOpacity>
+            <View style={styles.headerSpacer} />
           </View>
           <View style={styles.errorContainer}>
+            <Ionicons name="alert-circle-outline" size={48} color={colors.gray400} style={styles.errorIcon} />
             <Text style={styles.errorText}>{error || 'Slot no encontrado'}</Text>
           </View>
         </SafeAreaView>
@@ -147,13 +153,25 @@ export default function SlotDetailScreen() {
 
   return (
     <View style={styles.container}>
-      <SafeAreaView style={styles.safeArea} edges={['top']}>
+      {/* Background Gradients */}
+      <View style={styles.backgroundContainer}>
+        <LinearGradient
+          colors={['rgba(90, 107, 255, 0.15)', 'transparent']}
+          style={styles.gradientTop}
+        />
+        <LinearGradient
+          colors={['rgba(90, 107, 255, 0.15)', 'transparent']}
+          style={styles.gradientBottom}
+        />
+      </View>
+
+      <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-            <Ionicons name="arrow-back" size={24} color={colors.textDark} />
+            <Ionicons name="chevron-back" size={24} color={colors.textDark} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>{slot.training_type.name.toUpperCase()}</Text>
+          <Text style={styles.headerTitle}>{slot.training_type.name}</Text>
           <View style={styles.headerSpacer} />
         </View>
 
@@ -165,20 +183,35 @@ export default function SlotDetailScreen() {
           {/* Date & Time Card */}
           <View style={styles.infoCard}>
             <View style={styles.infoRow}>
-              <Ionicons name="calendar-outline" size={20} color={colors.gray400} />
-              <Text style={styles.infoText}>{formatDate(slot.date)}</Text>
+              <View style={styles.iconContainer}>
+                <Ionicons name="calendar-outline" size={20} color={colors.primary} />
+              </View>
+              <View style={styles.infoTextContainer}>
+                <Text style={styles.infoLabel}>Fecha</Text>
+                <Text style={styles.infoText}>{formatDate(slot.date)}</Text>
+              </View>
             </View>
+            <View style={styles.divider} />
             <View style={styles.infoRow}>
-              <Ionicons name="time-outline" size={20} color={colors.gray400} />
-              <Text style={styles.infoText}>{slot.hour_init} - {slot.hour_end}</Text>
+              <View style={styles.iconContainer}>
+                <Ionicons name="time-outline" size={20} color={colors.primary} />
+              </View>
+              <View style={styles.infoTextContainer}>
+                <Text style={styles.infoLabel}>Horario</Text>
+                <Text style={styles.infoText}>{slot.hour_init} - {slot.hour_end}</Text>
+              </View>
             </View>
           </View>
 
           {/* Available Spots Card */}
           <View style={styles.spotsCard}>
-            <Text style={styles.spotsNumber}>{slot.available_places}</Text>
-            <Text style={styles.spotsLabel}>Cupos disponibles</Text>
-            <Text style={styles.spotsTotal}>de {slot.max_places} totales</Text>
+            <View style={styles.spotsContent}>
+              <Text style={styles.spotsNumber}>{slot.available_places}</Text>
+              <View style={styles.spotsTextContainer}>
+                <Text style={styles.spotsLabel}>Cupos disponibles</Text>
+                <Text style={styles.spotsTotal}>de {slot.max_places} totales</Text>
+              </View>
+            </View>
           </View>
 
           {/* Status Banner */}
@@ -191,7 +224,7 @@ export default function SlotDetailScreen() {
 
           {alreadyScheduledToday && !userHasBooked && (
             <View style={styles.warningBanner}>
-              <Ionicons name="warning" size={20} color={colors.warning} />
+              <Ionicons name="alert-circle-outline" size={20} color={colors.error} />
               <Text style={styles.warningText}>Ya tienes otro entrenamiento este día</Text>
             </View>
           )}
@@ -214,15 +247,19 @@ export default function SlotDetailScreen() {
               </View>
             </View>
           )}
+
+          {/* Bottom Spacer for Button */}
+          <View style={{ height: 100 }} />
         </ScrollView>
 
         {/* Book Button */}
         {!userHasBooked && (
-          <View style={styles.buttonContainer}>
+          <View style={[styles.buttonContainer, { paddingBottom: Math.max(insets.bottom, spacing.xxl) + spacing.lg }]}>
             <Button
               title={isBooking ? 'Reservando...' : 'Confirmar Reserva'}
               onPress={handleBook}
               disabled={!canBook || isBooking}
+              loading={isBooking}
             />
           </View>
         )}
@@ -239,6 +276,29 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
   },
+  backgroundContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  gradientTop: {
+    position: 'absolute',
+    top: 50,
+    left: -150,
+    width: 250,
+    height: 250,
+    borderRadius: 125,
+  },
+  gradientBottom: {
+    position: 'absolute',
+    bottom: 200,
+    right: -150,
+    width: 250,
+    height: 250,
+    borderRadius: 125,
+  },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -249,6 +309,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: spacing.xxl,
+  },
+  errorIcon: {
+    marginBottom: spacing.lg,
   },
   errorText: {
     fontSize: typography.fontSize.md,
@@ -262,7 +325,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: spacing.xxl,
-    paddingVertical: spacing.lg,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.md,
   },
   backButton: {
     width: 48,
@@ -273,11 +337,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   headerTitle: {
-    fontSize: typography.fontSize.title2,
+    fontSize: typography.fontSize.xxl,
     fontFamily: typography.fontFamily,
     fontWeight: typography.fontWeight.bold,
     color: colors.white,
-    textTransform: 'uppercase',
   },
   headerSpacer: {
     width: 48,
@@ -287,57 +350,90 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: spacing.xxl,
-    paddingBottom: 120,
+    paddingTop: spacing.md,
   },
   infoCard: {
     backgroundColor: colors.white,
-    borderRadius: borderRadius.xl,
+    borderRadius: borderRadius.xxl,
     padding: spacing.xxl,
     marginBottom: spacing.lg,
-    gap: spacing.lg,
   },
   infoRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.lg,
+  },
+  iconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(90, 107, 255, 0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: spacing.lg,
+  },
+  infoTextContainer: {
+    flex: 1,
+  },
+  infoLabel: {
+    fontSize: typography.fontSize.xs,
+    fontFamily: typography.fontFamily,
+    fontWeight: typography.fontWeight.medium,
+    color: colors.gray400,
+    marginBottom: spacing.xs,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   infoText: {
     fontSize: typography.fontSize.lg,
     fontFamily: typography.fontFamily,
-    fontWeight: typography.fontWeight.medium,
+    fontWeight: typography.fontWeight.semiBold,
     color: colors.textDark,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: colors.gray200,
+    marginVertical: spacing.lg,
+    marginLeft: 56, // iconContainer width + marginRight
   },
   spotsCard: {
-    backgroundColor: colors.primary,
-    borderRadius: borderRadius.xl,
+    backgroundColor: colors.white,
+    borderRadius: borderRadius.xxl,
     padding: spacing.xxl,
-    alignItems: 'center',
     marginBottom: spacing.lg,
   },
+  spotsContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
   spotsNumber: {
-    fontSize: 64,
+    fontSize: 56,
     fontFamily: typography.fontFamily,
     fontWeight: typography.fontWeight.bold,
-    color: colors.textDark,
-    lineHeight: 72,
+    color: colors.primary,
+    lineHeight: 64,
+  },
+  spotsTextContainer: {
+    alignItems: 'flex-end',
   },
   spotsLabel: {
-    fontSize: typography.fontSize.lg,
-    fontFamily: typography.fontFamily.semibold,
+    fontSize: typography.fontSize.md,
+    fontFamily: typography.fontFamily,
+    fontWeight: typography.fontWeight.semiBold,
     color: colors.textDark,
+    marginBottom: spacing.xs,
   },
   spotsTotal: {
     fontSize: typography.fontSize.sm,
     fontFamily: typography.fontFamily,
     fontWeight: typography.fontWeight.medium,
-    color: colors.textDark,
-    opacity: 0.7,
+    color: colors.gray400,
   },
   bookedBanner: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
-    backgroundColor: 'rgba(69, 255, 183, 0.15)',
+    backgroundColor: 'rgba(90, 107, 255, 0.15)',
     borderRadius: borderRadius.lg,
     padding: spacing.lg,
     marginBottom: spacing.lg,
@@ -353,7 +449,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
-    backgroundColor: 'rgba(255, 149, 0, 0.15)',
+    backgroundColor: 'rgba(255, 77, 77, 0.15)',
     borderRadius: borderRadius.lg,
     padding: spacing.lg,
     marginBottom: spacing.lg,
@@ -362,21 +458,22 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSize.sm,
     fontFamily: typography.fontFamily,
     fontWeight: typography.fontWeight.medium,
-    color: colors.warning,
+    color: colors.error,
     flex: 1,
   },
   usersSection: {
-    marginTop: spacing.lg,
+    marginTop: spacing.md,
   },
   usersSectionTitle: {
     fontSize: typography.fontSize.lg,
-    fontFamily: typography.fontFamily.semibold,
+    fontFamily: typography.fontFamily,
+    fontWeight: typography.fontWeight.semiBold,
     color: colors.white,
-    marginBottom: spacing.lg,
+    marginBottom: spacing.md,
   },
   usersList: {
     backgroundColor: colors.white,
-    borderRadius: borderRadius.xl,
+    borderRadius: borderRadius.xxl,
     overflow: 'hidden',
   },
   userItem: {
@@ -387,17 +484,18 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.gray200,
   },
   userNumber: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     backgroundColor: colors.gray200,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: spacing.lg,
+    marginRight: spacing.md,
   },
   userNumberText: {
     fontSize: typography.fontSize.sm,
-    fontFamily: typography.fontFamily.semibold,
+    fontFamily: typography.fontFamily,
+    fontWeight: typography.fontWeight.semiBold,
     color: colors.textDark,
   },
   userName: {
@@ -405,6 +503,7 @@ const styles = StyleSheet.create({
     fontFamily: typography.fontFamily,
     fontWeight: typography.fontWeight.medium,
     color: colors.textDark,
+    flex: 1,
   },
   buttonContainer: {
     position: 'absolute',
@@ -412,8 +511,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     paddingHorizontal: spacing.xxl,
-    paddingBottom: spacing.xxl,
-    paddingTop: spacing.lg,
+    paddingTop: spacing.xl,
     backgroundColor: colors.bgDark,
   },
 });

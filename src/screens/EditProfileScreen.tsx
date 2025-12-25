@@ -171,11 +171,11 @@ export default function EditProfileScreen() {
       {/* Background Gradients */}
       <View style={styles.backgroundContainer}>
         <LinearGradient
-          colors={['rgba(69, 255, 183, 0.4)', 'transparent']}
+          colors={['rgba(90, 107, 255, 0.15)', 'transparent']}
           style={styles.gradientTop}
         />
         <LinearGradient
-          colors={['rgba(69, 255, 183, 0.4)', 'transparent']}
+          colors={['rgba(90, 107, 255, 0.15)', 'transparent']}
           style={styles.gradientBottom}
         />
       </View>
@@ -229,7 +229,7 @@ export default function EditProfileScreen() {
 
               {/* Gradient Card */}
               <LinearGradient
-                colors={['#45FFB7', '#A8FFD9', '#FFFFFF']}
+                colors={['#5a6bff', '#9aabff', '#FFFFFF']}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={styles.profileCard}

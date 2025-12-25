@@ -9,7 +9,7 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, typography, spacing } from '../theme/colors';
@@ -38,16 +38,18 @@ const MONTH_NAMES = [
 
 function getWeekDays(): WeekDayData[] {
   const today = new Date();
+  const currentDay = today.getDay(); // 0 = Sunday, 1 = Monday, etc.
   const days: WeekDayData[] = [];
 
-  // Start from today and get 7 days
+  // Calculate week starting from Sunday (same logic as HomeScreen)
   for (let i = 0; i < 7; i++) {
     const date = new Date(today);
-    date.setDate(today.getDate() + i);
+    date.setDate(today.getDate() - currentDay + i);
 
     const dayName = DAY_NAMES[date.getDay()];
     const dayNumber = date.getDate().toString();
-    const fullDate = date.toISOString().split('T')[0];
+    // Format as YYYY-MM-DD without timezone conversion to avoid day shifts
+    const fullDate = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 
     days.push({ date, dayName, dayNumber, fullDate });
   }
@@ -65,23 +67,23 @@ export default function CalendarScreen() {
   const initialDate = route.params?.initialDate;
   
   // Calculate week days starting from initialDate if provided, otherwise from today
+  // Uses the same logic as HomeScreen: calculate the week containing the given date
   const getInitialWeekDays = useCallback((): WeekDayData[] => {
     if (initialDate) {
-      const startDate = new Date(initialDate + 'T00:00:00');
+      // Parse the date string (YYYY-MM-DD) to avoid timezone issues
+      const [year, month, day] = initialDate.split('-').map(Number);
+      const targetDate = new Date(year, month - 1, day); // month is 0-indexed
+      const dayOfWeek = targetDate.getDay(); // 0 = Sunday, 1 = Monday, etc.
       const days: WeekDayData[] = [];
       
-      // Find the start of the week (Sunday) for the given date
-      const dayOfWeek = startDate.getDay();
-      const startOfWeek = new Date(startDate);
-      startOfWeek.setDate(startDate.getDate() - dayOfWeek);
-      
+      // Calculate week starting from Sunday (same logic as HomeScreen)
       for (let i = 0; i < 7; i++) {
-        const date = new Date(startOfWeek);
-        date.setDate(startOfWeek.getDate() + i);
+        const date = new Date(year, month - 1, day - dayOfWeek + i);
         
         const dayName = DAY_NAMES[date.getDay()];
         const dayNumber = date.getDate().toString();
-        const fullDate = date.toISOString().split('T')[0];
+        // Format as YYYY-MM-DD without timezone conversion
+        const fullDate = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
         
         days.push({ date, dayName, dayNumber, fullDate });
       }
@@ -91,17 +93,39 @@ export default function CalendarScreen() {
     return getWeekDays();
   }, [initialDate]);
   
-  const [weekDays, setWeekDays] = useState<WeekDayData[]>(getInitialWeekDays);
-  const [selectedDate, setSelectedDate] = useState<string>(
-    initialDate || weekDays[0]?.fullDate || getWeekDays()[0].fullDate
-  );
+  // Initialize weekDays and selectedDate based on initialDate
+  const initialWeekDays = getInitialWeekDays();
+  const [weekDays, setWeekDays] = useState<WeekDayData[]>(initialWeekDays);
+  const [selectedDate, setSelectedDate] = useState<string>(() => {
+    // If initialDate is provided, verify it exists in the calculated week
+    if (initialDate) {
+      const foundDay = initialWeekDays.find(d => d.fullDate === initialDate);
+      if (foundDay) {
+        return initialDate;
+      }
+      // If not found, use the first day (shouldn't happen, but fallback)
+      return initialWeekDays[0]?.fullDate || '';
+    }
+    return initialWeekDays[0]?.fullDate || '';
+  });
   
-  // Update week days when initialDate changes
+  // Update week days and selected date when initialDate changes (e.g., when navigating from HomeScreen)
   useEffect(() => {
     if (initialDate) {
       const newWeekDays = getInitialWeekDays();
       setWeekDays(newWeekDays);
-      setSelectedDate(initialDate);
+      // Verify the initialDate exists in the new week days before setting it
+      const foundDay = newWeekDays.find(d => d.fullDate === initialDate);
+      if (foundDay) {
+        // Use setTimeout to ensure state updates happen after render
+        setTimeout(() => {
+          setSelectedDate(initialDate);
+        }, 0);
+      } else {
+        // Fallback: use the first day if initialDate not found (shouldn't happen)
+        console.warn('InitialDate not found in calculated week:', initialDate, 'Available dates:', newWeekDays.map(d => d.fullDate));
+        setSelectedDate(newWeekDays[0]?.fullDate || '');
+      }
     }
   }, [initialDate, getInitialWeekDays]);
   const [slots, setSlots] = useState<Slot[]>([]);
@@ -290,7 +314,8 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: typography.fontSize.xxl,
-    fontFamily: typography.fontFamily.semibold,
+    fontFamily: typography.fontFamily,
+    fontWeight: typography.fontWeight.semiBold,
     color: colors.white,
     marginBottom: spacing.xl,
   },
@@ -313,7 +338,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   scheduledBanner: {
-    backgroundColor: 'rgba(69, 255, 183, 0.15)',
+    backgroundColor: 'rgba(90, 107, 255, 0.15)',
     borderRadius: 12,
     padding: spacing.lg,
     marginBottom: spacing.lg,
