@@ -72,6 +72,15 @@ export default function NotificationsScreen() {
       // Navigate to trainings
     } else if (notification.data?.type === 'membership_expiring') {
       // Navigate to membership
+    } else if (
+      notification.data?.type === 'community_comment' ||
+      notification.data?.type === 'community_reaction' ||
+      notification.data?.type === 'community_new_post'
+    ) {
+      // Navigate to post detail
+      if (notification.data?.post_id) {
+        navigation.navigate('PostDetail' as never, { postId: notification.data.post_id } as never);
+      }
     }
   };
 
@@ -87,6 +96,8 @@ export default function NotificationsScreen() {
         return 'trophy-outline';
       case 'promotion':
         return 'pricetag-outline';
+      case 'community':
+        return 'people-outline';
       default:
         return 'notifications-outline';
     }
