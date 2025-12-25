@@ -23,6 +23,7 @@ export const colors = {
   bgCard: '#FFFFFF',
   bgGray: '#F5F5F5',
   bgOverlay: 'rgba(255, 255, 255, 0.18)',
+  cardDark: '#1E1E1E',
 
   // Text
   textPrimary: '#FFFFFF',

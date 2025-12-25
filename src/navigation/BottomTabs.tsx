@@ -11,6 +11,7 @@ const TAB_BAR_MARGIN = 32; // Margen fijo a cada lado
 // Screens
 import HomeScreen from '../screens/HomeScreen';
 import CalendarScreen from '../screens/CalendarScreen';
+import CommunityScreen from '../screens/CommunityScreen';
 import TrainingsScreen from '../screens/TrainingsScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 
@@ -88,6 +89,20 @@ export default function BottomTabs() {
             />
           ),
           tabBarLabel: 'Calendario',
+        }}
+      />
+      <Tab.Screen
+        name="Community"
+        component={CommunityScreen}
+        options={{
+          tabBarIcon: ({ focused, color }) => (
+            <Ionicons
+              name={focused ? 'people' : 'people-outline'}
+              size={24}
+              color={focused ? colors.primary : color}
+            />
+          ),
+          tabBarLabel: 'Comunidad',
         }}
       />
       <Tab.Screen

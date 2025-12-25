@@ -19,6 +19,8 @@ import WeightInputScreen from './src/screens/WeightInputScreen';
 import WeightHistoryScreen from './src/screens/WeightHistoryScreen';
 import BirthdateInputScreen from './src/screens/BirthdateInputScreen';
 import HeightInputScreen from './src/screens/HeightInputScreen';
+import CreatePostScreen from './src/screens/CreatePostScreen';
+import PostDetailScreen from './src/screens/PostDetailScreen';
 import { colors } from './src/theme/colors';
 
 const Stack = createNativeStackNavigator();
@@ -46,6 +48,8 @@ function MainStack() {
       <Stack.Screen name="WeightHistory" component={WeightHistoryScreen} />
       <Stack.Screen name="BirthdateInput" component={BirthdateInputScreen} />
       <Stack.Screen name="HeightInput" component={HeightInputScreen} />
+      <Stack.Screen name="CreatePost" component={CreatePostScreen} />
+      <Stack.Screen name="PostDetail" component={PostDetailScreen} />
     </Stack.Navigator>
   );
 }

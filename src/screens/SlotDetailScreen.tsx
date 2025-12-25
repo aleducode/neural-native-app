@@ -225,7 +225,7 @@ export default function SlotDetailScreen() {
           {alreadyScheduledToday && !userHasBooked && (
             <View style={styles.warningBanner}>
               <Ionicons name="alert-circle-outline" size={20} color={colors.error} />
-              <Text style={styles.warningText}>Ya tienes otro entrenamiento este día</Text>
+              <Text style={styles.warningText}>Ya tienes otro entrenamiento agendado para este día. Cancela tu reserva actual para agendar este horario.</Text>
             </View>
           )}
 

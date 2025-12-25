@@ -15,5 +15,8 @@ export type RootStackParamList = {
   WeightHistory: undefined;
   BirthdateInput: undefined;
   HeightInput: undefined;
+  // Community
+  CreatePost: undefined;
+  PostDetail: { postId: number };
 };
 

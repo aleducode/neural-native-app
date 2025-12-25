@@ -37,11 +37,9 @@ export default function BookingConfirmationScreen() {
   };
 
   const handleDone = () => {
-    // Navigate back to main/calendar
-    navigation.reset({
-      index: 0,
-      routes: [{ name: 'Main' }],
-    });
+    // Navigate back to main tabs (Home screen)
+    // Since BookingConfirmation is in MainStack, we need to navigate to MainTabs
+    navigation.navigate('MainTabs', { screen: 'Home' });
   };
 
   return (

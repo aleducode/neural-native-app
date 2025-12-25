@@ -110,13 +110,40 @@ export const slotsApi = {
   },
 
   /**
-   * Get user's upcoming trainings
+   * Get user's trainings (upcoming and past) with pagination
    */
-  async getMyTrainings(): Promise<{ data?: Training[]; error?: string }> {
-    const response = await api.get<{ trainings: Training[] }>(`/training/my-trainings/`);
+  async getMyTrainings(
+    includePast: boolean = true,
+    limit: number = 50,
+    offset: number = 0
+  ): Promise<{ 
+    data?: Training[]; 
+    count?: number;
+    hasMore?: boolean;
+    error?: string 
+  }> {
+    const params = new URLSearchParams();
+    if (includePast) {
+      params.append('include_past', 'true');
+    }
+    params.append('limit', limit.toString());
+    params.append('offset', offset.toString());
+    
+    const url = `/training/my-trainings/?${params.toString()}`;
+    const response = await api.get<{ 
+      trainings: Training[];
+      count: number;
+      limit: number;
+      offset: number;
+      has_more: boolean;
+    }>(url);
 
     if (response.data) {
-      return { data: response.data.trainings };
+      return { 
+        data: response.data.trainings,
+        count: response.data.count,
+        hasMore: response.data.has_more,
+      };
     }
 
     return { error: response.error };
