@@ -39,7 +39,9 @@ yarn-error.*
 # generated native folders
 /ios
 /android
-# google-services.json - now tracked for EAS builds
+# google-services.json - contains sensitive API keys
+google-services.json
 package-lock.json
 .playwright*
 pushes/
+secrets/
