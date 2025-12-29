@@ -442,6 +442,23 @@ Query params:
 
 ---
 
+## COMMUNITY (`/api/v1/community/`)
+
+Ver documentación completa en [COMMUNITY.md](./COMMUNITY.md)
+
+**Endpoints principales:**
+- `GET /community/feed/?page={page}` - Feed de publicaciones
+- `POST /community/posts/` - Crear publicación
+- `GET /community/posts/{id}/` - Detalle de post
+- `DELETE /community/posts/{id}/` - Eliminar post
+- `POST /community/posts/{id}/react/` - Agregar reacción
+- `DELETE /community/posts/{id}/react/` - Remover reacción
+- `GET /community/posts/{id}/comments/` - Obtener comentarios
+- `POST /community/posts/{id}/comments/` - Agregar comentario
+- `DELETE /community/comments/{id}/` - Eliminar comentario
+
+---
+
 ## Notas Importantes
 
 | Item                   | Detalle                                                              |
