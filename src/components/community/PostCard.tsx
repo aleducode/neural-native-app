@@ -1,23 +1,69 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
-  Image,
   Pressable,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  withSequence,
+  withTiming,
+} from 'react-native-reanimated';
 import { colors, typography, spacing, borderRadius } from '../../theme/colors';
-import { Post, ReactionType, REACTION_EMOJIS } from '../../types/community';
+import { Post, ReactionType, REACTION_ICONS } from '../../types/community';
 import ReactionBar from './ReactionBar';
 import TrainingBadge from './TrainingBadge';
+import SkeletonImage from './SkeletonImage';
+import FullScreenImage from './FullScreenImage';
 
 interface PostCardProps {
   post: Post;
   onPress: () => void;
   onReaction: (reactionType: ReactionType | null) => void;
   onOptionsPress?: () => void;
+}
+
+interface AnimatedReactionSummaryItemProps {
+  type: ReactionType;
+  count: number;
+}
+
+function AnimatedReactionSummaryItem({ type, count }: AnimatedReactionSummaryItemProps) {
+  const opacity = useSharedValue(1);
+  const translateY = useSharedValue(0);
+
+  useEffect(() => {
+    // Animate when count changes - use opacity and translate instead of scale to avoid blur
+    opacity.value = withSequence(
+      withTiming(0.5, { duration: 100 }),
+      withTiming(1, { duration: 200 })
+    );
+    translateY.value = withSequence(
+      withSpring(-4, { damping: 8, stiffness: 200 }),
+      withSpring(0, { damping: 10, stiffness: 150 })
+    );
+  }, [count]);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+    transform: [{ translateY: translateY.value }],
+  }));
+
+  return (
+    <Animated.View style={[styles.reactionSummaryItem, animatedStyle]}>
+      <Ionicons 
+        name={REACTION_ICONS[type].outline as any} 
+        size={16} 
+        color={colors.gray400} 
+      />
+      <Text style={styles.reactionCount}>{count}</Text>
+    </Animated.View>
+  );
 }
 
 export default function PostCard({
@@ -27,6 +73,7 @@ export default function PostCard({
   onOptionsPress,
 }: PostCardProps) {
   const [showReactionPicker, setShowReactionPicker] = useState(false);
+  const [showFullScreenImage, setShowFullScreenImage] = useState(false);
 
   const handleReactionPress = (type: ReactionType) => {
     if (post.user_reaction === type) {
@@ -63,9 +110,10 @@ export default function PostCard({
       <View style={styles.header}>
         <View style={styles.authorInfo}>
           {post.author.photo_url ? (
-            <Image
+            <SkeletonImage
               source={{ uri: post.author.photo_url }}
               style={styles.avatar}
+              borderRadius={24}
             />
           ) : (
             <View style={styles.avatarPlaceholder}>
@@ -95,13 +143,18 @@ export default function PostCard({
 
       {/* Image */}
       {post.image_url && (
-        <View style={styles.imageContainer}>
-          <Image
+        <TouchableOpacity
+          style={styles.imageContainer}
+          activeOpacity={0.9}
+          onPress={() => setShowFullScreenImage(true)}
+        >
+          <SkeletonImage
             source={{ uri: post.image_url }}
             style={styles.postImage}
             resizeMode="cover"
+            borderRadius={borderRadius.md}
           />
-        </View>
+        </TouchableOpacity>
       )}
 
       {/* Training Badge */}
@@ -115,12 +168,11 @@ export default function PostCard({
           {Object.entries(post.reactions_summary)
             .filter(([_, count]) => count > 0)
             .map(([type, count]) => (
-              <View key={type} style={styles.reactionSummaryItem}>
-                <Text style={styles.reactionEmoji}>
-                  {REACTION_EMOJIS[type as ReactionType]}
-                </Text>
-                <Text style={styles.reactionCount}>{count}</Text>
-              </View>
+              <AnimatedReactionSummaryItem
+                key={type}
+                type={type as ReactionType}
+                count={count}
+              />
             ))}
         </View>
       )}
@@ -137,26 +189,39 @@ export default function PostCard({
         />
 
         <TouchableOpacity style={styles.commentButton} onPress={onPress}>
-          <Ionicons name="chatbubble-outline" size={20} color={colors.gray400} />
-          <Text style={styles.commentCount}>{post.comments_count}</Text>
+          <Ionicons name="chatbubble-outline" size={18} color={colors.gray400} />
+          {post.comments_count > 0 && (
+            <Text style={styles.commentCount}>{post.comments_count}</Text>
+          )}
         </TouchableOpacity>
       </View>
+
+      {/* Full Screen Image Modal */}
+      {post.image_url && (
+        <FullScreenImage
+          visible={showFullScreenImage}
+          imageUri={post.image_url}
+          onClose={() => setShowFullScreenImage(false)}
+        />
+      )}
     </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: colors.white,
-    borderRadius: borderRadius.xl,
-    padding: spacing.lg,
-    marginBottom: spacing.md,
+    backgroundColor: colors.cardDark,
+    borderRadius: borderRadius.lg,
+    padding: spacing.xl,
+    marginBottom: spacing.lg,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.06)',
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: spacing.md,
+    marginBottom: spacing.lg,
   },
   authorInfo: {
     flexDirection: 'row',
@@ -164,17 +229,21 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   avatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   avatarPlaceholder: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: colors.primary,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(90, 107, 255, 0.2)',
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(90, 107, 255, 0.3)',
   },
   avatarText: {
     fontSize: typography.fontSize.md,
@@ -183,54 +252,60 @@ const styles = StyleSheet.create({
     color: colors.textDark,
   },
   authorDetails: {
-    marginLeft: spacing.md,
+    marginLeft: spacing.lg,
     flex: 1,
   },
   authorName: {
     fontSize: typography.fontSize.md,
     fontFamily: typography.fontFamily,
     fontWeight: typography.fontWeight.semiBold,
-    color: colors.textDark,
+    color: colors.white,
+    letterSpacing: -0.2,
   },
   timeAgo: {
     fontSize: typography.fontSize.sm,
     fontFamily: typography.fontFamily,
     fontWeight: typography.fontWeight.regular,
     color: colors.gray400,
-    marginTop: 2,
+    marginTop: 4,
+    letterSpacing: -0.1,
   },
   optionsButton: {
-    padding: spacing.xs,
+    padding: spacing.sm,
+    borderRadius: borderRadius.sm,
   },
   content: {
     fontSize: typography.fontSize.md,
     fontFamily: typography.fontFamily,
     fontWeight: typography.fontWeight.regular,
-    color: colors.textDark,
-    lineHeight: 22,
-    marginBottom: spacing.md,
+    color: 'rgba(255, 255, 255, 0.9)',
+    lineHeight: 24,
+    marginBottom: spacing.lg,
+    letterSpacing: -0.1,
   },
   imageContainer: {
-    marginHorizontal: -spacing.lg,
-    marginBottom: spacing.md,
+    marginHorizontal: -spacing.xl,
+    marginBottom: spacing.lg,
+    borderRadius: borderRadius.md,
+    overflow: 'hidden',
   },
   postImage: {
     width: '100%',
-    height: 250,
+    height: 280,
   },
   reactionsSummary: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: spacing.md,
-    gap: spacing.md,
+    marginBottom: spacing.lg,
+    gap: spacing.lg,
+    paddingTop: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.06)',
   },
   reactionSummaryItem: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs,
-  },
-  reactionEmoji: {
-    fontSize: 16,
   },
   reactionCount: {
     fontSize: typography.fontSize.sm,
@@ -244,19 +319,20 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingTop: spacing.md,
     borderTopWidth: 1,
-    borderTopColor: colors.gray200,
+    borderTopColor: 'rgba(255, 255, 255, 0.06)',
   },
   commentButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.xs,
+    gap: spacing.sm,
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.md,
   },
   commentCount: {
-    fontSize: typography.fontSize.md,
+    fontSize: typography.fontSize.sm,
     fontFamily: typography.fontFamily,
     fontWeight: typography.fontWeight.medium,
     color: colors.gray400,
+    letterSpacing: -0.1,
   },
 });

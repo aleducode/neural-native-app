@@ -1,11 +1,11 @@
 // Tipos de reacciones disponibles
 export type ReactionType = 'fire' | 'muscle' | 'clap' | 'heart';
 
-export const REACTION_EMOJIS: Record<ReactionType, string> = {
-  fire: '🔥',
-  muscle: '💪',
-  clap: '👏',
-  heart: '❤️',
+export const REACTION_ICONS: Record<ReactionType, { outline: string; filled: string }> = {
+  fire: { outline: 'flame-outline', filled: 'flame' },
+  muscle: { outline: 'fitness-outline', filled: 'fitness' },
+  clap: { outline: 'hand-right-outline', filled: 'hand-right' },
+  heart: { outline: 'heart-outline', filled: 'heart' },
 };
 
 export const REACTION_LABELS: Record<ReactionType, string> = {

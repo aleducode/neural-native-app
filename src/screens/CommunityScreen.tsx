@@ -10,7 +10,6 @@ import {
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { colors, typography, spacing, borderRadius } from '../theme/colors';
@@ -136,7 +135,7 @@ export default function CommunityScreen() {
   const renderEmptyState = () => (
     <View style={styles.emptyContainer}>
       <View style={styles.emptyIconContainer}>
-        <Ionicons name="people-outline" size={64} color={colors.gray400} />
+        <Ionicons name="people-outline" size={56} color={colors.gray400} />
       </View>
       <Text style={styles.emptyTitle}>Sin publicaciones</Text>
       <Text style={styles.emptySubtitle}>
@@ -171,18 +170,6 @@ export default function CommunityScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Background Gradients */}
-      <View style={styles.backgroundContainer}>
-        <LinearGradient
-          colors={['rgba(69, 255, 183, 0.15)', 'transparent']}
-          style={styles.gradientTop}
-        />
-        <LinearGradient
-          colors={['rgba(69, 255, 183, 0.15)', 'transparent']}
-          style={styles.gradientBottom}
-        />
-      </View>
-
       <SafeAreaView style={styles.safeArea} edges={['top']}>
         {/* Header */}
         <View style={styles.header}>
@@ -216,9 +203,9 @@ export default function CommunityScreen() {
         <TouchableOpacity
           style={styles.fab}
           onPress={handleCreatePost}
-          activeOpacity={0.8}
+          activeOpacity={0.85}
         >
-          <Ionicons name="add" size={28} color={colors.textDark} />
+          <Ionicons name="add" size={24} color={colors.white} />
         </TouchableOpacity>
       </SafeAreaView>
     </View>
@@ -238,42 +225,21 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  backgroundContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-  },
-  gradientTop: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 300,
-  },
-  gradientBottom: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 300,
-    transform: [{ rotate: '180deg' }],
-  },
   header: {
     paddingHorizontal: spacing.xxl,
-    paddingTop: spacing.lg,
-    paddingBottom: spacing.md,
+    paddingTop: spacing.xl,
+    paddingBottom: spacing.lg,
   },
   headerTitle: {
     fontSize: typography.fontSize.xxxl,
     fontFamily: typography.fontFamily,
     fontWeight: typography.fontWeight.bold,
     color: colors.white,
+    letterSpacing: -0.5,
   },
   listContent: {
-    paddingHorizontal: spacing.lg,
-    paddingBottom: 120,
+    paddingHorizontal: spacing.xxl,
+    paddingBottom: 140,
   },
   listContentEmpty: {
     flex: 1,
@@ -285,20 +251,23 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xxl,
   },
   emptyIconContainer: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: colors.cardDark,
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: spacing.xl,
+    marginBottom: spacing.xxl,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.06)',
   },
   emptyTitle: {
     fontSize: typography.fontSize.xxl,
     fontFamily: typography.fontFamily,
     fontWeight: typography.fontWeight.bold,
     color: colors.white,
-    marginBottom: spacing.sm,
+    marginBottom: spacing.md,
+    letterSpacing: -0.3,
   },
   emptySubtitle: {
     fontSize: typography.fontSize.md,
@@ -306,39 +275,43 @@ const styles = StyleSheet.create({
     fontWeight: typography.fontWeight.regular,
     color: colors.gray400,
     textAlign: 'center',
-    lineHeight: 22,
-    marginBottom: spacing.xl,
+    lineHeight: 24,
+    marginBottom: spacing.xxl,
+    letterSpacing: -0.1,
   },
   emptyButton: {
     backgroundColor: colors.primary,
     paddingHorizontal: spacing.xxl,
-    paddingVertical: spacing.md,
+    paddingVertical: spacing.lg,
     borderRadius: borderRadius.full,
+    minWidth: 180,
+    alignItems: 'center',
   },
   emptyButtonText: {
     fontSize: typography.fontSize.md,
     fontFamily: typography.fontFamily,
     fontWeight: typography.fontWeight.semiBold,
-    color: colors.textDark,
+    color: colors.white,
+    letterSpacing: -0.1,
   },
   footerLoader: {
-    paddingVertical: spacing.xl,
+    paddingVertical: spacing.xxl,
     alignItems: 'center',
   },
   fab: {
     position: 'absolute',
     bottom: 100,
-    right: spacing.lg,
+    right: spacing.xxl,
     width: 56,
     height: 56,
     borderRadius: 28,
     backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 8,
   },
 });

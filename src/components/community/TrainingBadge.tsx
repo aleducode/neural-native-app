@@ -28,7 +28,7 @@ export default function TrainingBadge({ training }: TrainingBadgeProps) {
   return (
     <View style={styles.container}>
       <View style={styles.iconContainer}>
-        <Ionicons name="barbell" size={24} color={colors.textDark} />
+        <Ionicons name="barbell" size={22} color={colors.primary} />
       </View>
 
       <View style={styles.content}>
@@ -54,21 +54,23 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(69, 255, 183, 0.1)',
+    backgroundColor: 'rgba(90, 107, 255, 0.08)',
     borderRadius: borderRadius.lg,
     padding: spacing.lg,
-    marginBottom: spacing.md,
+    marginBottom: spacing.lg,
     borderWidth: 1,
-    borderColor: 'rgba(69, 255, 183, 0.3)',
+    borderColor: 'rgba(90, 107, 255, 0.15)',
   },
   iconContainer: {
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: colors.primary,
+    backgroundColor: 'rgba(90, 107, 255, 0.15)',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: spacing.md,
+    marginRight: spacing.lg,
+    borderWidth: 1,
+    borderColor: 'rgba(90, 107, 255, 0.25)',
   },
   content: {
     flex: 1,
@@ -77,8 +79,9 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSize.md,
     fontFamily: typography.fontFamily,
     fontWeight: typography.fontWeight.semiBold,
-    color: colors.textDark,
+    color: colors.white,
     marginBottom: spacing.xs,
+    letterSpacing: -0.1,
   },
   details: {
     flexDirection: 'row',

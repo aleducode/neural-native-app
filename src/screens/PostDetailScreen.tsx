@@ -14,9 +14,10 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute, useFocusEffect, RouteProp } from '@react-navigation/native';
 import { colors, typography, spacing, borderRadius } from '../theme/colors';
-import { Post, Comment, ReactionType, REACTION_EMOJIS } from '../types/community';
+import { Post, Comment, ReactionType, REACTION_ICONS } from '../types/community';
 import { communityApi } from '../api/community';
 import { CommentItem, CommentInput, ReactionBar, TrainingBadge } from '../components/community';
+import FullScreenImage from '../components/community/FullScreenImage';
 import { RootStackParamList } from '../navigation/RootNavigator';
 
 type PostDetailRouteProp = RouteProp<RootStackParamList, 'PostDetail'>;
@@ -31,6 +32,7 @@ export default function PostDetailScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingComments, setIsLoadingComments] = useState(true);
   const [showReactionPicker, setShowReactionPicker] = useState(false);
+  const [showFullScreenImage, setShowFullScreenImage] = useState(false);
 
   const fetchPostAndComments = useCallback(async () => {
     setIsLoading(true);
@@ -167,7 +169,12 @@ export default function PostDetailScreen() {
 
         {/* Image */}
         {post.image_url && (
-          <Image source={{ uri: post.image_url }} style={styles.postImage} resizeMode="cover" />
+          <TouchableOpacity
+            activeOpacity={0.9}
+            onPress={() => setShowFullScreenImage(true)}
+          >
+            <Image source={{ uri: post.image_url }} style={styles.postImage} resizeMode="cover" />
+          </TouchableOpacity>
         )}
 
         {/* Training Badge */}
@@ -180,9 +187,11 @@ export default function PostDetailScreen() {
               .filter(([_, count]) => count > 0)
               .map(([type, count]) => (
                 <View key={type} style={styles.reactionSummaryItem}>
-                  <Text style={styles.reactionEmoji}>
-                    {REACTION_EMOJIS[type as ReactionType]}
-                  </Text>
+                  <Ionicons 
+                    name={REACTION_ICONS[type as ReactionType].outline as any} 
+                    size={16} 
+                    color={colors.gray400} 
+                  />
                   <Text style={styles.reactionCount}>{count}</Text>
                 </View>
               ))}
@@ -295,6 +304,15 @@ export default function PostDetailScreen() {
           <CommentInput onSubmit={handleAddComment} />
         </SafeAreaView>
       </SafeAreaView>
+
+      {/* Full Screen Image Modal */}
+      {post.image_url && (
+        <FullScreenImage
+          visible={showFullScreenImage}
+          imageUri={post.image_url}
+          onClose={() => setShowFullScreenImage(false)}
+        />
+      )}
     </View>
   );
 }
@@ -426,9 +444,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs,
-  },
-  reactionEmoji: {
-    fontSize: 16,
   },
   reactionCount: {
     fontSize: typography.fontSize.sm,

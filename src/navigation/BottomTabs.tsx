@@ -1,12 +1,9 @@
 import React from 'react';
-import { View, StyleSheet, TouchableOpacity, Platform, Dimensions } from 'react-native';
+import { StyleSheet, Platform } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, borderRadius } from '../theme/colors';
-
-const SCREEN_WIDTH = Dimensions.get('window').width;
-const TAB_BAR_MARGIN = 32; // Margen fijo a cada lado
+import { colors } from '../theme/colors';
 
 // Screens
 import HomeScreen from '../screens/HomeScreen';
@@ -50,23 +47,6 @@ export default function BottomTabs() {
         name="Home"
         component={HomeScreen}
         options={{
-          tabBarButton: (props) => {
-            const { children, onPress, accessibilityState } = props;
-            const isFocused = accessibilityState?.selected;
-            return (
-              <TouchableOpacity
-                onPress={onPress}
-                activeOpacity={0.7}
-                style={[
-                  styles.tabBarButton,
-                  isFocused && styles.tabBarButtonActive,
-                ]}
-                accessibilityState={accessibilityState}
-              >
-                {children}
-              </TouchableOpacity>
-            );
-          },
           tabBarIcon: ({ focused, color }) => (
             <Ionicons
               name={focused ? 'home' : 'home-outline'}
@@ -164,15 +144,5 @@ const styles = StyleSheet.create({
       default: 'System',
     }),
     fontWeight: '500',
-  },
-  tabBarButton: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 8,
-    borderRadius: borderRadius.md,
-  },
-  tabBarButtonActive: {
-    backgroundColor: colors.gray500,
   },
 });
