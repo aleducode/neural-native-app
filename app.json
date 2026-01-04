@@ -19,7 +19,8 @@
         "UIBackgroundModes": [
           "remote-notification"
         ],
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSPhotoLibraryUsageDescription": "Neural Consciente necesita acceso a tu biblioteca de fotos para que puedas actualizar tu foto de perfil y compartir imágenes de tus entrenamientos con la comunidad."
       }
     },
     "android": {
