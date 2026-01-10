@@ -210,9 +210,3 @@ src/
 ```
 
 ---
-
-## Credenciales de Prueba
-
-- **Dominio:** app.neural.com.co
-- **Email:** ducode@outlook.com
-- **Password:** jua91duq10

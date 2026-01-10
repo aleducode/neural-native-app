@@ -30,7 +30,7 @@ class PushNotificationService {
   async registerForPushNotifications(): Promise<string | null> {
     // Check if we're on a physical device
     if (!Device.isDevice) {
-      console.log('Push notifications require a physical device');
+      console.log('[PushNotifications] Push notifications require a physical device');
       return null;
     }
 
@@ -45,7 +45,7 @@ class PushNotificationService {
     }
 
     if (finalStatus !== 'granted') {
-      console.log('Push notification permission not granted');
+      console.log('[PushNotifications] Push notification permission not granted');
       return null;
     }
 
@@ -53,12 +53,17 @@ class PushNotificationService {
     try {
       const projectId = Constants.expoConfig?.extra?.eas?.projectId;
 
+      if (!projectId) {
+        console.warn('[PushNotifications] No projectId found in app config');
+        return null;
+      }
+
       const tokenData = await Notifications.getExpoPushTokenAsync({
         projectId,
       });
 
       this.expoPushToken = tokenData.data;
-      console.log('Expo Push Token:', this.expoPushToken);
+      console.log('[PushNotifications] Expo Push Token:', this.expoPushToken);
 
       // Configure notification channel for Android
       if (Platform.OS === 'android') {
@@ -71,8 +76,30 @@ class PushNotificationService {
       }
 
       return this.expoPushToken;
-    } catch (error) {
-      console.error('Error getting push token:', error);
+    } catch (error: any) {
+      // Handle specific Android errors
+      if (Platform.OS === 'android') {
+        const errorMessage = error?.message || String(error);
+        
+        if (errorMessage.includes('SERVICE_NOT_AVAILABLE')) {
+          console.warn(
+            '[PushNotifications] Google Play Services not available. ' +
+            'This can happen if:\n' +
+            '- Google Play Services is not installed or needs updating\n' +
+            '- Device is in airplane mode or has no internet connection\n' +
+            '- Device doesn\'t have Google Services (some Chinese/Huawei devices)\n' +
+            'Push notifications will not work on this device.'
+          );
+          return null;
+        }
+        
+        if (errorMessage.includes('NETWORK_ERROR')) {
+          console.warn('[PushNotifications] Network error while getting push token. Retry later.');
+          return null;
+        }
+      }
+      
+      console.error('[PushNotifications] Error getting push token:', error);
       return null;
     }
   }
@@ -129,16 +156,24 @@ class PushNotificationService {
 
   /**
    * Setup push notifications - call this on app startup after login
+   * This method is non-blocking and will fail silently if push notifications
+   * are not available (e.g., device without Google Play Services)
    */
   async setup(): Promise<void> {
-    const token = await this.registerForPushNotifications();
+    try {
+      const token = await this.registerForPushNotifications();
 
-    if (token) {
-      // Only register with backend if user is authenticated
-      const authToken = await getToken();
-      if (authToken) {
-        await this.registerDeviceWithBackend(token);
+      if (token) {
+        // Only register with backend if user is authenticated
+        const authToken = await getToken();
+        if (authToken) {
+          await this.registerDeviceWithBackend(token);
+        }
       }
+    } catch (error) {
+      // Silently fail - push notifications are optional
+      // Some Android devices don't have Google Play Services
+      console.warn('[PushNotifications] Setup failed (this is ok if device lacks Google Services):', error);
     }
   }
 

@@ -9,7 +9,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Feather } from '@expo/vector-icons';
 import { colors, typography, spacing, borderRadius } from '../../theme/colors';
 
 interface CommentInputProps {
@@ -67,7 +67,7 @@ export default function CommentInput({
           {isSubmitting ? (
             <ActivityIndicator size="small" color={colors.textDark} />
           ) : (
-            <Ionicons
+            <Feather
               name="send"
               size={20}
               color={canSubmit ? colors.textDark : colors.gray400}

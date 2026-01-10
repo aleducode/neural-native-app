@@ -10,7 +10,7 @@ import {
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import { Feather } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { colors, typography, spacing, borderRadius } from '../theme/colors';
 import { Post, ReactionType } from '../types/community';
@@ -123,19 +123,24 @@ export default function CommunityScreen() {
     Alert.alert('Opciones', 'Próximamente');
   };
 
+  const handleAuthorPress = (authorId: number) => {
+    navigation.navigate('UserProfile', { userId: authorId });
+  };
+
   const renderPost = ({ item }: { item: Post }) => (
     <PostCard
       post={item}
       onPress={() => handlePostPress(item)}
       onReaction={(type) => handleReaction(item.id, type)}
       onOptionsPress={() => handleOptionsPress(item)}
+      onAuthorPress={() => handleAuthorPress(item.author.id)}
     />
   );
 
   const renderEmptyState = () => (
     <View style={styles.emptyContainer}>
       <View style={styles.emptyIconContainer}>
-        <Ionicons name="people-outline" size={56} color={colors.gray400} />
+        <Feather name="users" size={56} color={colors.gray400} />
       </View>
       <Text style={styles.emptyTitle}>Sin publicaciones</Text>
       <Text style={styles.emptySubtitle}>
@@ -205,7 +210,7 @@ export default function CommunityScreen() {
           onPress={handleCreatePost}
           activeOpacity={0.85}
         >
-          <Ionicons name="add" size={24} color={colors.white} />
+          <Feather name="plus" size={24} color={colors.white} />
         </TouchableOpacity>
       </SafeAreaView>
     </View>

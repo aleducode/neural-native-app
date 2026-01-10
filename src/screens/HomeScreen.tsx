@@ -146,7 +146,11 @@ export default function HomeScreen() {
         >
           {/* Header: User Info + Notification */}
           <View style={styles.header}>
-            <View style={styles.userInfo}>
+            <TouchableOpacity
+              style={styles.userInfo}
+              onPress={() => navigation.navigate('Profile')}
+              activeOpacity={0.7}
+            >
               {userPhoto ? (
                 <Image source={{ uri: userPhoto }} style={styles.avatar} />
               ) : (
@@ -158,7 +162,7 @@ export default function HomeScreen() {
                 <Text style={styles.welcomeText}>¡BIENVENIDO!</Text>
                 <Text style={styles.userName}>{userName}</Text>
               </View>
-            </View>
+            </TouchableOpacity>
             <TouchableOpacity
               style={styles.notificationBtn}
               onPress={() => navigation.navigate('Notifications')}

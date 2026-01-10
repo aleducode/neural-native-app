@@ -123,6 +123,30 @@ export const communityApi = {
   deleteComment: async (commentId: number) => {
     return api.delete(`/community/comments/${commentId}/`);
   },
+
+  // ============ USER PROFILE ============
+
+  getUserProfile: async (userId: number) => {
+    return api.get<UserPublicProfile>(`/community/users/${userId}/`);
+  },
 };
+
+// Types
+export interface UserPublicProfile {
+  id: number;
+  name: string;
+  first_name: string;
+  last_name: string;
+  photo_url: string | null;
+  instagram: string | null;
+  profession: string | null;
+  member_since: string | null;
+  stats: {
+    total_trainings: number;
+    current_strike: number;
+    posts_count: number;
+  };
+  recent_posts: Post[];
+}
 
 export default communityApi;

@@ -18,5 +18,6 @@ export type RootStackParamList = {
   // Community
   CreatePost: undefined;
   PostDetail: { postId: number };
+  UserProfile: { userId: number };
 };
 

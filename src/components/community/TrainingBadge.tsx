@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Feather } from '@expo/vector-icons';
 import { colors, typography, spacing, borderRadius } from '../../theme/colors';
 import { PostTraining } from '../../types/community';
 
@@ -28,24 +28,24 @@ export default function TrainingBadge({ training }: TrainingBadgeProps) {
   return (
     <View style={styles.container}>
       <View style={styles.iconContainer}>
-        <Ionicons name="barbell" size={22} color={colors.primary} />
+        <Feather name="activity" size={22} color={colors.primary} />
       </View>
 
       <View style={styles.content}>
         <Text style={styles.trainingType}>{training.type}</Text>
         <View style={styles.details}>
           <View style={styles.detailItem}>
-            <Ionicons name="calendar-outline" size={14} color={colors.gray400} />
+            <Feather name="calendar" size={14} color={colors.gray400} />
             <Text style={styles.detailText}>{formatDate(training.date)}</Text>
           </View>
           <View style={styles.detailItem}>
-            <Ionicons name="time-outline" size={14} color={colors.gray400} />
+            <Feather name="clock" size={14} color={colors.gray400} />
             <Text style={styles.detailText}>{formatDuration(training.duration_minutes)}</Text>
           </View>
         </View>
       </View>
 
-      <Ionicons name="checkmark-circle" size={24} color={colors.primary} />
+      <Feather name="check-circle" size={24} color={colors.primary} />
     </View>
   );
 }

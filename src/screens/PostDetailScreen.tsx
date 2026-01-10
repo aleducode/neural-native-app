@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
+import { Feather } from '@expo/vector-icons';
 import { useNavigation, useRoute, useFocusEffect, RouteProp } from '@react-navigation/native';
 import { colors, typography, spacing, borderRadius } from '../theme/colors';
 import { Post, Comment, ReactionType, REACTION_ICONS } from '../types/community';
@@ -23,7 +23,7 @@ import { RootStackParamList } from '../navigation/RootNavigator';
 type PostDetailRouteProp = RouteProp<RootStackParamList, 'PostDetail'>;
 
 export default function PostDetailScreen() {
-  const navigation = useNavigation();
+  const navigation = useNavigation<any>();
   const route = useRoute<PostDetailRouteProp>();
   const { postId } = route.params;
 
@@ -150,7 +150,11 @@ export default function PostDetailScreen() {
     return (
       <View style={styles.postContainer}>
         {/* Author Header */}
-        <View style={styles.authorRow}>
+        <TouchableOpacity
+          style={styles.authorRow}
+          onPress={() => navigation.navigate('UserProfile', { userId: post.author.id })}
+          activeOpacity={0.7}
+        >
           {post.author.photo_url ? (
             <Image source={{ uri: post.author.photo_url }} style={styles.avatar} />
           ) : (
@@ -162,7 +166,7 @@ export default function PostDetailScreen() {
             <Text style={styles.authorName}>{post.author.name}</Text>
             <Text style={styles.timeAgo}>{post.time_ago}</Text>
           </View>
-        </View>
+        </TouchableOpacity>
 
         {/* Content */}
         {post.content ? <Text style={styles.content}>{post.content}</Text> : null}
@@ -187,10 +191,10 @@ export default function PostDetailScreen() {
               .filter(([_, count]) => count > 0)
               .map(([type, count]) => (
                 <View key={type} style={styles.reactionSummaryItem}>
-                  <Ionicons 
-                    name={REACTION_ICONS[type as ReactionType].outline as any} 
-                    size={16} 
-                    color={colors.gray400} 
+                  <Feather
+                    name={REACTION_ICONS[type as ReactionType].icon as any}
+                    size={16}
+                    color={colors.gray400}
                   />
                   <Text style={styles.reactionCount}>{count}</Text>
                 </View>
@@ -231,7 +235,7 @@ export default function PostDetailScreen() {
 
   const renderEmptyComments = () => (
     <View style={styles.emptyComments}>
-      <Ionicons name="chatbubble-outline" size={48} color={colors.gray400} />
+      <Feather name="message-circle" size={48} color={colors.gray400} />
       <Text style={styles.emptyCommentsText}>Sin comentarios aún</Text>
       <Text style={styles.emptyCommentsSubtext}>Sé el primero en comentar</Text>
     </View>
@@ -255,7 +259,7 @@ export default function PostDetailScreen() {
         <SafeAreaView style={styles.safeArea}>
           <View style={styles.header}>
             <TouchableOpacity onPress={handleBack} style={styles.backButton}>
-              <Ionicons name="arrow-back" size={24} color={colors.white} />
+              <Feather name="arrow-left" size={24} color={colors.white} />
             </TouchableOpacity>
             <Text style={styles.headerTitle}>Publicación</Text>
             <View style={styles.headerSpacer} />
@@ -282,7 +286,7 @@ export default function PostDetailScreen() {
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity onPress={handleBack} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={24} color={colors.white} />
+            <Feather name="arrow-left" size={24} color={colors.white} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Publicación</Text>
           <View style={styles.headerSpacer} />

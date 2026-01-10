@@ -10,8 +10,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
+import { Feather } from '@expo/vector-icons';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../context/AuthContext';
@@ -21,19 +20,23 @@ import { authApi } from '../api/auth';
 import ConfirmModal from '../components/ConfirmModal';
 
 interface MenuItemProps {
-  icon: string;
+  icon: keyof typeof Feather.glyphMap;
   title: string;
+  subtitle?: string;
   onPress: () => void;
 }
 
-function MenuItem({ icon, title, onPress }: MenuItemProps) {
+function MenuItem({ icon, title, subtitle, onPress }: MenuItemProps) {
   return (
-    <TouchableOpacity style={styles.menuItem} onPress={onPress} activeOpacity={0.7}>
-      <View style={styles.menuIconWrapper}>
-        <Ionicons name={icon as any} size={22} color={colors.textDark} />
+    <TouchableOpacity style={styles.menuItem} onPress={onPress} activeOpacity={0.6}>
+      <View style={styles.menuIconContainer}>
+        <Feather name={icon} size={20} color={colors.white} />
       </View>
-      <Text style={styles.menuTitle}>{title}</Text>
-      <Ionicons name="chevron-forward" size={18} color={colors.gray400} />
+      <View style={styles.menuContent}>
+        <Text style={styles.menuTitle}>{title}</Text>
+        {subtitle && <Text style={styles.menuSubtitle}>{subtitle}</Text>}
+      </View>
+      <Feather name="chevron-right" size={20} color={colors.gray400} />
     </TouchableOpacity>
   );
 }
@@ -65,7 +68,6 @@ export default function ProfileScreen() {
     : 'U';
   const userPhoto = user?.photo_url;
 
-  // Stats from dashboard
   const membershipDays = dashboardData?.membership?.days_left ?? 0;
   const trainingsCount = dashboardData?.stats?.trainings ?? 0;
   const strikeWeeks = dashboardData?.strike?.weeks ?? 0;
@@ -77,14 +79,6 @@ export default function ProfileScreen() {
   const confirmLogout = () => {
     setShowLogoutModal(false);
     logout();
-  };
-
-  const handleMembership = () => {
-    navigation.navigate('Membership');
-  };
-
-  const handleEditProfile = () => {
-    navigation.navigate('EditProfile');
   };
 
   const handleChangePhoto = async () => {
@@ -119,43 +113,20 @@ export default function ProfileScreen() {
 
       if (data) {
         updateUser(data);
-        Alert.alert('Foto actualizada', 'Tu foto de perfil ha sido actualizada correctamente.');
       } else {
-        Alert.alert('Error', error || 'No se pudo actualizar la foto de perfil.');
+        Alert.alert('Error', error || 'No se pudo actualizar la foto.');
       }
     }
   };
 
-  const handleNotifications = () => {
-    navigation.navigate('Notifications');
-  };
-
-  const handleMyCalendar = () => {
-    navigation.navigate('Trainings');
-  };
-
   return (
     <View style={styles.container}>
-      {/* Subtle Background Gradients */}
-      <View style={styles.backgroundContainer}>
-        <LinearGradient
-          colors={['rgba(90, 107, 255, 0.15)', 'transparent']}
-          style={styles.gradientTop}
-        />
-        <LinearGradient
-          colors={['rgba(90, 107, 255, 0.15)', 'transparent']}
-          style={styles.gradientBottom}
-        />
-      </View>
-
       <SafeAreaView style={styles.safeArea} edges={['top']}>
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-            <Ionicons name="chevron-back" size={24} color={colors.textDark} />
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+            <Feather name="arrow-left" size={22} color={colors.white} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Perfil</Text>
-          <View style={styles.headerSpacer} />
         </View>
 
         <ScrollView
@@ -165,7 +136,6 @@ export default function ProfileScreen() {
         >
           {/* Profile Section */}
           <View style={styles.profileSection}>
-            {/* Avatar */}
             <TouchableOpacity
               style={styles.avatarContainer}
               onPress={handleChangePhoto}
@@ -184,66 +154,88 @@ export default function ProfileScreen() {
                   <ActivityIndicator size="small" color={colors.white} />
                 </View>
               ) : (
-                <View style={styles.cameraIconContainer}>
-                  <Ionicons name="camera" size={14} color={colors.white} />
+                <View style={styles.cameraButton}>
+                  <Feather name="camera" size={14} color={colors.white} />
                 </View>
               )}
             </TouchableOpacity>
 
-            {/* User Info */}
             <Text style={styles.userName}>{userName}</Text>
             <Text style={styles.userEmail}>{userEmail}</Text>
           </View>
 
-          {/* Stats Card */}
-          <View style={styles.statsCard}>
+          {/* Divider */}
+          <View style={styles.divider} />
+
+          {/* Stats Section */}
+          <View style={styles.statsSection}>
             <View style={styles.statItem}>
+              <View style={styles.statIconContainer}>
+                <Feather name="credit-card" size={18} color={colors.primary} />
+              </View>
               <Text style={styles.statValue}>{membershipDays}</Text>
-              <Text style={styles.statLabel}>Días de Membresía</Text>
+              <Text style={styles.statLabel}>Días</Text>
             </View>
-            <View style={styles.statDivider} />
+
             <View style={styles.statItem}>
+              <View style={styles.statIconContainer}>
+                <Feather name="activity" size={18} color={colors.primary} />
+              </View>
               <Text style={styles.statValue}>{trainingsCount}</Text>
               <Text style={styles.statLabel}>Entrenos</Text>
             </View>
-            <View style={styles.statDivider} />
+
             <View style={styles.statItem}>
+              <View style={styles.statIconContainer}>
+                <Feather name="zap" size={18} color={colors.primary} />
+              </View>
               <Text style={styles.statValue}>{strikeWeeks}</Text>
-              <Text style={styles.statLabel}>Racha (semanas)</Text>
+              <Text style={styles.statLabel}>Semanas</Text>
             </View>
           </View>
 
-          {/* Menu Items */}
-          <View style={styles.menuContainer}>
+          {/* Divider */}
+          <View style={styles.divider} />
+
+          {/* Menu Section */}
+          <View style={styles.menuSection}>
+            <Text style={styles.sectionLabel}>Cuenta</Text>
+
             <MenuItem
-              icon="calendar-outline"
+              icon="calendar"
               title="Mi calendario"
-              onPress={handleMyCalendar}
+              subtitle="Ver mis entrenamientos"
+              onPress={() => navigation.navigate('Trainings')}
             />
+
             <MenuItem
-              icon="card-outline"
+              icon="credit-card"
               title="Membresía"
-              onPress={handleMembership}
+              subtitle={`${membershipDays} días restantes`}
+              onPress={() => navigation.navigate('Membership')}
             />
+
             <MenuItem
-              icon="person-outline"
-              title="Mi Perfil"
-              onPress={handleEditProfile}
+              icon="user"
+              title="Editar perfil"
+              subtitle="Información personal"
+              onPress={() => navigation.navigate('EditProfile')}
             />
+
             <MenuItem
-              icon="notifications-outline"
+              icon="bell"
               title="Notificaciones"
-              onPress={handleNotifications}
+              subtitle="Preferencias de alertas"
+              onPress={() => navigation.navigate('Notifications')}
             />
           </View>
 
-          {/* Logout Button */}
-          <TouchableOpacity style={styles.logoutButton} onPress={handleLogout} activeOpacity={0.7}>
-            <Ionicons name="log-out-outline" size={20} color={colors.error} />
-            <Text style={styles.logoutText}>Cerrar Sesión</Text>
+          {/* Logout */}
+          <TouchableOpacity style={styles.logoutButton} onPress={handleLogout} activeOpacity={0.6}>
+            <Feather name="log-out" size={18} color={colors.error} />
+            <Text style={styles.logoutText}>Cerrar sesión</Text>
           </TouchableOpacity>
 
-          {/* Bottom Spacer */}
           <View style={styles.bottomSpacer} />
         </ScrollView>
 
@@ -267,108 +259,75 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.bgDark,
   },
-  backgroundContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-  },
-  gradientTop: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 300,
-  },
-  gradientBottom: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 300,
-    transform: [{ rotate: '180deg' }],
-  },
   safeArea: {
     flex: 1,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: spacing.xxl,
-    paddingTop: spacing.lg,
-    paddingBottom: spacing.xl,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.md,
   },
   backButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: colors.white,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: spacing.md,
-  },
-  headerTitle: {
-    flex: 1,
-    fontSize: typography.fontSize.xxl,
-    fontFamily: typography.fontFamily,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.white,
-    textAlign: 'center',
-  },
-  headerSpacer: {
-    width: 48,
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: spacing.xxl,
+    paddingBottom: 40,
   },
   profileSection: {
     alignItems: 'center',
-    marginTop: spacing.xl,
-    marginBottom: spacing.xxl,
+    paddingHorizontal: spacing.xxl,
+    paddingTop: spacing.xl,
+    paddingBottom: spacing.xxxl,
   },
   avatarContainer: {
     position: 'relative',
-    marginBottom: spacing.lg,
+    marginBottom: spacing.xxl,
   },
   avatar: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    borderWidth: 4,
-    borderColor: colors.white,
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   avatarPlaceholder: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: colors.primary,
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: colors.cardDark,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 4,
-    borderColor: colors.white,
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.06)',
   },
   avatarText: {
-    fontSize: 42,
+    fontSize: 28,
     fontFamily: typography.fontFamily,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.textDark,
+    fontWeight: typography.fontWeight.semiBold,
+    color: colors.gray400,
+    letterSpacing: 1,
   },
-  cameraIconContainer: {
+  cameraButton: {
     position: 'absolute',
     bottom: 0,
     right: 0,
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 3,
-    borderColor: colors.white,
+    borderWidth: 2,
+    borderColor: colors.bgDark,
   },
   avatarOverlay: {
     position: 'absolute',
@@ -376,8 +335,8 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    borderRadius: 60,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    borderRadius: 48,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -386,89 +345,122 @@ const styles = StyleSheet.create({
     fontFamily: typography.fontFamily,
     fontWeight: typography.fontWeight.bold,
     color: colors.white,
-    marginTop: spacing.md,
-    marginBottom: spacing.xs,
+    letterSpacing: -0.5,
   },
   userEmail: {
-    fontSize: typography.fontSize.md,
+    fontSize: typography.fontSize.sm,
     fontFamily: typography.fontFamily,
     fontWeight: typography.fontWeight.regular,
     color: colors.gray400,
+    marginTop: spacing.xs,
   },
-  statsCard: {
-    backgroundColor: colors.white,
-    borderRadius: borderRadius.xxl,
-    paddingVertical: spacing.xxl,
-    paddingHorizontal: spacing.xxl,
-    marginBottom: spacing.xxl,
+  divider: {
+    height: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    marginHorizontal: spacing.xxl,
+  },
+  statsSection: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    alignItems: 'center',
+    paddingVertical: spacing.xxxl,
+    paddingHorizontal: spacing.xxl,
   },
   statItem: {
     alignItems: 'center',
     flex: 1,
   },
+  statIconContainer: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(90, 107, 255, 0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.md,
+  },
   statValue: {
-    fontSize: typography.fontSize.xxxl,
+    fontSize: typography.fontSize.xl,
     fontFamily: typography.fontFamily,
     fontWeight: typography.fontWeight.bold,
-    color: colors.textDark,
-    marginBottom: spacing.xs,
+    color: colors.white,
+    letterSpacing: -0.5,
   },
   statLabel: {
-    fontSize: typography.fontSize.sm,
+    fontSize: typography.fontSize.xs,
+    fontFamily: typography.fontFamily,
+    fontWeight: typography.fontWeight.regular,
+    color: colors.gray400,
+    marginTop: spacing.xs,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  menuSection: {
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.xxxl,
+  },
+  sectionLabel: {
+    fontSize: typography.fontSize.xs,
     fontFamily: typography.fontFamily,
     fontWeight: typography.fontWeight.medium,
     color: colors.gray400,
-    textAlign: 'center',
-  },
-  statDivider: {
-    width: 1,
-    height: 50,
-    backgroundColor: colors.gray200,
-  },
-  menuContainer: {
-    gap: spacing.md,
-    marginBottom: spacing.xl,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: spacing.lg,
+    paddingHorizontal: spacing.xs,
   },
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.white,
-    borderRadius: borderRadius.xl,
+    backgroundColor: colors.cardDark,
+    borderRadius: borderRadius.lg,
     paddingVertical: spacing.lg,
-    paddingHorizontal: spacing.xxl,
-    minHeight: 64,
+    paddingHorizontal: spacing.lg,
+    marginBottom: spacing.sm,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.04)',
   },
-  menuIconWrapper: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: colors.gray200,
+  menuIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: spacing.lg,
   },
-  menuTitle: {
+  menuContent: {
     flex: 1,
-    fontSize: typography.fontSize.lg,
+  },
+  menuTitle: {
+    fontSize: typography.fontSize.md,
     fontFamily: typography.fontFamily,
-    fontWeight: typography.fontWeight.semiBold,
-    color: colors.textDark,
+    fontWeight: typography.fontWeight.medium,
+    color: colors.white,
+  },
+  menuSubtitle: {
+    fontSize: typography.fontSize.sm,
+    fontFamily: typography.fontFamily,
+    fontWeight: typography.fontWeight.regular,
+    color: colors.gray400,
+    marginTop: 2,
   },
   logoutButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: spacing.lg,
-    marginBottom: spacing.xl,
+    marginTop: spacing.xxxl,
+    marginHorizontal: spacing.xxl,
+    paddingVertical: spacing.lg,
     gap: spacing.sm,
+    borderRadius: borderRadius.lg,
+    backgroundColor: 'rgba(255, 77, 77, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 77, 77, 0.15)',
   },
   logoutText: {
     fontSize: typography.fontSize.md,
     fontFamily: typography.fontFamily,
-    fontWeight: typography.fontWeight.semiBold,
+    fontWeight: typography.fontWeight.medium,
     color: colors.error,
   },
   bottomSpacer: {

@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, Image, TouchableOpacity } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Feather } from '@expo/vector-icons';
 import { colors, typography, spacing, borderRadius } from '../../theme/colors';
 import { Comment } from '../../types/community';
 
@@ -40,7 +40,7 @@ export default function CommentItem({ comment, onDelete }: CommentItemProps) {
           onPress={onDelete}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
-          <Ionicons name="trash-outline" size={16} color={colors.error} />
+          <Feather name="trash-2" size={16} color={colors.error} />
         </TouchableOpacity>
       )}
     </View>

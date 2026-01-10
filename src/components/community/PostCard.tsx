@@ -1,19 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
-  Pressable,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withSpring,
-  withSequence,
-  withTiming,
-} from 'react-native-reanimated';
+import { Feather } from '@expo/vector-icons';
 import { colors, typography, spacing, borderRadius } from '../../theme/colors';
 import { Post, ReactionType, REACTION_ICONS } from '../../types/community';
 import ReactionBar from './ReactionBar';
@@ -26,44 +18,7 @@ interface PostCardProps {
   onPress: () => void;
   onReaction: (reactionType: ReactionType | null) => void;
   onOptionsPress?: () => void;
-}
-
-interface AnimatedReactionSummaryItemProps {
-  type: ReactionType;
-  count: number;
-}
-
-function AnimatedReactionSummaryItem({ type, count }: AnimatedReactionSummaryItemProps) {
-  const opacity = useSharedValue(1);
-  const translateY = useSharedValue(0);
-
-  useEffect(() => {
-    // Animate when count changes - use opacity and translate instead of scale to avoid blur
-    opacity.value = withSequence(
-      withTiming(0.5, { duration: 100 }),
-      withTiming(1, { duration: 200 })
-    );
-    translateY.value = withSequence(
-      withSpring(-4, { damping: 8, stiffness: 200 }),
-      withSpring(0, { damping: 10, stiffness: 150 })
-    );
-  }, [count]);
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    opacity: opacity.value,
-    transform: [{ translateY: translateY.value }],
-  }));
-
-  return (
-    <Animated.View style={[styles.reactionSummaryItem, animatedStyle]}>
-      <Ionicons 
-        name={REACTION_ICONS[type].outline as any} 
-        size={16} 
-        color={colors.gray400} 
-      />
-      <Text style={styles.reactionCount}>{count}</Text>
-    </Animated.View>
-  );
+  onAuthorPress?: () => void;
 }
 
 export default function PostCard({
@@ -71,6 +26,7 @@ export default function PostCard({
   onPress,
   onReaction,
   onOptionsPress,
+  onAuthorPress,
 }: PostCardProps) {
   const [showReactionPicker, setShowReactionPicker] = useState(false);
   const [showFullScreenImage, setShowFullScreenImage] = useState(false);
@@ -108,7 +64,12 @@ export default function PostCard({
     >
       {/* Header */}
       <View style={styles.header}>
-        <View style={styles.authorInfo}>
+        <TouchableOpacity
+          style={styles.authorInfo}
+          onPress={onAuthorPress}
+          activeOpacity={onAuthorPress ? 0.7 : 1}
+          disabled={!onAuthorPress}
+        >
           {post.author.photo_url ? (
             <SkeletonImage
               source={{ uri: post.author.photo_url }}
@@ -124,14 +85,14 @@ export default function PostCard({
             <Text style={styles.authorName}>{post.author.name}</Text>
             <Text style={styles.timeAgo}>{post.time_ago}</Text>
           </View>
-        </View>
+        </TouchableOpacity>
         {onOptionsPress && (
           <TouchableOpacity
             style={styles.optionsButton}
             onPress={onOptionsPress}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
-            <Ionicons name="ellipsis-horizontal" size={20} color={colors.gray400} />
+            <Feather name="more-horizontal" size={20} color={colors.gray400} />
           </TouchableOpacity>
         )}
       </View>
@@ -168,11 +129,14 @@ export default function PostCard({
           {Object.entries(post.reactions_summary)
             .filter(([_, count]) => count > 0)
             .map(([type, count]) => (
-              <AnimatedReactionSummaryItem
-                key={type}
-                type={type as ReactionType}
-                count={count}
-              />
+              <View key={type} style={styles.reactionSummaryItem}>
+                <Feather
+                  name={REACTION_ICONS[type as ReactionType].icon as any}
+                  size={16}
+                  color={colors.gray400}
+                />
+                <Text style={styles.reactionCount}>{count}</Text>
+              </View>
             ))}
         </View>
       )}
@@ -189,7 +153,7 @@ export default function PostCard({
         />
 
         <TouchableOpacity style={styles.commentButton} onPress={onPress}>
-          <Ionicons name="chatbubble-outline" size={18} color={colors.gray400} />
+          <Feather name="message-circle" size={18} color={colors.gray400} />
           {post.comments_count > 0 && (
             <Text style={styles.commentCount}>{post.comments_count}</Text>
           )}

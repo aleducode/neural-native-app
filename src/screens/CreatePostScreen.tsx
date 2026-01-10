@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
+import { Feather } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import { colors, typography, spacing, borderRadius } from '../theme/colors';
@@ -144,7 +144,7 @@ export default function CreatePostScreen() {
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
-            <Ionicons name="close" size={28} color={colors.white} />
+            <Feather name="x" size={28} color={colors.white} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Nueva publicación</Text>
           <TouchableOpacity
@@ -191,7 +191,7 @@ export default function CreatePostScreen() {
               <View style={styles.imagePreviewContainer}>
                 <Image source={{ uri: selectedImage }} style={styles.imagePreview} />
                 <TouchableOpacity style={styles.removeImageButton} onPress={handleRemoveImage}>
-                  <Ionicons name="close-circle" size={28} color={colors.white} />
+                  <Feather name="x-circle" size={28} color={colors.white} />
                 </TouchableOpacity>
               </View>
             )}
@@ -200,7 +200,7 @@ export default function CreatePostScreen() {
             {selectedTraining && (
               <View style={styles.trainingPreview}>
                 <View style={styles.trainingIcon}>
-                  <Ionicons name="barbell" size={24} color={colors.primary} />
+                  <Feather name="activity" size={24} color={colors.primary} />
                 </View>
                 <View style={styles.trainingInfo}>
                   <Text style={styles.trainingType}>{selectedTraining.type}</Text>
@@ -209,7 +209,7 @@ export default function CreatePostScreen() {
                   </Text>
                 </View>
                 <TouchableOpacity onPress={handleToggleTraining}>
-                  <Ionicons name="close-circle" size={24} color={colors.gray400} />
+                  <Feather name="x-circle" size={24} color={colors.gray400} />
                 </TouchableOpacity>
               </View>
             )}
@@ -218,13 +218,13 @@ export default function CreatePostScreen() {
           {/* Bottom Actions */}
           <View style={styles.bottomActions}>
             <TouchableOpacity style={styles.actionButton} onPress={handlePickImage}>
-              <Ionicons name="image-outline" size={24} color={colors.primary} />
+              <Feather name="image" size={24} color={colors.primary} />
               <Text style={styles.actionButtonText}>Foto</Text>
             </TouchableOpacity>
 
             {lastTraining && !selectedTraining && (
               <TouchableOpacity style={styles.actionButton} onPress={handleToggleTraining}>
-                <Ionicons name="barbell-outline" size={24} color={colors.primary} />
+                <Feather name="activity" size={24} color={colors.primary} />
                 <Text style={styles.actionButtonText}>Entrenamiento</Text>
               </TouchableOpacity>
             )}
