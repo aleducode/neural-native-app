@@ -126,11 +126,11 @@ export default function PostDetailScreen() {
   };
 
   const handleDeleteComment = async (commentId: number) => {
-    Alert.alert('Eliminar comentario', '¿Estás seguro de que quieres eliminar este comentario?', [
-      { text: 'Cancelar', style: 'cancel' },
+    Alert.alert('Eliminar comentario', '¿Estás seguro de que quieres eliminar este comentario?', Array.from([
+      { text: 'Cancelar', style: 'cancel' as const },
       {
         text: 'Eliminar',
-        style: 'destructive',
+        style: 'destructive' as const,
         onPress: async () => {
           const { error } = await communityApi.deleteComment(commentId);
           if (!error) {

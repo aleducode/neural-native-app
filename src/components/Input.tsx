@@ -33,8 +33,13 @@ export default function Input({
       <View style={styles.inputRow}>
         <TextInput
           style={[styles.input, !editable && styles.inputDisabled, error && styles.inputError]}
-          value={value}
-          onChangeText={onChangeText}
+          value={value || ''}
+          onChangeText={(text) => {
+            // Ensure onChangeText always receives a string, never null/undefined
+            if (onChangeText) {
+              onChangeText(text || '');
+            }
+          }}
           secureTextEntry={isPassword && !showPassword}
           keyboardType={keyboardType}
           autoCapitalize={autoCapitalize}

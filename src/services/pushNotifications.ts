@@ -4,6 +4,7 @@ import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 import api from '../api/client';
 import { getToken } from '../utils/storage';
+import { captureException, addBreadcrumb } from '../utils/sentry';
 
 // Configure how notifications are handled when app is in foreground
 Notifications.setNotificationHandler({
@@ -38,15 +39,32 @@ class PushNotificationService {
     const { status: existingStatus } = await Notifications.getPermissionsAsync();
     let finalStatus = existingStatus;
 
+    addBreadcrumb('Checking notification permissions', 'notifications', {
+      existingStatus,
+    });
+
     // Request permission if not already granted
     if (existingStatus !== 'granted') {
+      addBreadcrumb('Requesting notification permissions', 'notifications');
       const { status } = await Notifications.requestPermissionsAsync();
       finalStatus = status;
-    }
 
-    if (finalStatus !== 'granted') {
-      console.log('[PushNotifications] Push notification permission not granted');
-      return null;
+      addBreadcrumb('Notification permission result', 'notifications', {
+        status,
+        wasGranted: status === 'granted',
+      });
+
+      if (status !== 'granted') {
+        // Track denied permissions
+        captureException(new Error('Notification permission denied'), {
+          context: 'pushNotifications',
+          errorType: 'permission_denied',
+          permissionStatus: status,
+          existingStatus,
+        });
+        console.log('[PushNotifications] Push notification permission not granted:', status);
+        return null;
+      }
     }
 
     // Get Expo push token

@@ -74,8 +74,7 @@ export default function SlotDetailScreen() {
     if (alreadyScheduledToday && !userHasBooked) {
       Alert.alert(
         'Ya tienes reserva',
-        'Ya tienes un entrenamiento reservado para este día. Cancela tu reserva actual para agendar otro horario.',
-        [{ text: 'Entendido' }]
+        'Ya tienes un entrenamiento reservado para este día. Cancela tu reserva actual para agendar otro horario.'
       );
       return;
     }
@@ -83,8 +82,7 @@ export default function SlotDetailScreen() {
     if (slot.available_places <= 0) {
       Alert.alert(
         'Sin cupos',
-        'Este horario ya no tiene cupos disponibles.',
-        [{ text: 'Entendido' }]
+        'Este horario ya no tiene cupos disponibles.'
       );
       return;
     }

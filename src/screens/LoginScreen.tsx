@@ -19,6 +19,8 @@ import { colors, typography, spacing, borderRadius } from '../theme/colors';
 import { Ionicons } from '@expo/vector-icons';
 import Input from '../components/Input';
 import Button from '../components/Button';
+import { captureException, addBreadcrumb } from '../utils/sentry';
+import { testLoginFlowError, testSentryError, testBiometricPermissionDenied, testNotificationPermissionDenied } from '../utils/testSentry';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const CONTENT_PADDING = spacing.xxl;
@@ -32,17 +34,40 @@ export default function LoginScreen() {
   const [isLoading, setIsLoading] = useState(false);
 
   const handleBiometricLogin = React.useCallback(async () => {
+    addBreadcrumb('Biometric login attempt', 'auth', {
+      biometricType,
+    });
+    
     setIsLoading(true);
+    
+    try {
     const { success, error } = await loginWithBiometric();
     setIsLoading(false);
 
-    if (!success && error) {
+      if (success) {
+        addBreadcrumb('Biometric login successful', 'auth');
+      } else if (error) {
       // Don't show alert if user cancelled - it's expected behavior
       if (error !== 'Autenticación cancelada') {
+          addBreadcrumb('Biometric login failed', 'auth', { error });
+          // Track biometric errors that aren't cancellations
+          captureException(new Error(error), {
+            context: 'biometricLogin',
+            biometricType,
+            errorType: 'auth_failure',
+          });
         Alert.alert('Error', error);
+        }
       }
+    } catch (error) {
+      setIsLoading(false);
+      captureException(error as Error, {
+        context: 'handleBiometricLogin',
+        biometricType,
+      });
+      Alert.alert('Error', 'Ocurrió un error al usar autenticación biométrica');
     }
-  }, [loginWithBiometric]);
+  }, [loginWithBiometric, biometricType]);
 
   // Auto-trigger biometric login if enabled when screen loads (only if not authenticated)
   useEffect(() => {
@@ -56,15 +81,43 @@ export default function LoginScreen() {
   }, [isAuthenticated, biometricEnabled, biometricAvailable, handleBiometricLogin]);
 
   const handleLogin = async () => {
-    if (!email.trim() || !password.trim()) {
+    // Safe email/password handling
+    const emailValue = email?.trim() || '';
+    const passwordValue = password?.trim() || '';
+
+    if (!emailValue || !passwordValue) {
       Alert.alert('Error', 'Por favor ingresa tu correo y contraseña');
       return;
     }
 
+    // Track login attempt
+    try {
+      addBreadcrumb('Login attempt started', 'auth', {
+        email: emailValue.toLowerCase(),
+        emailLength: emailValue.length,
+        hasBiometric: biometricAvailable,
+      });
+    } catch (error) {
+      captureException(error as Error, {
+        context: 'handleLogin',
+        action: 'addBreadcrumb',
+      });
+    }
+
     setIsLoading(true);
-    const { success, error } = await login({ email, password }, false);
+    
+    try {
+      const { success, error } = await login({ email: emailValue, password: passwordValue }, false);
     
     if (success) {
+        try {
+          addBreadcrumb('Login successful', 'auth', {
+            email: emailValue.toLowerCase(),
+          });
+        } catch (err) {
+          // Non-critical error in breadcrumb
+        }
+        
       // After successful login, ask user if they want to enable biometric login
       // Only ask if biometric is available and not already enabled
       if (biometricAvailable && !biometricEnabled) {
@@ -72,21 +125,29 @@ export default function LoginScreen() {
         Alert.alert(
           `¿Habilitar ${biometricType}?`,
           `¿Quieres usar ${biometricType} para iniciar sesión más rápido la próxima vez?`,
-          [
+            Array.from([
             {
               text: 'No',
-              style: 'cancel',
+                style: 'cancel' as const,
             },
             {
               text: 'Sí',
               onPress: async () => {
-                const enabled = await enableBiometric(email, password);
+                  try {
+                    const enabled = await enableBiometric(emailValue, passwordValue);
                 if (enabled) {
                   Alert.alert('Éxito', `${biometricType} habilitado correctamente`);
+                      addBreadcrumb('Biometric enabled', 'auth');
+                    }
+                  } catch (err) {
+                    captureException(err as Error, {
+                      context: 'enableBiometric',
+                      email: emailValue.toLowerCase(),
+                    });
                 }
               },
             },
-          ]
+            ])
         );
       } else {
         setIsLoading(false);
@@ -94,8 +155,29 @@ export default function LoginScreen() {
     } else {
       setIsLoading(false);
       if (error) {
+          // Track login errors (but not as exceptions - these are expected)
+          try {
+            addBreadcrumb('Login failed', 'auth', {
+              email: emailValue.toLowerCase(),
+              error: error,
+            });
+          } catch (err) {
+            // Non-critical error in breadcrumb
+          }
         Alert.alert('Error', error);
+        }
       }
+    } catch (error) {
+      setIsLoading(false);
+      // Track unexpected errors during login
+      captureException(error as Error, {
+        context: 'handleLogin',
+        email: emailValue.toLowerCase(),
+        emailLength: emailValue.length,
+        hasBiometric: biometricAvailable,
+        errorMessage: (error as Error)?.message,
+      });
+      Alert.alert('Error', 'Ocurrió un error inesperado al iniciar sesión');
     }
   };
 
@@ -143,8 +225,22 @@ export default function LoginScreen() {
                 <View style={styles.form}>
                   <Input
                     placeholder="Email"
-                    value={email}
-                    onChangeText={setEmail}
+                    value={email || ''}
+                    onChangeText={(text) => {
+                      try {
+                        // Ensure we always set a string, even if text is null/undefined
+                        setEmail(text || '');
+                        addBreadcrumb('User typing email', 'user_action', {
+                          emailLength: (text || '').length,
+                        });
+                      } catch (error) {
+                        captureException(error as Error, {
+                          context: 'emailInput',
+                          action: 'onChangeText',
+                          textType: typeof text,
+                        });
+                      }
+                    }}
                     keyboardType="email-address"
                     autoCapitalize="none"
                     editable={!isLoading}
@@ -216,6 +312,56 @@ export default function LoginScreen() {
                     <Text style={styles.registerLink}>Regístrate</Text>
                   </TouchableOpacity>
                 </View>
+
+                {/* Test Sentry Button - Solo visible en desarrollo */}
+                {__DEV__ && (
+                  <TouchableOpacity
+                    style={styles.testButton}
+                    onPress={() => {
+                      Alert.alert(
+                        'Test Sentry',
+                        '¿Qué error quieres simular?',
+                        Array.from([
+                          {
+                            text: 'Error de Login',
+                            onPress: () => {
+                              testLoginFlowError();
+                              Alert.alert('Enviado', 'Error de prueba enviado a Sentry.');
+                            },
+                          },
+                          {
+                            text: 'Permiso Biometría',
+                            onPress: () => {
+                              testBiometricPermissionDenied();
+                              Alert.alert('Enviado', 'Error de permisos de biometría enviado a Sentry.');
+                            },
+                          },
+                          {
+                            text: 'Permiso Notificaciones',
+                            onPress: () => {
+                              testNotificationPermissionDenied();
+                              Alert.alert('Enviado', 'Error de permisos de notificaciones enviado a Sentry.');
+                            },
+                          },
+                          {
+                            text: 'Error Simple',
+                            onPress: () => {
+                              testSentryError();
+                              Alert.alert('Enviado', 'Error de prueba enviado a Sentry.');
+                            },
+                          },
+                          {
+                            text: 'Cancelar',
+                            style: 'cancel' as const,
+                          },
+                        ])
+                      );
+                    }}
+                    disabled={isLoading}
+                  >
+                    <Text style={styles.testButtonText}>🧪 Test Sentry</Text>
+                  </TouchableOpacity>
+                )}
               </View>
             </View>
           </ScrollView>
@@ -368,5 +514,18 @@ const styles = StyleSheet.create({
     fontFamily: typography.fontFamily,
     fontWeight: typography.fontWeight.bold,
     color: colors.primary,
+  },
+  testButton: {
+    marginTop: spacing.md,
+    padding: spacing.sm,
+    backgroundColor: colors.gray200,
+    borderRadius: borderRadius.xs,
+    alignItems: 'center',
+  },
+  testButtonText: {
+    fontSize: typography.fontSize.xs,
+    fontFamily: typography.fontFamily,
+    fontWeight: typography.fontWeight.medium,
+    color: colors.gray500,
   },
 });

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { ActivityIndicator, View } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
@@ -23,6 +23,8 @@ import CreatePostScreen from './src/screens/CreatePostScreen';
 import PostDetailScreen from './src/screens/PostDetailScreen';
 import UserProfileScreen from './src/screens/UserProfileScreen';
 import { colors } from './src/theme/colors';
+import ErrorBoundary from './src/components/ErrorBoundary';
+import { initSentry } from './src/utils/sentry';
 
 const Stack = createNativeStackNavigator();
 
@@ -84,15 +86,22 @@ function RootNavigator() {
 }
 
 export default function App() {
+  // Initialize Sentry before rendering anything
+  useEffect(() => {
+    initSentry();
+  }, []);
+
   // System fonts nativas - no necesitan carga, están disponibles inmediatamente
   return (
-    <SafeAreaProvider>
-      <AuthProvider>
-        <NavigationContainer>
-          <StatusBar style="light" />
-          <RootNavigator />
-        </NavigationContainer>
-      </AuthProvider>
-    </SafeAreaProvider>
+    <ErrorBoundary>
+      <SafeAreaProvider>
+        <AuthProvider>
+          <NavigationContainer>
+            <StatusBar style="light" />
+            <RootNavigator />
+          </NavigationContainer>
+        </AuthProvider>
+      </SafeAreaProvider>
+    </ErrorBoundary>
   );
 }

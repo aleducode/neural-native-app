@@ -10,6 +10,7 @@ import {
   clearAuthData,
 } from '../utils/storage';
 import { biometricService } from '../utils/biometrics';
+import { captureException, setUserContext, clearUserContext, addBreadcrumb } from '../utils/sentry';
 
 interface AuthContextType {
   user: User | null;
@@ -76,6 +77,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
         if (cachedUser) {
           setUserState(cachedUser);
+          // Set user context in Sentry if we have cached user
+          setUserContext({ id: cachedUser.id, email: cachedUser.email });
         }
 
         // Verify token is still valid by fetching current user
@@ -84,14 +87,20 @@ export function AuthProvider({ children }: AuthProviderProps) {
         if (data) {
           setUserState(data);
           await setUser(data);
+          // Update user context in Sentry
+          setUserContext({ id: data.id, email: data.email });
         } else if (error) {
           // Token invalid, clear auth data
           await clearAuthData();
           setUserState(null);
+          clearUserContext();
         }
       }
     } catch (error) {
       console.error('Error checking auth status:', error);
+      captureException(error as Error, {
+        context: 'checkAuthStatus',
+      });
     } finally {
       setIsLoading(false);
     }
@@ -101,68 +110,118 @@ export function AuthProvider({ children }: AuthProviderProps) {
     credentials: LoginRequest,
     saveForBiometric: boolean = false
   ): Promise<{ success: boolean; error?: string }> => {
-    const { data, error, errors } = await authApi.login(credentials);
+    try {
+      const { data, error, errors } = await authApi.login(credentials);
 
-    if (data) {
-      await setToken(data.token);
-      await setUser(data.user);
-      setUserState(data.user);
+      if (data) {
+        await setToken(data.token);
+        await setUser(data.user);
+        setUserState(data.user);
 
-      // Save credentials for biometric login if requested
-      if (saveForBiometric && biometricAvailable) {
-        await biometricService.saveCredentials(credentials.email, credentials.password);
-        setBiometricEnabled(true);
+        // Set user context in Sentry for error tracking
+        setUserContext({
+          id: data.user.id,
+          email: data.user.email,
+          username: data.user.username || data.user.email,
+        });
+
+        // Save credentials for biometric login if requested
+        if (saveForBiometric && biometricAvailable) {
+          try {
+            await biometricService.saveCredentials(credentials.email, credentials.password);
+            setBiometricEnabled(true);
+          } catch (bioError) {
+            // Log but don't fail the login
+            captureException(bioError as Error, {
+              context: 'saveBiometricCredentials',
+              userId: data.user.id,
+            });
+          }
+        }
+
+        return { success: true };
       }
 
-      return { success: true };
-    }
-
-    // Format error message
-    let errorMessage = error || 'Error al iniciar sesión';
-    if (errors) {
-      const firstError = Object.values(errors)[0];
-      if (firstError && firstError.length > 0) {
-        errorMessage = firstError[0];
+      // Format error message
+      let errorMessage = error || 'Error al iniciar sesión';
+      if (errors) {
+        const firstError = Object.values(errors)[0];
+        if (firstError && firstError.length > 0) {
+          errorMessage = firstError[0];
+        }
       }
-    }
 
-    return { success: false, error: errorMessage };
+      return { success: false, error: errorMessage };
+    } catch (error) {
+      // Capture unexpected errors during login
+      captureException(error as Error, {
+        context: 'login',
+        email: credentials.email,
+      });
+      return { success: false, error: 'Error inesperado al iniciar sesión' };
+    }
   };
 
   const loginWithBiometric = async (): Promise<{ success: boolean; error?: string }> => {
-    if (!biometricAvailable) {
-      return { success: false, error: 'Biometría no disponible' };
+    try {
+      if (!biometricAvailable) {
+        return { success: false, error: 'Biometría no disponible' };
+      }
+
+      const hasCredentials = await biometricService.hasStoredCredentials();
+      if (!hasCredentials) {
+        return { success: false, error: 'No hay credenciales guardadas' };
+      }
+
+      const authResult = await biometricService.authenticate(
+        `Usa ${biometricType} para iniciar sesión`
+      );
+
+      if (!authResult.success) {
+        // Don't return error if user cancelled - it's expected behavior
+        if (authResult.errorCode === 'USER_CANCEL') {
+          return { success: false, error: 'Autenticación cancelada' };
+        }
+        // For other errors, return the specific error message
+        return { success: false, error: authResult.error || 'Error en autenticación biométrica' };
+      }
+
+      const credentials = await biometricService.getCredentials();
+      if (!credentials) {
+        captureException(new Error('Failed to get credentials from secure storage'), {
+          context: 'loginWithBiometric',
+          biometricType,
+        });
+        return { success: false, error: 'Error al obtener credenciales' };
+      }
+
+      return login(credentials, false);
+    } catch (error) {
+      captureException(error as Error, {
+        context: 'loginWithBiometric',
+        biometricType,
+      });
+      return { success: false, error: 'Error al autenticar con biometría' };
     }
-
-    const hasCredentials = await biometricService.hasStoredCredentials();
-    if (!hasCredentials) {
-      return { success: false, error: 'No hay credenciales guardadas' };
-    }
-
-    const authenticated = await biometricService.authenticate(
-      `Usa ${biometricType} para iniciar sesión`
-    );
-
-    if (!authenticated) {
-      return { success: false, error: 'Autenticación cancelada' };
-    }
-
-    const credentials = await biometricService.getCredentials();
-    if (!credentials) {
-      return { success: false, error: 'Error al obtener credenciales' };
-    }
-
-    return login(credentials, false);
   };
 
   const enableBiometric = async (email: string, password: string): Promise<boolean> => {
     if (!biometricAvailable) return false;
 
-    const authenticated = await biometricService.authenticate(
+    const authResult = await biometricService.authenticate(
       `Configura ${biometricType} para inicio rápido`
     );
 
-    if (!authenticated) return false;
+    if (!authResult.success) {
+      // Don't track user cancellations as errors
+      if (authResult.errorCode !== 'USER_CANCEL') {
+        captureException(new Error(authResult.error || 'Biometric setup failed'), {
+          context: 'enableBiometric',
+          errorCode: authResult.errorCode,
+        });
+      }
+      return false;
+    }
 
     const saved = await biometricService.saveCredentials(email, password);
     if (saved) {
@@ -201,9 +260,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
       await authApi.logout();
     } catch (error) {
       console.error('Logout API error:', error);
+      captureException(error as Error, {
+        context: 'logout',
+      });
     } finally {
       await clearAuthData();
       setUserState(null);
+      clearUserContext(); // Clear Sentry user context
+      addBreadcrumb('User logged out', 'auth');
     }
   };
 
