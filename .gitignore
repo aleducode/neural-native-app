@@ -40,9 +40,9 @@ yarn-error.*
 /ios
 /android
 # google-services.json - contains sensitive API keys
-# Not tracked in git, created from EAS env variable during build
-google-services.json
+# Root version is tracked for EAS Build, local android/app version is ignored
 android/app/google-services.json
+!/google-services.json
 package-lock.json
 .playwright*
 pushes/
