@@ -126,7 +126,7 @@ export default function PostDetailScreen() {
   };
 
   const handleDeleteComment = async (commentId: number) => {
-    Alert.alert('Eliminar comentario', '¿Estás seguro de que quieres eliminar este comentario?', Array.from([
+    Alert.alert('Eliminar comentario', '¿Estás seguro de que quieres eliminar este comentario?', [
       { text: 'Cancelar', style: 'cancel' as const },
       {
         text: 'Eliminar',
