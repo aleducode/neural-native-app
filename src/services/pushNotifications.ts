@@ -4,7 +4,7 @@ import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 import api from '../api/client';
 import { getToken } from '../utils/storage';
-import { captureException, addBreadcrumb } from '../utils/sentry';
+import { addBreadcrumb } from '../utils/sentry';
 
 // Configure how notifications are handled when app is in foreground
 Notifications.setNotificationHandler({
@@ -55,10 +55,9 @@ class PushNotificationService {
       });
 
       if (status !== 'granted') {
-        // Track denied permissions
-        captureException(new Error('Notification permission denied'), {
-          context: 'pushNotifications',
-          errorType: 'permission_denied',
+        // Declining notifications is a valid user choice, not an error. Leave a
+        // breadcrumb so it still shows up as context on real crashes.
+        addBreadcrumb('Notification permission denied', 'notifications', {
           permissionStatus: status,
           existingStatus,
         });

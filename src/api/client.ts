@@ -14,6 +14,19 @@ interface ApiResponse<T> {
   errors?: Record<string, string[]>;
 }
 
+/**
+ * Coerce whatever the API put in an error field into a string.
+ *
+ * Django REST Framework answers with `{"detail": ["Credenciales inválidas"]}`,
+ * and handing that array to Alert.alert crashes iOS with
+ * "-[__NSSingleObjectArrayI length]: unrecognized selector".
+ */
+function asMessage(value: unknown): string | undefined {
+  if (typeof value === 'string') return value || undefined;
+  if (Array.isArray(value)) return asMessage(value[0]);
+  return undefined;
+}
+
 class ApiClient {
   private baseUrl: string;
   private onUnauthorized?: () => void;
@@ -116,9 +129,9 @@ class ApiClient {
         }
         
         // Only set general error if no field-specific errors exist
-        const generalError = errors && Object.keys(errors).length > 0 
-          ? undefined 
-          : (data.message || data.detail || data.error || 'Error en la solicitud');
+        const generalError = errors && Object.keys(errors).length > 0
+          ? undefined
+          : (asMessage(data.message) || asMessage(data.detail) || asMessage(data.error) || 'Error en la solicitud');
         
         return {
           error: generalError,
@@ -206,11 +219,11 @@ class ApiClient {
         }
 
         if (data.photo) {
-          return { error: Array.isArray(data.photo) ? data.photo[0] : data.photo };
+          return { error: asMessage(data.photo) };
         }
 
         return {
-          error: data.message || data.detail || 'Error en la solicitud',
+          error: asMessage(data.message) || asMessage(data.detail) || 'Error en la solicitud',
           errors: data.errors || data,
         };
       }
