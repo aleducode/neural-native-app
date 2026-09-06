@@ -38,8 +38,11 @@ export default function BottomTabs() {
           },
         ],
         tabBarItemStyle: styles.tabBarItem,
-        tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.white,
+        // The bar keeps its dark ground, as the design's floating navbar does.
+        // The active tint moves off the legacy blue onto the brand accent,
+        // which is what the rest of the migrated screens now use.
+        tabBarActiveTintColor: colors.accent,
+        tabBarInactiveTintColor: 'rgba(255, 255, 255, 0.55)',
         tabBarLabelStyle: styles.tabBarLabel,
       }}
     >
@@ -51,7 +54,7 @@ export default function BottomTabs() {
             <Ionicons
               name={focused ? 'home' : 'home-outline'}
               size={24}
-              color={focused ? colors.primary : color}
+              color={focused ? colors.accent : color}
             />
           ),
           tabBarLabel: 'Inicio',
@@ -65,7 +68,7 @@ export default function BottomTabs() {
             <Ionicons
               name={focused ? 'calendar' : 'calendar-outline'}
               size={24}
-              color={focused ? colors.primary : color}
+              color={focused ? colors.accent : color}
             />
           ),
           tabBarLabel: 'Calendario',
@@ -79,7 +82,7 @@ export default function BottomTabs() {
             <Ionicons
               name={focused ? 'people' : 'people-outline'}
               size={24}
-              color={focused ? colors.primary : color}
+              color={focused ? colors.accent : color}
             />
           ),
           tabBarLabel: 'Comunidad',
@@ -93,7 +96,7 @@ export default function BottomTabs() {
             <Ionicons
               name={focused ? 'barbell' : 'barbell-outline'}
               size={24}
-              color={focused ? colors.primary : color}
+              color={focused ? colors.accent : color}
             />
           ),
           tabBarLabel: 'Entrenos',
@@ -107,7 +110,7 @@ export default function BottomTabs() {
             <Ionicons
               name={focused ? 'person' : 'person-outline'}
               size={24}
-              color={focused ? colors.primary : color}
+              color={focused ? colors.accent : color}
             />
           ),
           tabBarLabel: 'Perfil',
