@@ -3,40 +3,71 @@ import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
   ScrollView,
-  Alert,
   ActivityIndicator,
   Dimensions,
   NativeSyntheticEvent,
   NativeScrollEvent,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
+import { Feather } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
-import { colors, typography, spacing } from '../theme/colors';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  withDelay,
+  Easing,
+} from 'react-native-reanimated';
+import { colors, typography } from '../theme/colors';
 import { profileApi } from '../api/profile';
+import Screen from '../components/ui/Screen';
+import AppHeader from '../components/ui/AppHeader';
+import PrimaryButton from '../components/ui/PrimaryButton';
 
 const MIN_WEIGHT = 30;
 const MAX_WEIGHT = 200;
 const TICK_WIDTH = 10;
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
+// The ruler is centred on the tick itself, not on the gap before it: content
+// padding of exactly half the screen leaves the pointer half a tick to the
+// left of the number it claims to select.
+const RULER_PADDING = SCREEN_WIDTH / 2 - TICK_WIDTH / 2;
+
 export default function WeightInputScreen() {
   const navigation = useNavigation<any>();
   const scrollViewRef = useRef<ScrollView>(null);
 
   const [selectedWeight, setSelectedWeight] = useState(70);
+  const [previousWeight, setPreviousWeight] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const lastHapticValue = useRef(70);
 
   const weights = Array.from(
     { length: MAX_WEIGHT - MIN_WEIGHT + 1 },
     (_, i) => MIN_WEIGHT + i
   );
+
+  // Short staggered entrance, same rhythm as the rest of the app.
+  const intro = useSharedValue(0);
+  useEffect(() => {
+    intro.value = withTiming(1, { duration: 460, easing: Easing.out(Easing.cubic) });
+  }, []);
+
+  const headerStyle = useAnimatedStyle(() => ({
+    opacity: intro.value,
+    transform: [{ translateY: (1 - intro.value) * 16 }],
+  }));
+  const valueStyle = useAnimatedStyle(() => ({
+    opacity: withDelay(90, withTiming(intro.value, { duration: 400 })),
+    transform: [{ translateY: withDelay(90, withTiming((1 - intro.value) * 16, { duration: 400 })) }],
+  }));
+  const footerStyle = useAnimatedStyle(() => ({
+    opacity: withDelay(170, withTiming(intro.value, { duration: 400 })),
+  }));
 
   useEffect(() => {
     fetchProfile();
@@ -46,6 +77,7 @@ export default function WeightInputScreen() {
     const { data } = await profileApi.getProfile();
     if (data?.latest_weight) {
       setSelectedWeight(data.latest_weight.weight);
+      setPreviousWeight(data.latest_weight.weight);
       lastHapticValue.current = data.latest_weight.weight;
       // Scroll to current weight after layout
       setTimeout(() => {
@@ -62,20 +94,21 @@ export default function WeightInputScreen() {
     setIsLoading(false);
   };
 
-  const handleBack = () => {
-    navigation.goBack();
-  };
-
   const handleSave = async () => {
+    setSaveError(null);
     setIsSaving(true);
     const { data, error } = await profileApi.createWeight(selectedWeight);
     setIsSaving(false);
 
     if (data) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       // Navigate to weight history screen
       navigation.replace('WeightHistory');
     } else {
-      Alert.alert('Error', error || 'No se pudo guardar el peso');
+      // The failure belongs next to the button that failed, not behind a modal
+      // the user has to dismiss before they can retry.
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      setSaveError(error || 'No se pudo guardar el peso');
     }
   };
 
@@ -86,6 +119,8 @@ export default function WeightInputScreen() {
 
     if (clampedValue !== selectedWeight) {
       setSelectedWeight(clampedValue);
+      // A failure about the old value stops being true once it moves.
+      setSaveError(null);
 
       // Haptic feedback when value changes
       if (clampedValue !== lastHapticValue.current) {
@@ -105,250 +140,243 @@ export default function WeightInputScreen() {
     scrollViewRef.current?.scrollTo({ x: snapOffset, animated: true });
   };
 
+  const delta = previousWeight === null ? null : selectedWeight - previousWeight;
+
+  const hint =
+    delta === null
+      ? 'Es tu primer registro.'
+      : delta === 0
+      ? `Igual que tu último registro (${previousWeight} kg).`
+      : `${delta > 0 ? '+' : '-'}${Math.abs(delta)} kg respecto a tu último registro.`;
+
   if (isLoading) {
     return (
-      <View style={styles.container}>
-        <SafeAreaView style={styles.safeArea}>
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={colors.primary} />
-          </View>
-        </SafeAreaView>
-      </View>
+      <Screen tone="plain" wash edges={['top', 'bottom']}>
+        <AppHeader title="Datos corporales" />
+        <View style={styles.loading}>
+          <ActivityIndicator size="large" color={colors.ink} />
+        </View>
+      </Screen>
     );
   }
 
   return (
-    <View style={styles.container}>
-      {/* Background Gradients */}
-      <View style={styles.backgroundContainer}>
-        <LinearGradient
-          colors={['rgba(90, 107, 255, 0.15)', 'transparent']}
-          style={styles.gradientTop}
-        />
-        <LinearGradient
-          colors={['rgba(90, 107, 255, 0.15)', 'transparent']}
-          style={styles.gradientBottom}
-        />
+    <Screen tone="plain" wash edges={['top', 'bottom']}>
+      <AppHeader title="Datos corporales" />
+
+      <View style={styles.body}>
+        <Animated.View style={[styles.head, headerStyle]}>
+          <Text style={styles.title}>Tu peso</Text>
+          <Text style={styles.subtitle}>Desliza la regla hasta el número y suelta.</Text>
+        </Animated.View>
+
+        <Animated.View style={[styles.stage, valueStyle]}>
+          {/* The value is the whole point of the screen, so it carries the
+              weight the ruler used to. */}
+          <View style={styles.valueRow}>
+            <Text
+              style={styles.value}
+              accessibilityRole="text"
+              accessibilityLabel={`${selectedWeight} kilogramos`}
+            >
+              {selectedWeight}
+            </Text>
+            <Text style={styles.unit}>kg</Text>
+          </View>
+          <Text style={styles.hint}>{hint}</Text>
+
+          <View style={styles.ruler}>
+            {/* Centre pointer: the one place the brand accent belongs here. */}
+            <View style={styles.pointer} pointerEvents="none">
+              <View style={styles.pointerCap} />
+              <View style={styles.pointerBar} />
+            </View>
+
+            <ScrollView
+              ref={scrollViewRef}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.rulerContent}
+              onScroll={handleScroll}
+              onMomentumScrollEnd={handleScrollEnd}
+              onScrollEndDrag={handleScrollEnd}
+              scrollEventThrottle={16}
+              decelerationRate="fast"
+              snapToInterval={TICK_WIDTH}
+            >
+              {weights.map((weight) => {
+                const isMajor = weight % 10 === 0;
+                const isMinor5 = weight % 5 === 0 && !isMajor;
+
+                return (
+                  <View key={weight} style={styles.tickContainer}>
+                    <View
+                      style={[
+                        styles.tick,
+                        isMinor5 && styles.tickMinor5,
+                        isMajor && styles.tickMajor,
+                      ]}
+                    />
+                    {isMajor && <Text style={styles.tickLabel}>{weight}</Text>}
+                  </View>
+                );
+              })}
+            </ScrollView>
+          </View>
+        </Animated.View>
+
+        <Animated.View style={[styles.footer, footerStyle]}>
+          {!!saveError && (
+            <View style={styles.errorRow}>
+              <Feather name="alert-circle" size={16} color={colors.error} />
+              <Text style={styles.errorText}>{saveError}</Text>
+            </View>
+          )}
+
+          <PrimaryButton label="Guardar" onPress={handleSave} loading={isSaving} />
+        </Animated.View>
       </View>
-
-      <SafeAreaView style={styles.safeArea} edges={['top']}>
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity style={styles.backButton} onPress={handleBack}>
-            <Ionicons name="chevron-back" size={24} color={colors.textDark} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Peso</Text>
-          <View style={styles.headerSpacer} />
-        </View>
-
-        {/* Current Weight Display */}
-        <View style={styles.currentValueContainer}>
-          <Text style={styles.currentValue}>{selectedWeight}</Text>
-          <Text style={styles.currentUnit}>kg</Text>
-        </View>
-
-        {/* Ruler Picker */}
-        <View style={styles.rulerContainer}>
-          {/* Center Indicator */}
-          <View style={styles.centerIndicator} />
-
-          <ScrollView
-            ref={scrollViewRef}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.rulerContent}
-            onScroll={handleScroll}
-            onMomentumScrollEnd={handleScrollEnd}
-            onScrollEndDrag={handleScrollEnd}
-            scrollEventThrottle={16}
-            decelerationRate="fast"
-            snapToInterval={TICK_WIDTH}
-          >
-            {weights.map((weight) => {
-              const isMajor = weight % 10 === 0;
-              const isMinor5 = weight % 5 === 0 && !isMajor;
-
-              return (
-                <View key={weight} style={styles.tickContainer}>
-                  <View
-                    style={[
-                      styles.tick,
-                      isMajor && styles.tickMajor,
-                      isMinor5 && styles.tickMinor5,
-                    ]}
-                  />
-                  {isMajor && (
-                    <Text style={styles.tickLabel}>{weight}</Text>
-                  )}
-                </View>
-              );
-            })}
-          </ScrollView>
-        </View>
-
-        {/* Save Button */}
-        <View style={styles.bottomButtonContainer}>
-          <TouchableOpacity
-            style={[styles.saveButton, isSaving && styles.saveButtonDisabled]}
-            onPress={handleSave}
-            disabled={isSaving}
-            activeOpacity={0.8}
-          >
-            {isSaving ? (
-              <ActivityIndicator size="small" color={colors.textDark} />
-            ) : (
-              <Text style={styles.saveButtonText}>Guardar</Text>
-            )}
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
-    </View>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  loading: {
     flex: 1,
-    backgroundColor: colors.bgDark,
-  },
-  safeArea: {
-    flex: 1,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  backgroundContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-  },
-  gradientTop: {
-    position: 'absolute',
-    top: 50,
-    left: -150,
-    width: 250,
-    height: 250,
-    borderRadius: 125,
-  },
-  gradientBottom: {
-    position: 'absolute',
-    bottom: 80,
-    right: -150,
-    width: 250,
-    height: 250,
-    borderRadius: 125,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-  },
-  backButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: colors.white,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  headerTitle: {
-    fontSize: typography.fontSize.title1,
+  body: {
+    flex: 1,
+    paddingHorizontal: 24,
+    paddingBottom: 16,
+  },
+  head: {
+    marginTop: 8,
+    gap: 8,
+  },
+  title: {
     fontFamily: typography.fontFamily,
+    fontSize: 36,
     fontWeight: typography.fontWeight.bold,
-    color: colors.white,
-    textTransform: 'uppercase',
+    lineHeight: 40,
+    letterSpacing: -1,
+    color: colors.ink,
   },
-  headerSpacer: {
-    width: 48,
+  subtitle: {
+    fontFamily: typography.fontFamily,
+    fontSize: 15,
+    lineHeight: 21,
+    // gray400 is 5.3:1 on white. The design's muted grey is 2.7:1 and fails AA,
+    // so the role is kept and the value is not.
+    color: colors.gray400,
   },
-  currentValueContainer: {
+  stage: {
+    flex: 1,
+    justifyContent: 'center',
+    gap: 8,
+  },
+  valueRow: {
     flexDirection: 'row',
     alignItems: 'baseline',
     justifyContent: 'center',
-    marginTop: spacing.xxl * 2,
-    marginBottom: spacing.xxl * 2,
+    gap: 8,
   },
-  currentValue: {
-    fontSize: 80,
+  value: {
     fontFamily: typography.fontFamily,
+    fontSize: 76,
     fontWeight: typography.fontWeight.bold,
-    color: colors.white,
+    letterSpacing: -3,
+    color: colors.ink,
   },
-  currentUnit: {
-    fontSize: typography.fontSize.title1,
+  unit: {
     fontFamily: typography.fontFamily,
-    fontWeight: typography.fontWeight.medium,
+    fontSize: 22,
+    fontWeight: typography.fontWeight.semiBold,
     color: colors.gray400,
-    marginLeft: spacing.sm,
   },
-  rulerContainer: {
-    flex: 1,
-    justifyContent: 'center',
+  hint: {
+    fontFamily: typography.fontFamily,
+    fontSize: 13,
+    textAlign: 'center',
+    color: colors.gray400,
   },
-  centerIndicator: {
+  ruler: {
+    height: 92,
+    marginTop: 24,
+    // Bleeds past the 24pt gutter so the ruler reads as continuous.
+    marginHorizontal: -24,
+    justifyContent: 'flex-start',
+  },
+  pointer: {
     position: 'absolute',
-    left: SCREEN_WIDTH / 2 - 1,
+    left: SCREEN_WIDTH / 2 - 5,
     top: 0,
-    bottom: 60,
-    width: 2,
-    backgroundColor: colors.primary,
+    width: 10,
+    alignItems: 'center',
     zIndex: 10,
   },
+  pointerCap: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: colors.accentDeep,
+  },
+  pointerBar: {
+    width: 3,
+    height: 46,
+    marginTop: 2,
+    borderRadius: 2,
+    backgroundColor: colors.accentDeep,
+  },
   rulerContent: {
-    paddingHorizontal: SCREEN_WIDTH / 2,
+    paddingHorizontal: RULER_PADDING,
     alignItems: 'flex-start',
-    paddingTop: 20,
+    paddingTop: 14,
   },
   tickContainer: {
     width: TICK_WIDTH,
     alignItems: 'center',
   },
+  // Ticks are graphic rules, not text: they carry no information the number
+  // above doesn't already state, so they stay quiet.
   tick: {
-    width: 1,
-    height: 20,
+    width: 1.5,
+    height: 16,
+    borderRadius: 1,
     backgroundColor: colors.gray400,
-  },
-  tickMajor: {
-    height: 40,
-    width: 2,
-    backgroundColor: colors.white,
+    opacity: 0.3,
   },
   tickMinor5: {
-    height: 30,
-    backgroundColor: colors.gray400,
+    height: 24,
+    opacity: 0.45,
+  },
+  tickMajor: {
+    width: 2,
+    height: 34,
+    opacity: 1,
+    backgroundColor: colors.ink,
   },
   tickLabel: {
-    marginTop: spacing.sm,
-    fontSize: typography.fontSize.sm,
+    marginTop: 8,
     fontFamily: typography.fontFamily,
+    fontSize: 12,
     fontWeight: typography.fontWeight.medium,
     color: colors.gray400,
   },
-  bottomButtonContainer: {
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.xxl,
-    paddingTop: spacing.lg,
+  footer: {
+    gap: 14,
+    paddingTop: 8,
   },
-  saveButton: {
-    backgroundColor: colors.primary,
-    borderRadius: 1000,
-    paddingVertical: spacing.lg,
+  errorRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: 8,
   },
-  saveButtonDisabled: {
-    opacity: 0.5,
-  },
-  saveButtonText: {
-    fontSize: typography.fontSize.lg,
-    fontFamily: typography.fontFamily.semibold,
-    color: colors.textDark,
-    textTransform: 'uppercase',
+  errorText: {
+    flex: 1,
+    fontFamily: typography.fontFamily,
+    fontSize: 13,
+    color: colors.error,
   },
 });
