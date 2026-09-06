@@ -1,27 +1,69 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
+  Pressable,
   FlatList,
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
+import { Feather } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  Easing,
+} from 'react-native-reanimated';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
-import { colors, typography, spacing, borderRadius } from '../theme/colors';
+import Screen from '../components/ui/Screen';
+import AppHeader from '../components/ui/AppHeader';
+import { colors, typography } from '../theme/colors';
 import { notificationsApi, Notification } from '../api/notifications';
 
+/** Ionicons are gone from the migrated screens; these are the Feather equivalents. */
+function getNotificationIcon(type: string): keyof typeof Feather.glyphMap {
+  switch (type) {
+    case 'training_reminder':
+    case 'training_cancelled':
+      return 'activity';
+    case 'membership_expiring':
+    case 'membership_expired':
+      return 'credit-card';
+    case 'achievement':
+      return 'award';
+    case 'promotion':
+      return 'tag';
+    case 'community':
+      return 'users';
+    default:
+      return 'bell';
+  }
+}
+
 export default function NotificationsScreen() {
-  const navigation = useNavigation();
+  const navigation = useNavigation<any>();
 
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Delete: the row asks before it removes, and says so where it happened.
+  const [confirmingId, setConfirmingId] = useState<number | null>(null);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  const intro = useSharedValue(0);
+  useEffect(() => {
+    intro.value = withTiming(1, { duration: 420, easing: Easing.out(Easing.cubic) });
+  }, []);
+
+  const bodyStyle = useAnimatedStyle(() => ({
+    opacity: intro.value,
+    transform: [{ translateY: (1 - intro.value) * 14 }],
+  }));
 
   useFocusEffect(
     useCallback(() => {
@@ -41,14 +83,12 @@ export default function NotificationsScreen() {
 
   const handleRefresh = () => {
     setIsRefreshing(true);
+    setConfirmingId(null);
     fetchNotifications();
   };
 
-  const handleBack = () => {
-    navigation.goBack();
-  };
-
   const handleMarkAllRead = async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     await notificationsApi.markAllAsRead();
     setNotifications((prev) =>
       prev.map((n) => ({ ...n, is_read: true, status: 'read' }))
@@ -57,6 +97,14 @@ export default function NotificationsScreen() {
   };
 
   const handleNotificationPress = async (notification: Notification) => {
+    if (confirmingId !== null) {
+      // A row is waiting on an answer; the tap dismisses it instead.
+      setConfirmingId(null);
+      return;
+    }
+
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
     if (!notification.is_read) {
       await notificationsApi.markAsRead(notification.id);
       setNotifications((prev) =>
@@ -70,8 +118,10 @@ export default function NotificationsScreen() {
     // Handle navigation based on notification type
     if (notification.data?.type === 'training_reminder') {
       // Navigate to trainings
+      navigation.navigate('MainTabs', { screen: 'Trainings' });
     } else if (notification.data?.type === 'membership_expiring') {
       // Navigate to membership
+      navigation.navigate('Membership');
     } else if (
       notification.data?.type === 'community_comment' ||
       notification.data?.type === 'community_reaction' ||
@@ -79,61 +129,126 @@ export default function NotificationsScreen() {
     ) {
       // Navigate to post detail
       if (notification.data?.post_id) {
-        navigation.navigate('PostDetail' as never, { postId: notification.data.post_id } as never);
+        navigation.navigate('PostDetail', { postId: notification.data.post_id });
       }
     }
   };
 
-  const getNotificationIcon = (type: string) => {
-    switch (type) {
-      case 'training_reminder':
-      case 'training_cancelled':
-        return 'fitness-outline';
-      case 'membership_expiring':
-      case 'membership_expired':
-        return 'card-outline';
-      case 'achievement':
-        return 'trophy-outline';
-      case 'promotion':
-        return 'pricetag-outline';
-      case 'community':
-        return 'people-outline';
-      default:
-        return 'notifications-outline';
+  const handleAskDelete = (notification: Notification) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setDeleteError(null);
+    setConfirmingId(notification.id);
+  };
+
+  const handleConfirmDelete = async (notification: Notification) => {
+    setDeletingId(notification.id);
+    const { error } = await notificationsApi.deleteNotification(notification.id);
+    setDeletingId(null);
+    setConfirmingId(null);
+
+    if (error) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      setDeleteError(error);
+      return;
+    }
+
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    setNotifications((prev) => prev.filter((n) => n.id !== notification.id));
+    if (!notification.is_read) {
+      setUnreadCount((prev) => Math.max(0, prev - 1));
     }
   };
 
-  const renderNotification = ({ item }: { item: Notification }) => (
-    <TouchableOpacity
-      style={[styles.notificationCard, !item.is_read && styles.notificationCardUnread]}
-      onPress={() => handleNotificationPress(item)}
-      activeOpacity={0.7}
-    >
-      <View style={styles.notificationIcon}>
-        <Ionicons
-          name={getNotificationIcon(item.notification_type)}
-          size={24}
-          color={colors.textDark}
-        />
-      </View>
-      <View style={styles.notificationContent}>
-        <View style={styles.notificationHeader}>
-          <Text style={styles.notificationTitle} numberOfLines={1}>
-            {item.title}
+  const renderNotification = ({ item }: { item: Notification }) => {
+    const confirming = confirmingId === item.id;
+    const deleting = deletingId === item.id;
+
+    if (confirming) {
+      return (
+        <View style={[styles.row, styles.confirmRow]}>
+          <Text style={styles.confirmText} numberOfLines={2}>
+            ¿Eliminar «{item.title}»?
           </Text>
-          <Text style={styles.notificationTime}>{item.time_ago}</Text>
+          <View style={styles.confirmActions}>
+            <Pressable
+              onPress={() => setConfirmingId(null)}
+              disabled={deleting}
+              style={({ pressed }) => [styles.confirmButton, pressed && styles.pressed]}
+              accessibilityRole="button"
+              accessibilityLabel="Cancelar"
+            >
+              <Text style={styles.confirmCancel}>Cancelar</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => handleConfirmDelete(item)}
+              disabled={deleting}
+              style={({ pressed }) => [
+                styles.confirmButton,
+                styles.confirmDanger,
+                pressed && styles.pressed,
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel="Eliminar notificación"
+              accessibilityState={{ busy: deleting }}
+            >
+              {deleting ? (
+                <ActivityIndicator size="small" color={colors.error} />
+              ) : (
+                <Text style={styles.confirmDelete}>Eliminar</Text>
+              )}
+            </Pressable>
+          </View>
         </View>
-        <Text style={styles.notificationBody} numberOfLines={2}>
-          {item.body}
-        </Text>
-      </View>
-    </TouchableOpacity>
-  );
+      );
+    }
+
+    return (
+      <Pressable
+        onPress={() => handleNotificationPress(item)}
+        style={({ pressed }) => [styles.row, pressed && styles.pressed]}
+        accessibilityRole="button"
+        accessibilityLabel={`${item.title}. ${item.body}. ${item.time_ago}${
+          item.is_read ? '' : ', sin leer'
+        }`}
+      >
+        <View style={[styles.icon, !item.is_read && styles.iconUnread]}>
+          <Feather
+            name={getNotificationIcon(item.notification_type)}
+            size={18}
+            color={item.is_read ? colors.gray400 : colors.accentDeep}
+          />
+        </View>
+
+        <View style={styles.content}>
+          <View style={styles.contentHead}>
+            <Text style={styles.title} numberOfLines={1}>
+              {item.title}
+            </Text>
+            {!item.is_read && <View style={styles.unreadDot} />}
+          </View>
+          <Text style={styles.body} numberOfLines={2}>
+            {item.body}
+          </Text>
+          <Text style={styles.time}>{item.time_ago}</Text>
+        </View>
+
+        <Pressable
+          onPress={() => handleAskDelete(item)}
+          hitSlop={10}
+          style={({ pressed }) => [styles.trash, pressed && styles.pressed]}
+          accessibilityRole="button"
+          accessibilityLabel={`Eliminar ${item.title}`}
+        >
+          <Feather name="trash-2" size={18} color={colors.gray400} />
+        </Pressable>
+      </Pressable>
+    );
+  };
 
   const renderEmptyState = () => (
-    <View style={styles.emptyContainer}>
-      <View style={styles.emptyIconContainer}>
-        <Ionicons name="notifications-off-outline" size={64} color={colors.gray400} />
+    <View style={styles.empty}>
+      <View style={styles.emptyIcon}>
+        <Feather name="bell-off" size={30} color={colors.gray400} />
       </View>
       <Text style={styles.emptyTitle}>Sin notificaciones</Text>
       <Text style={styles.emptySubtitle}>
@@ -144,50 +259,32 @@ export default function NotificationsScreen() {
 
   if (isLoading) {
     return (
-      <View style={styles.container}>
-        <SafeAreaView style={styles.safeArea}>
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={colors.primary} />
-          </View>
-        </SafeAreaView>
-      </View>
+      <Screen tone="surface" wash>
+        <AppHeader title="Notificaciones" />
+        <View style={styles.loading}>
+          <ActivityIndicator size="large" color={colors.ink} />
+        </View>
+      </Screen>
     );
   }
 
   return (
-    <View style={styles.container}>
-      {/* Background Gradients */}
-      <View style={styles.backgroundContainer}>
-        <LinearGradient
-          colors={['rgba(90, 107, 255, 0.15)', 'transparent']}
-          style={styles.gradientTop}
-        />
-        <LinearGradient
-          colors={['rgba(90, 107, 255, 0.15)', 'transparent']}
-          style={styles.gradientBottom}
-        />
-      </View>
+    <Screen tone="surface" wash>
+      <AppHeader
+        title="Notificaciones"
+        subtitle={unreadCount > 0 ? `${unreadCount} sin leer` : undefined}
+        action={
+          unreadCount > 0
+            ? {
+                icon: 'check-circle',
+                label: 'Marcar todas como leídas',
+                onPress: handleMarkAllRead,
+              }
+            : undefined
+        }
+      />
 
-      <SafeAreaView style={styles.safeArea} edges={['top']}>
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity style={styles.backButton} onPress={handleBack}>
-            <Ionicons name="chevron-back" size={24} color={colors.textDark} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Notificaciones</Text>
-          {unreadCount > 0 ? (
-            <TouchableOpacity
-              style={styles.markAllButton}
-              onPress={handleMarkAllRead}
-            >
-              <Ionicons name="checkmark-done" size={24} color={colors.primary} />
-            </TouchableOpacity>
-          ) : (
-            <View style={styles.headerSpacer} />
-          )}
-        </View>
-
-        {/* Notifications List */}
+      <Animated.View style={[styles.list, bodyStyle]}>
         <FlatList
           data={notifications}
           keyExtractor={(item) => item.id.toString()}
@@ -197,172 +294,180 @@ export default function NotificationsScreen() {
             notifications.length === 0 && styles.listContentEmpty,
           ]}
           showsVerticalScrollIndicator={false}
+          ListHeaderComponent={
+            deleteError ? (
+              <Text style={styles.listError} accessibilityLiveRegion="polite">
+                {deleteError}
+              </Text>
+            ) : null
+          }
           ListEmptyComponent={renderEmptyState}
           refreshControl={
             <RefreshControl
               refreshing={isRefreshing}
               onRefresh={handleRefresh}
-              tintColor={colors.primary}
+              tintColor={colors.ink}
             />
           }
         />
-      </SafeAreaView>
-    </View>
+      </Animated.View>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  loading: {
     flex: 1,
-    backgroundColor: colors.bgDark,
-  },
-  safeArea: {
-    flex: 1,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  backgroundContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-  },
-  gradientTop: {
-    position: 'absolute',
-    top: 50,
-    left: -150,
-    width: 250,
-    height: 250,
-    borderRadius: 125,
-  },
-  gradientBottom: {
-    position: 'absolute',
-    bottom: 80,
-    right: -150,
-    width: 250,
-    height: 250,
-    borderRadius: 125,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-  },
-  backButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: colors.white,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  headerTitle: {
-    fontSize: typography.fontSize.xxl,
-    fontFamily: typography.fontFamily,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.white,
-  },
-  markAllButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerSpacer: {
-    width: 48,
+  list: {
+    flex: 1,
   },
   listContent: {
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.xxl,
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 32,
+    gap: 12,
   },
   listContentEmpty: {
-    flex: 1,
+    flexGrow: 1,
   },
-  notificationCard: {
+  listError: {
+    fontFamily: typography.fontFamily,
+    fontSize: 13,
+    lineHeight: 18,
+    color: colors.error,
+  },
+  row: {
     flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
     backgroundColor: colors.white,
-    borderRadius: borderRadius.lg,
-    padding: spacing.lg,
-    marginBottom: spacing.md,
+    borderRadius: 20,
+    padding: 16,
   },
-  notificationCardUnread: {
-    borderLeftWidth: 3,
-    borderLeftColor: colors.primary,
+  pressed: {
+    opacity: 0.85,
   },
-  notificationIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: colors.primary,
+  icon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: spacing.md,
   },
-  notificationContent: {
+  iconUnread: {
+    backgroundColor: colors.accentSoft,
+  },
+  content: {
     flex: 1,
+    gap: 2,
   },
-  notificationHeader: {
+  contentHead: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: spacing.xs,
+    alignItems: 'center',
+    gap: 8,
   },
-  notificationTitle: {
+  title: {
     flex: 1,
-    fontSize: typography.fontSize.lg,
     fontFamily: typography.fontFamily,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.textDark,
-    marginRight: spacing.sm,
+    fontSize: 15,
+    fontWeight: typography.fontWeight.semiBold,
+    color: colors.ink,
   },
-  notificationTime: {
-    fontSize: typography.fontSize.sm,
+  unreadDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: colors.accentDeep,
+  },
+  body: {
     fontFamily: typography.fontFamily,
-    fontWeight: typography.fontWeight.regular,
+    fontSize: 13,
+    lineHeight: 18,
     color: colors.gray400,
   },
-  notificationBody: {
-    fontSize: typography.fontSize.md,
+  time: {
     fontFamily: typography.fontFamily,
-    fontWeight: typography.fontWeight.regular,
+    fontSize: 11,
     color: colors.gray400,
-    lineHeight: 20,
   },
-  emptyContainer: {
+  trash: {
+    width: 32,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  confirmRow: {
+    flexDirection: 'column',
+    alignItems: 'stretch',
+    gap: 12,
+  },
+  confirmText: {
+    fontFamily: typography.fontFamily,
+    fontSize: 14,
+    fontWeight: typography.fontWeight.semiBold,
+    color: colors.ink,
+  },
+  confirmActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 8,
+  },
+  confirmButton: {
+    minWidth: 96,
+    height: 40,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    backgroundColor: colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  confirmDanger: {
+    backgroundColor: 'rgba(255, 77, 77, 0.10)',
+  },
+  confirmCancel: {
+    fontFamily: typography.fontFamily,
+    fontSize: 14,
+    fontWeight: typography.fontWeight.semiBold,
+    color: colors.ink,
+  },
+  confirmDelete: {
+    fontFamily: typography.fontFamily,
+    fontSize: 14,
+    fontWeight: typography.fontWeight.semiBold,
+    color: colors.error,
+  },
+  empty: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: spacing.xxl,
+    paddingHorizontal: 24,
+    gap: 8,
   },
-  emptyIconContainer: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: colors.cardDark,
+  emptyIcon: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: colors.white,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: spacing.xl,
+    marginBottom: 8,
   },
   emptyTitle: {
-    fontSize: typography.fontSize.title2,
     fontFamily: typography.fontFamily,
+    fontSize: 22,
     fontWeight: typography.fontWeight.bold,
-    color: colors.white,
-    marginBottom: spacing.sm,
+    letterSpacing: -0.5,
+    color: colors.ink,
   },
   emptySubtitle: {
-    fontSize: typography.fontSize.md,
     fontFamily: typography.fontFamily,
-    fontWeight: typography.fontWeight.regular,
+    fontSize: 14,
+    lineHeight: 20,
     color: colors.gray400,
     textAlign: 'center',
-    lineHeight: 22,
   },
 });
