@@ -3,42 +3,70 @@ import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
   ScrollView,
-  Alert,
   ActivityIndicator,
   Dimensions,
   NativeSyntheticEvent,
   NativeScrollEvent,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
+import { Feather } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
-import { colors, typography, spacing } from '../theme/colors';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  withDelay,
+  Easing,
+} from 'react-native-reanimated';
+import { colors, typography } from '../theme/colors';
 import { profileApi } from '../api/profile';
-import ConfirmModal from '../components/ConfirmModal';
+import Screen from '../components/ui/Screen';
+import AppHeader from '../components/ui/AppHeader';
+import PrimaryButton from '../components/ui/PrimaryButton';
 
 const MIN_HEIGHT = 100;
 const MAX_HEIGHT = 250;
 const TICK_WIDTH = 10;
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
+// Half a tick less than half the screen, so the pointer lands on the tick it
+// selects rather than on the gap before it.
+const RULER_PADDING = SCREEN_WIDTH / 2 - TICK_WIDTH / 2;
+
 export default function HeightInputScreen() {
   const navigation = useNavigation();
   const scrollViewRef = useRef<ScrollView>(null);
 
   const [selectedHeight, setSelectedHeight] = useState(170);
+  const [previousHeight, setPreviousHeight] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const lastHapticValue = useRef(170);
 
   const heights = Array.from(
     { length: MAX_HEIGHT - MIN_HEIGHT + 1 },
     (_, i) => MIN_HEIGHT + i
   );
+
+  const intro = useSharedValue(0);
+  useEffect(() => {
+    intro.value = withTiming(1, { duration: 460, easing: Easing.out(Easing.cubic) });
+  }, []);
+
+  const headerStyle = useAnimatedStyle(() => ({
+    opacity: intro.value,
+    transform: [{ translateY: (1 - intro.value) * 16 }],
+  }));
+  const valueStyle = useAnimatedStyle(() => ({
+    opacity: withDelay(90, withTiming(intro.value, { duration: 400 })),
+    transform: [{ translateY: withDelay(90, withTiming((1 - intro.value) * 16, { duration: 400 })) }],
+  }));
+  const footerStyle = useAnimatedStyle(() => ({
+    opacity: withDelay(170, withTiming(intro.value, { duration: 400 })),
+  }));
 
   useEffect(() => {
     fetchProfile();
@@ -48,6 +76,7 @@ export default function HeightInputScreen() {
     const { data } = await profileApi.getProfile();
     if (data?.profile.height) {
       setSelectedHeight(data.profile.height);
+      setPreviousHeight(data.profile.height);
       lastHapticValue.current = data.profile.height;
       // Scroll to current height after layout
       setTimeout(() => {
@@ -64,24 +93,24 @@ export default function HeightInputScreen() {
     setIsLoading(false);
   };
 
-  const handleBack = () => {
-    navigation.goBack();
-  };
-
   const handleSave = async () => {
+    setSaveError(null);
     setIsSaving(true);
     const { data, error } = await profileApi.updateProfile({ height: selectedHeight });
     setIsSaving(false);
 
     if (data) {
-      setShowSuccessModal(true);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setSaved(true);
+      setPreviousHeight(selectedHeight);
     } else {
-      Alert.alert('Error', error || 'No se pudo guardar la altura');
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      setSaveError(error || 'No se pudo guardar la altura');
     }
   };
 
   const handleSuccessClose = () => {
-    setShowSuccessModal(false);
+    setSaved(false);
     navigation.goBack();
   };
 
@@ -92,6 +121,9 @@ export default function HeightInputScreen() {
 
     if (clampedValue !== selectedHeight) {
       setSelectedHeight(clampedValue);
+      // Moving the ruler makes the confirmation stale.
+      setSaved(false);
+      setSaveError(null);
 
       // Haptic feedback when value changes
       if (clampedValue !== lastHapticValue.current) {
@@ -111,261 +143,263 @@ export default function HeightInputScreen() {
     scrollViewRef.current?.scrollTo({ x: snapOffset, animated: true });
   };
 
+  const meters = (selectedHeight / 100).toFixed(2).replace('.', ',');
+  const hint =
+    previousHeight === null
+      ? `Equivale a ${meters} m. Es tu primer registro.`
+      : `Equivale a ${meters} m. Tenías ${previousHeight} cm registrados.`;
+
   if (isLoading) {
     return (
-      <View style={styles.container}>
-        <SafeAreaView style={styles.safeArea}>
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={colors.primary} />
-          </View>
-        </SafeAreaView>
-      </View>
+      <Screen tone="plain" wash edges={['top', 'bottom']}>
+        <AppHeader title="Datos corporales" />
+        <View style={styles.loading}>
+          <ActivityIndicator size="large" color={colors.ink} />
+        </View>
+      </Screen>
     );
   }
 
   return (
-    <View style={styles.container}>
-      {/* Background Gradients */}
-      <View style={styles.backgroundContainer}>
-        <LinearGradient
-          colors={['rgba(90, 107, 255, 0.15)', 'transparent']}
-          style={styles.gradientTop}
-        />
-        <LinearGradient
-          colors={['rgba(90, 107, 255, 0.15)', 'transparent']}
-          style={styles.gradientBottom}
-        />
+    <Screen tone="plain" wash edges={['top', 'bottom']}>
+      <AppHeader title="Datos corporales" />
+
+      <View style={styles.body}>
+        <Animated.View style={[styles.head, headerStyle]}>
+          <Text style={styles.title}>Tu altura</Text>
+          <Text style={styles.subtitle}>Desliza la regla hasta el número y suelta.</Text>
+        </Animated.View>
+
+        <Animated.View style={[styles.stage, valueStyle]}>
+          <View style={styles.valueRow}>
+            <Text
+              style={styles.value}
+              accessibilityRole="text"
+              accessibilityLabel={`${selectedHeight} centímetros`}
+            >
+              {selectedHeight}
+            </Text>
+            <Text style={styles.unit}>cm</Text>
+          </View>
+          <Text style={styles.hint}>{hint}</Text>
+
+          <View style={styles.ruler}>
+            <View style={styles.pointer} pointerEvents="none">
+              <View style={styles.pointerCap} />
+              <View style={styles.pointerBar} />
+            </View>
+
+            <ScrollView
+              ref={scrollViewRef}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.rulerContent}
+              onScroll={handleScroll}
+              onMomentumScrollEnd={handleScrollEnd}
+              onScrollEndDrag={handleScrollEnd}
+              scrollEventThrottle={16}
+              decelerationRate="fast"
+              snapToInterval={TICK_WIDTH}
+            >
+              {heights.map((height) => {
+                const isMajor = height % 10 === 0;
+                const isMinor5 = height % 5 === 0 && !isMajor;
+
+                return (
+                  <View key={height} style={styles.tickContainer}>
+                    <View
+                      style={[
+                        styles.tick,
+                        isMinor5 && styles.tickMinor5,
+                        isMajor && styles.tickMajor,
+                      ]}
+                    />
+                    {isMajor && <Text style={styles.tickLabel}>{height}</Text>}
+                  </View>
+                );
+              })}
+            </ScrollView>
+          </View>
+        </Animated.View>
+
+        <Animated.View style={[styles.footer, footerStyle]}>
+          {!!saveError && (
+            <View style={styles.errorRow}>
+              <Feather name="alert-circle" size={16} color={colors.error} />
+              <Text style={styles.errorText}>{saveError}</Text>
+            </View>
+          )}
+
+          {/* Confirmation reads in place. A modal over a saved value only asks
+              the user to dismiss news they can already see. */}
+          {saved && (
+            <View style={styles.successRow}>
+              <Feather name="check-circle" size={16} color={colors.accentDeep} />
+              <Text style={styles.successText}>
+                Guardado. Tu altura quedó en {selectedHeight} cm.
+              </Text>
+            </View>
+          )}
+
+          <PrimaryButton
+            label={saved ? 'Listo' : 'Guardar'}
+            onPress={saved ? handleSuccessClose : handleSave}
+            loading={isSaving}
+          />
+        </Animated.View>
       </View>
-
-      <SafeAreaView style={styles.safeArea} edges={['top']}>
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity style={styles.backButton} onPress={handleBack}>
-            <Ionicons name="chevron-back" size={24} color={colors.textDark} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Altura</Text>
-          <View style={styles.headerSpacer} />
-        </View>
-
-        {/* Current Height Display */}
-        <View style={styles.currentValueContainer}>
-          <Text style={styles.currentValue}>{selectedHeight}</Text>
-          <Text style={styles.currentUnit}>cm</Text>
-        </View>
-
-        {/* Ruler Picker */}
-        <View style={styles.rulerContainer}>
-          {/* Center Indicator */}
-          <View style={styles.centerIndicator} />
-
-          <ScrollView
-            ref={scrollViewRef}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.rulerContent}
-            onScroll={handleScroll}
-            onMomentumScrollEnd={handleScrollEnd}
-            onScrollEndDrag={handleScrollEnd}
-            scrollEventThrottle={16}
-            decelerationRate="fast"
-            snapToInterval={TICK_WIDTH}
-          >
-            {heights.map((height) => {
-              const isMajor = height % 10 === 0;
-              const isMinor5 = height % 5 === 0 && !isMajor;
-
-              return (
-                <View key={height} style={styles.tickContainer}>
-                  <View
-                    style={[
-                      styles.tick,
-                      isMajor && styles.tickMajor,
-                      isMinor5 && styles.tickMinor5,
-                    ]}
-                  />
-                  {isMajor && (
-                    <Text style={styles.tickLabel}>{height}</Text>
-                  )}
-                </View>
-              );
-            })}
-          </ScrollView>
-        </View>
-
-        {/* Save Button */}
-        <View style={styles.bottomButtonContainer}>
-          <TouchableOpacity
-            style={[styles.saveButton, isSaving && styles.saveButtonDisabled]}
-            onPress={handleSave}
-            disabled={isSaving}
-            activeOpacity={0.8}
-          >
-            {isSaving ? (
-              <ActivityIndicator size="small" color={colors.textDark} />
-            ) : (
-              <Text style={styles.saveButtonText}>Guardar</Text>
-            )}
-          </TouchableOpacity>
-        </View>
-
-        {/* Success Modal */}
-        <ConfirmModal
-          visible={showSuccessModal}
-          title="Guardado"
-          message="Tu altura ha sido actualizada correctamente."
-          confirmText="OK"
-          onConfirm={handleSuccessClose}
-          onCancel={handleSuccessClose}
-          singleButton
-        />
-      </SafeAreaView>
-    </View>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  loading: {
     flex: 1,
-    backgroundColor: colors.bgDark,
-  },
-  safeArea: {
-    flex: 1,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  backgroundContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-  },
-  gradientTop: {
-    position: 'absolute',
-    top: 50,
-    left: -150,
-    width: 250,
-    height: 250,
-    borderRadius: 125,
-  },
-  gradientBottom: {
-    position: 'absolute',
-    bottom: 80,
-    right: -150,
-    width: 250,
-    height: 250,
-    borderRadius: 125,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-  },
-  backButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: colors.white,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  headerTitle: {
-    fontSize: typography.fontSize.title1,
+  body: {
+    flex: 1,
+    paddingHorizontal: 24,
+    paddingBottom: 16,
+  },
+  head: {
+    marginTop: 8,
+    gap: 8,
+  },
+  title: {
     fontFamily: typography.fontFamily,
+    fontSize: 36,
     fontWeight: typography.fontWeight.bold,
-    color: colors.white,
-    textTransform: 'uppercase',
+    lineHeight: 40,
+    letterSpacing: -1,
+    color: colors.ink,
   },
-  headerSpacer: {
-    width: 48,
+  subtitle: {
+    fontFamily: typography.fontFamily,
+    fontSize: 15,
+    lineHeight: 21,
+    color: colors.gray400,
   },
-  currentValueContainer: {
+  stage: {
+    flex: 1,
+    justifyContent: 'center',
+    gap: 8,
+  },
+  valueRow: {
     flexDirection: 'row',
     alignItems: 'baseline',
     justifyContent: 'center',
-    marginTop: spacing.xxl * 2,
-    marginBottom: spacing.xxl * 2,
+    gap: 8,
   },
-  currentValue: {
-    fontSize: 80,
+  value: {
     fontFamily: typography.fontFamily,
+    fontSize: 76,
     fontWeight: typography.fontWeight.bold,
-    color: colors.white,
+    letterSpacing: -3,
+    color: colors.ink,
   },
-  currentUnit: {
-    fontSize: typography.fontSize.title1,
+  unit: {
     fontFamily: typography.fontFamily,
-    fontWeight: typography.fontWeight.medium,
+    fontSize: 22,
+    fontWeight: typography.fontWeight.semiBold,
     color: colors.gray400,
-    marginLeft: spacing.sm,
   },
-  rulerContainer: {
-    flex: 1,
-    justifyContent: 'center',
+  hint: {
+    fontFamily: typography.fontFamily,
+    fontSize: 13,
+    textAlign: 'center',
+    color: colors.gray400,
   },
-  centerIndicator: {
+  ruler: {
+    height: 92,
+    marginTop: 24,
+    marginHorizontal: -24,
+    justifyContent: 'flex-start',
+  },
+  pointer: {
     position: 'absolute',
-    left: SCREEN_WIDTH / 2 - 1,
+    left: SCREEN_WIDTH / 2 - 5,
     top: 0,
-    bottom: 60,
-    width: 2,
-    backgroundColor: colors.primary,
+    width: 10,
+    alignItems: 'center',
     zIndex: 10,
   },
+  pointerCap: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: colors.accentDeep,
+  },
+  pointerBar: {
+    width: 3,
+    height: 46,
+    marginTop: 2,
+    borderRadius: 2,
+    backgroundColor: colors.accentDeep,
+  },
   rulerContent: {
-    paddingHorizontal: SCREEN_WIDTH / 2,
+    paddingHorizontal: RULER_PADDING,
     alignItems: 'flex-start',
-    paddingTop: 20,
+    paddingTop: 14,
   },
   tickContainer: {
     width: TICK_WIDTH,
     alignItems: 'center',
   },
   tick: {
-    width: 1,
-    height: 20,
+    width: 1.5,
+    height: 16,
+    borderRadius: 1,
     backgroundColor: colors.gray400,
-  },
-  tickMajor: {
-    height: 40,
-    width: 2,
-    backgroundColor: colors.white,
+    opacity: 0.3,
   },
   tickMinor5: {
-    height: 30,
-    backgroundColor: colors.gray400,
+    height: 24,
+    opacity: 0.45,
+  },
+  tickMajor: {
+    width: 2,
+    height: 34,
+    opacity: 1,
+    backgroundColor: colors.ink,
   },
   tickLabel: {
-    marginTop: spacing.sm,
-    fontSize: typography.fontSize.sm,
+    marginTop: 8,
     fontFamily: typography.fontFamily,
+    fontSize: 12,
     fontWeight: typography.fontWeight.medium,
     color: colors.gray400,
   },
-  bottomButtonContainer: {
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.xxl,
-    paddingTop: spacing.lg,
+  footer: {
+    gap: 14,
+    paddingTop: 8,
   },
-  saveButton: {
-    backgroundColor: colors.primary,
-    borderRadius: 1000,
-    paddingVertical: spacing.lg,
+  errorRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: 8,
   },
-  saveButtonDisabled: {
-    opacity: 0.5,
+  errorText: {
+    flex: 1,
+    fontFamily: typography.fontFamily,
+    fontSize: 13,
+    color: colors.error,
   },
-  saveButtonText: {
-    fontSize: typography.fontSize.lg,
-    fontFamily: typography.fontFamily.semibold,
-    color: colors.textDark,
-    textTransform: 'uppercase',
+  successRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 14,
+    backgroundColor: colors.accentSoft,
+  },
+  successText: {
+    flex: 1,
+    fontFamily: typography.fontFamily,
+    fontSize: 13,
+    fontWeight: typography.fontWeight.semiBold,
+    color: colors.ink,
   },
 });

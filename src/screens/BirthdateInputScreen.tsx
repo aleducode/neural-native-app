@@ -3,27 +3,34 @@ import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
   ScrollView,
-  Alert,
   ActivityIndicator,
-  Dimensions,
   NativeSyntheticEvent,
   NativeScrollEvent,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
+import { Feather } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
-import { colors, typography, spacing, borderRadius } from '../theme/colors';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  withDelay,
+  Easing,
+} from 'react-native-reanimated';
+import { colors, typography } from '../theme/colors';
 import { profileApi } from '../api/profile';
-import ConfirmModal from '../components/ConfirmModal';
+import Screen from '../components/ui/Screen';
+import AppHeader from '../components/ui/AppHeader';
+import PrimaryButton from '../components/ui/PrimaryButton';
 
-const SCREEN_WIDTH = Dimensions.get('window').width;
-const ITEM_HEIGHT = 40;
+const ITEM_HEIGHT = 44;
 const VISIBLE_ITEMS = 5;
 const PICKER_HEIGHT = ITEM_HEIGHT * VISIBLE_ITEMS;
+
+const DAY_WIDTH = 76;
+const MONTH_WIDTH = 104;
+const YEAR_WIDTH = 104;
 
 const MONTHS = [
   'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun',
@@ -44,9 +51,10 @@ interface WheelPickerProps {
   selectedIndex: number;
   onValueChange: (index: number) => void;
   width: number;
+  label: string;
 }
 
-function WheelPicker({ data, selectedIndex, onValueChange, width }: WheelPickerProps) {
+function WheelPicker({ data, selectedIndex, onValueChange, width, label }: WheelPickerProps) {
   const scrollViewRef = useRef<ScrollView>(null);
   const lastHapticIndex = useRef(selectedIndex);
 
@@ -87,36 +95,43 @@ function WheelPicker({ data, selectedIndex, onValueChange, width }: WheelPickerP
   };
 
   return (
-    <View style={[styles.wheelContainer, { width }]}>
-      <ScrollView
-        ref={scrollViewRef}
-        showsVerticalScrollIndicator={false}
-        snapToInterval={ITEM_HEIGHT}
-        decelerationRate="fast"
-        onScroll={handleScroll}
-        onMomentumScrollEnd={handleScrollEnd}
-        onScrollEndDrag={handleScrollEnd}
-        scrollEventThrottle={16}
-        contentContainerStyle={{
-          paddingVertical: ITEM_HEIGHT * 2,
-        }}
-      >
-        {data.map((item, index) => {
-          const isSelected = index === selectedIndex;
-          return (
-            <View key={index} style={styles.wheelItem}>
-              <Text
-                style={[
-                  styles.wheelItemText,
-                  isSelected && styles.wheelItemTextSelected,
-                ]}
-              >
-                {item}
-              </Text>
-            </View>
-          );
-        })}
-      </ScrollView>
+    <View style={[styles.wheelColumn, { width }]}>
+      <Text style={styles.wheelLabel}>{label}</Text>
+      <View style={styles.wheelContainer}>
+        <ScrollView
+          ref={scrollViewRef}
+          showsVerticalScrollIndicator={false}
+          snapToInterval={ITEM_HEIGHT}
+          decelerationRate="fast"
+          onScroll={handleScroll}
+          onMomentumScrollEnd={handleScrollEnd}
+          onScrollEndDrag={handleScrollEnd}
+          scrollEventThrottle={16}
+          contentContainerStyle={{
+            paddingVertical: ITEM_HEIGHT * 2,
+          }}
+        >
+          {data.map((item, index) => {
+            const distance = Math.abs(index - selectedIndex);
+            const isSelected = distance === 0;
+            return (
+              <View key={index} style={styles.wheelItem}>
+                <Text
+                  style={[
+                    styles.wheelItemText,
+                    // The selected row has to win outright: everything either
+                    // side steps back in size, weight and presence.
+                    isSelected && styles.wheelItemTextSelected,
+                    !isSelected && { opacity: distance === 1 ? 0.6 : 0.3 },
+                  ]}
+                >
+                  {item}
+                </Text>
+              </View>
+            );
+          })}
+        </ScrollView>
+      </View>
     </View>
   );
 }
@@ -129,7 +144,8 @@ export default function BirthdateInputScreen() {
   const [selectedYear, setSelectedYear] = useState(2000);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
   // Generate arrays
   const days = Array.from({ length: 31 }, (_, i) => i + 1);
@@ -137,6 +153,23 @@ export default function BirthdateInputScreen() {
     { length: MAX_YEAR - MIN_YEAR + 1 },
     (_, i) => MAX_YEAR - i
   );
+
+  const intro = useSharedValue(0);
+  useEffect(() => {
+    intro.value = withTiming(1, { duration: 460, easing: Easing.out(Easing.cubic) });
+  }, []);
+
+  const headerStyle = useAnimatedStyle(() => ({
+    opacity: intro.value,
+    transform: [{ translateY: (1 - intro.value) * 16 }],
+  }));
+  const valueStyle = useAnimatedStyle(() => ({
+    opacity: withDelay(90, withTiming(intro.value, { duration: 400 })),
+    transform: [{ translateY: withDelay(90, withTiming((1 - intro.value) * 16, { duration: 400 })) }],
+  }));
+  const footerStyle = useAnimatedStyle(() => ({
+    opacity: withDelay(170, withTiming(intro.value, { duration: 400 })),
+  }));
 
   useEffect(() => {
     fetchProfile();
@@ -153,15 +186,15 @@ export default function BirthdateInputScreen() {
     setIsLoading(false);
   };
 
-  const handleBack = () => {
-    navigation.goBack();
-  };
-
   const handleSave = async () => {
+    setFormError(null);
+
     // Validate date
     const date = new Date(selectedYear, selectedMonth, selectedDay);
     if (date.getMonth() !== selectedMonth) {
-      Alert.alert('Error', 'Fecha inválida');
+      // Inline, beside the pickers that produced it.
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      setFormError('Fecha inválida');
       return;
     }
 
@@ -171,14 +204,16 @@ export default function BirthdateInputScreen() {
     setIsSaving(false);
 
     if (data) {
-      setShowSuccessModal(true);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setSaved(true);
     } else {
-      Alert.alert('Error', error || 'No se pudo guardar la fecha de nacimiento');
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      setFormError(error || 'No se pudo guardar la fecha de nacimiento');
     }
   };
 
   const handleSuccessClose = () => {
-    setShowSuccessModal(false);
+    setSaved(false);
     navigation.goBack();
   };
 
@@ -199,212 +234,206 @@ export default function BirthdateInputScreen() {
     }
   }, [selectedMonth, selectedYear]);
 
+  // Any change to the wheels makes a previous confirmation stale.
+  useEffect(() => {
+    setSaved(false);
+    setFormError(null);
+  }, [selectedDay, selectedMonth, selectedYear]);
+
+  const getAge = () => {
+    const today = new Date();
+    let age = today.getFullYear() - selectedYear;
+    const monthDiff = today.getMonth() - selectedMonth;
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < selectedDay)) {
+      age -= 1;
+    }
+    return age;
+  };
+
   if (isLoading) {
     return (
-      <View style={styles.container}>
-        <SafeAreaView style={styles.safeArea}>
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={colors.primary} />
-          </View>
-        </SafeAreaView>
-      </View>
+      <Screen tone="plain" wash edges={['top', 'bottom']}>
+        <AppHeader title="Datos corporales" />
+        <View style={styles.loading}>
+          <ActivityIndicator size="large" color={colors.ink} />
+        </View>
+      </Screen>
     );
   }
 
   const displayDays = days.slice(0, getMaxDays());
+  const age = getAge();
 
   return (
-    <View style={styles.container}>
-      {/* Background Gradients */}
-      <View style={styles.backgroundContainer}>
-        <LinearGradient
-          colors={['rgba(90, 107, 255, 0.15)', 'transparent']}
-          style={styles.gradientTop}
-        />
-        <LinearGradient
-          colors={['rgba(90, 107, 255, 0.15)', 'transparent']}
-          style={styles.gradientBottom}
-        />
-      </View>
+    <Screen tone="plain" wash edges={['top', 'bottom']}>
+      <AppHeader title="Datos corporales" />
 
-      <SafeAreaView style={styles.safeArea} edges={['top']}>
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity style={styles.backButton} onPress={handleBack}>
-            <Ionicons name="chevron-back" size={24} color={colors.textDark} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Fecha de Nacimiento</Text>
-          <View style={styles.headerSpacer} />
-        </View>
+      <View style={styles.body}>
+        <Animated.View style={[styles.head, headerStyle]}>
+          <Text style={styles.title}>Tu fecha{'\n'}de nacimiento</Text>
+          <Text style={styles.subtitle}>Desliza cada rueda hasta tu fecha.</Text>
+        </Animated.View>
 
-        {/* Current Date Display */}
-        <View style={styles.currentValueContainer}>
-          <Text style={styles.currentValue}>{formatDisplayDate()}</Text>
-          <View style={styles.underline} />
-        </View>
-
-        {/* Date Picker */}
-        <View style={styles.pickerContainer}>
-          {/* Selection Highlight */}
-          <View style={styles.selectionHighlight} />
-
-          <View style={styles.pickersRow}>
-            {/* Day Picker */}
-            <WheelPicker
-              data={displayDays}
-              selectedIndex={selectedDay - 1}
-              onValueChange={(index) => setSelectedDay(index + 1)}
-              width={80}
-            />
-
-            {/* Month Picker */}
-            <WheelPicker
-              data={MONTHS}
-              selectedIndex={selectedMonth}
-              onValueChange={setSelectedMonth}
-              width={100}
-            />
-
-            {/* Year Picker */}
-            <WheelPicker
-              data={years}
-              selectedIndex={years.indexOf(selectedYear)}
-              onValueChange={(index) => setSelectedYear(years[index])}
-              width={100}
-            />
+        <Animated.View style={[styles.stage, valueStyle]}>
+          <View style={styles.valueBlock}>
+            <Text
+              style={styles.value}
+              accessibilityRole="text"
+              accessibilityLabel={`Fecha seleccionada: ${formatDisplayDate()}`}
+            >
+              {formatDisplayDate()}
+            </Text>
+            <Text style={styles.hint}>
+              {age >= 0 ? `${age} ${age === 1 ? 'año' : 'años'}` : 'Fecha futura'}
+            </Text>
           </View>
-        </View>
 
-        {/* Save Button */}
-        <View style={styles.bottomButtonContainer}>
-          <TouchableOpacity
-            style={[styles.saveButton, isSaving && styles.saveButtonDisabled]}
-            onPress={handleSave}
-            disabled={isSaving}
-            activeOpacity={0.8}
-          >
-            {isSaving ? (
-              <ActivityIndicator size="small" color={colors.textDark} />
-            ) : (
-              <Text style={styles.saveButtonText}>Guardar</Text>
-            )}
-          </TouchableOpacity>
-        </View>
+          <View style={styles.wheels}>
+            {/* Selection band: the row under the band is the answer. */}
+            <View style={styles.selectionBand} pointerEvents="none" />
 
-        {/* Success Modal */}
-        <ConfirmModal
-          visible={showSuccessModal}
-          title="Guardado"
-          message="Tu fecha de nacimiento ha sido actualizada correctamente."
-          confirmText="OK"
-          onConfirm={handleSuccessClose}
-          onCancel={handleSuccessClose}
-          singleButton
-        />
-      </SafeAreaView>
-    </View>
+            <View style={styles.pickersRow}>
+              {/* Day Picker */}
+              <WheelPicker
+                data={displayDays}
+                selectedIndex={selectedDay - 1}
+                onValueChange={(index) => setSelectedDay(index + 1)}
+                width={DAY_WIDTH}
+                label="Día"
+              />
+
+              {/* Month Picker */}
+              <WheelPicker
+                data={MONTHS}
+                selectedIndex={selectedMonth}
+                onValueChange={setSelectedMonth}
+                width={MONTH_WIDTH}
+                label="Mes"
+              />
+
+              {/* Year Picker */}
+              <WheelPicker
+                data={years}
+                selectedIndex={years.indexOf(selectedYear)}
+                onValueChange={(index) => setSelectedYear(years[index])}
+                width={YEAR_WIDTH}
+                label="Año"
+              />
+            </View>
+          </View>
+        </Animated.View>
+
+        <Animated.View style={[styles.footer, footerStyle]}>
+          {!!formError && (
+            <View style={styles.errorRow}>
+              <Feather name="alert-circle" size={16} color={colors.error} />
+              <Text style={styles.errorText}>{formError}</Text>
+            </View>
+          )}
+
+          {saved && (
+            <View style={styles.successRow}>
+              <Feather name="check-circle" size={16} color={colors.accentDeep} />
+              <Text style={styles.successText}>
+                Guardado. Tu fecha quedó en {formatDisplayDate()}.
+              </Text>
+            </View>
+          )}
+
+          <PrimaryButton
+            label={saved ? 'Listo' : 'Guardar'}
+            onPress={saved ? handleSuccessClose : handleSave}
+            loading={isSaving}
+          />
+        </Animated.View>
+      </View>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  loading: {
     flex: 1,
-    backgroundColor: colors.bgDark,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  safeArea: {
+  body: {
     flex: 1,
+    paddingHorizontal: 24,
+    paddingBottom: 16,
   },
-  loadingContainer: {
+  head: {
+    marginTop: 8,
+    gap: 8,
+  },
+  title: {
+    fontFamily: typography.fontFamily,
+    fontSize: 34,
+    fontWeight: typography.fontWeight.bold,
+    lineHeight: 38,
+    letterSpacing: -1,
+    color: colors.ink,
+  },
+  subtitle: {
+    fontFamily: typography.fontFamily,
+    fontSize: 15,
+    lineHeight: 21,
+    color: colors.gray400,
+  },
+  stage: {
     flex: 1,
     justifyContent: 'center',
-    alignItems: 'center',
+    gap: 20,
   },
-  backgroundContainer: {
+  valueBlock: {
+    alignItems: 'center',
+    gap: 4,
+  },
+  value: {
+    fontFamily: typography.fontFamily,
+    fontSize: 30,
+    fontWeight: typography.fontWeight.bold,
+    letterSpacing: -0.8,
+    color: colors.ink,
+  },
+  hint: {
+    fontFamily: typography.fontFamily,
+    fontSize: 13,
+    color: colors.gray400,
+  },
+  wheels: {
+    height: PICKER_HEIGHT + 24,
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+  },
+  selectionBand: {
     position: 'absolute',
-    top: 0,
     left: 0,
     right: 0,
-    bottom: 0,
-  },
-  gradientTop: {
-    position: 'absolute',
-    top: 50,
-    left: -150,
-    width: 250,
-    height: 250,
-    borderRadius: 125,
-  },
-  gradientBottom: {
-    position: 'absolute',
-    bottom: 80,
-    right: -150,
-    width: 250,
-    height: 250,
-    borderRadius: 125,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-  },
-  backButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: colors.white,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    fontSize: typography.fontSize.lg,
-    fontFamily: typography.fontFamily,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.white,
-    textTransform: 'uppercase',
-  },
-  headerSpacer: {
-    width: 48,
-  },
-  currentValueContainer: {
-    alignItems: 'center',
-    marginTop: spacing.xxl * 2,
-    marginBottom: spacing.xxl * 2,
-  },
-  currentValue: {
-    fontSize: 30,
-    fontFamily: typography.fontFamily,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.white,
-    textTransform: 'uppercase',
-  },
-  underline: {
-    width: 200,
-    height: 2,
-    backgroundColor: colors.primary,
-    marginTop: spacing.md,
-  },
-  pickerContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  selectionHighlight: {
-    position: 'absolute',
-    width: SCREEN_WIDTH - spacing.lg * 2,
+    // Sits over the middle row of the wheels, which start below the labels.
+    bottom: (PICKER_HEIGHT - ITEM_HEIGHT) / 2,
     height: ITEM_HEIGHT,
-    backgroundColor: colors.white,
-    borderRadius: borderRadius.md,
-    zIndex: 0,
+    borderRadius: 16,
+    backgroundColor: colors.surface,
   },
   pickersRow: {
     flexDirection: 'row',
-    height: PICKER_HEIGHT,
-    zIndex: 1,
+  },
+  wheelColumn: {
+    alignItems: 'center',
+    gap: 8,
+  },
+  wheelLabel: {
+    fontFamily: typography.fontFamily,
+    fontSize: 10,
+    fontWeight: typography.fontWeight.bold,
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
+    color: colors.gray400,
   },
   wheelContainer: {
     height: PICKER_HEIGHT,
+    alignSelf: 'stretch',
     overflow: 'hidden',
   },
   wheelItem: {
@@ -413,35 +442,45 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   wheelItemText: {
-    fontSize: typography.fontSize.xxl,
     fontFamily: typography.fontFamily,
+    fontSize: 17,
     fontWeight: typography.fontWeight.medium,
-    color: colors.white,
+    color: colors.gray400,
   },
   wheelItemTextSelected: {
-    fontFamily: typography.fontFamily,
+    fontSize: 22,
     fontWeight: typography.fontWeight.bold,
-    color: colors.textDark,
+    color: colors.ink,
   },
-  bottomButtonContainer: {
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.xxl,
-    paddingTop: spacing.lg,
+  footer: {
+    gap: 14,
+    paddingTop: 8,
   },
-  saveButton: {
-    backgroundColor: colors.primary,
-    borderRadius: 1000,
-    paddingVertical: spacing.lg,
+  errorRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: 8,
   },
-  saveButtonDisabled: {
-    opacity: 0.5,
+  errorText: {
+    flex: 1,
+    fontFamily: typography.fontFamily,
+    fontSize: 13,
+    color: colors.error,
   },
-  saveButtonText: {
-    fontSize: typography.fontSize.lg,
-    fontFamily: typography.fontFamily.semibold,
-    color: colors.textDark,
-    textTransform: 'uppercase',
+  successRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 14,
+    backgroundColor: colors.accentSoft,
+  },
+  successText: {
+    flex: 1,
+    fontFamily: typography.fontFamily,
+    fontSize: 13,
+    fontWeight: typography.fontWeight.semiBold,
+    color: colors.ink,
   },
 });

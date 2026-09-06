@@ -3,20 +3,45 @@ import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
   ActivityIndicator,
   Dimensions,
   ScrollView,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
+import { Feather } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import * as Haptics from 'expo-haptics';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  withDelay,
+  Easing,
+} from 'react-native-reanimated';
 import { LineChart } from 'react-native-chart-kit';
-import { colors, typography, spacing, borderRadius } from '../theme/colors';
+import { colors, typography, borderRadius } from '../theme/colors';
 import { profileApi, UserWeight } from '../api/profile';
+import Screen from '../components/ui/Screen';
+import AppHeader from '../components/ui/AppHeader';
+import Card from '../components/ui/Card';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
+
+const GUTTER = 16;
+// The chart lives inside a card, so it has the card's padding to clear too.
+const CHART_WIDTH = SCREEN_WIDTH - GUTTER * 2 - 32;
+
+/**
+ * chart-kit asks for `rgba(r, g, b, opacity)` factories, so the token has to be
+ * unpacked rather than handed over as a hex string. This keeps the chart on the
+ * palette instead of on a literal.
+ */
+function withAlpha(hex: string, opacity: number) {
+  const value = hex.replace('#', '');
+  const r = parseInt(value.slice(0, 2), 16);
+  const g = parseInt(value.slice(2, 4), 16);
+  const b = parseInt(value.slice(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${opacity})`;
+}
 
 export default function WeightHistoryScreen() {
   const navigation = useNavigation<any>();
@@ -31,6 +56,20 @@ export default function WeightHistoryScreen() {
   } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  const intro = useSharedValue(0);
+  useEffect(() => {
+    intro.value = withTiming(1, { duration: 460, easing: Easing.out(Easing.cubic) });
+  }, []);
+
+  const heroStyle = useAnimatedStyle(() => ({
+    opacity: intro.value,
+    transform: [{ translateY: (1 - intro.value) * 14 }],
+  }));
+  const bodyStyle = useAnimatedStyle(() => ({
+    opacity: withDelay(90, withTiming(intro.value, { duration: 400 })),
+    transform: [{ translateY: withDelay(90, withTiming((1 - intro.value) * 14, { duration: 400 })) }],
+  }));
+
   useEffect(() => {
     fetchWeights();
   }, []);
@@ -44,11 +83,8 @@ export default function WeightHistoryScreen() {
     setIsLoading(false);
   };
 
-  const handleBack = () => {
-    navigation.goBack();
-  };
-
   const handleAddWeight = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     navigation.navigate('WeightInput');
   };
 
@@ -87,318 +123,295 @@ export default function WeightHistoryScreen() {
 
   if (isLoading) {
     return (
-      <View style={styles.container}>
-        <SafeAreaView style={styles.safeArea}>
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={colors.primary} />
-          </View>
-        </SafeAreaView>
-      </View>
+      <Screen wash>
+        <AppHeader title="Peso" />
+        <View style={styles.loading}>
+          <ActivityIndicator size="large" color={colors.ink} />
+        </View>
+      </Screen>
     );
   }
 
+  // Losing weight is the outcome this app treats as progress, so that direction
+  // gets the brand accent. A gain is stated plainly rather than flagged red.
+  const change = stats?.change ?? 0;
+  const changeTint = change < 0 ? colors.accentDeep : colors.ink;
+
   return (
-    <View style={styles.container}>
-      {/* Background Gradients */}
-      <View style={styles.backgroundContainer}>
-        <LinearGradient
-          colors={['rgba(90, 107, 255, 0.15)', 'transparent']}
-          style={styles.gradientTop}
-        />
-        <LinearGradient
-          colors={['rgba(90, 107, 255, 0.15)', 'transparent']}
-          style={styles.gradientBottom}
-        />
-      </View>
+    <Screen wash>
+      <AppHeader
+        title="Peso"
+        action={{ icon: 'plus', label: 'Registrar peso', onPress: handleAddWeight }}
+      />
 
-      <SafeAreaView style={styles.safeArea} edges={['top']}>
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity style={styles.backButton} onPress={handleBack}>
-            <Ionicons name="chevron-back" size={24} color={colors.textDark} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Historial de Peso</Text>
-          <TouchableOpacity style={styles.addButton} onPress={handleAddWeight}>
-            <Ionicons name="add" size={24} color={colors.textDark} />
-          </TouchableOpacity>
-        </View>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <Animated.View style={[styles.hero, heroStyle]}>
+          <Text style={styles.heroLabel}>PESO ACTUAL</Text>
+          <View style={styles.heroValueRow}>
+            <Text style={styles.heroValue}>{stats?.current ?? '-'}</Text>
+            {!!stats?.current && <Text style={styles.heroUnit}>kg</Text>}
+          </View>
+          <Text style={styles.heroCaption}>
+            {stats && stats.total_entries > 0
+              ? `${stats.total_entries} ${
+                  stats.total_entries === 1 ? 'registro' : 'registros'
+                } en tu historial`
+              : 'Todavía no registraste tu peso.'}
+          </Text>
+        </Animated.View>
 
-        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-          {/* Stats Cards */}
+        <Animated.View style={bodyStyle}>
+          {/* Stats */}
           {stats && (
-            <View style={styles.statsContainer}>
-              <View style={styles.statCard}>
-                <Text style={styles.statLabel}>Actual</Text>
-                <Text style={styles.statValue}>
-                  {stats.current ? `${stats.current} kg` : '-'}
-                </Text>
+            <Card title="Resumen" subtitle="Mínimo, máximo y cambio acumulado" style={styles.card}>
+              <View style={styles.statRow}>
+                <View style={styles.stat}>
+                  <Feather name="arrow-down" size={16} color={colors.gray400} />
+                  <Text style={styles.statValue}>
+                    {stats.min ? `${stats.min} kg` : '-'}
+                  </Text>
+                  <Text style={styles.statLabel}>Mínimo</Text>
+                </View>
+                <View style={styles.stat}>
+                  <Feather name="arrow-up" size={16} color={colors.gray400} />
+                  <Text style={styles.statValue}>
+                    {stats.max ? `${stats.max} kg` : '-'}
+                  </Text>
+                  <Text style={styles.statLabel}>Máximo</Text>
+                </View>
+                <View style={styles.stat}>
+                  <Feather
+                    name={change < 0 ? 'trending-down' : change > 0 ? 'trending-up' : 'minus'}
+                    size={16}
+                    color={change === 0 ? colors.gray400 : changeTint}
+                  />
+                  <Text style={[styles.statValue, change !== 0 && { color: changeTint }]}>
+                    {change !== 0 ? `${change > 0 ? '+' : ''}${change} kg` : '-'}
+                  </Text>
+                  <Text style={styles.statLabel}>Cambio</Text>
+                </View>
               </View>
-              <View style={styles.statCard}>
-                <Text style={styles.statLabel}>Mínimo</Text>
-                <Text style={styles.statValue}>
-                  {stats.min ? `${stats.min} kg` : '-'}
-                </Text>
-              </View>
-              <View style={styles.statCard}>
-                <Text style={styles.statLabel}>Máximo</Text>
-                <Text style={styles.statValue}>
-                  {stats.max ? `${stats.max} kg` : '-'}
-                </Text>
-              </View>
-              <View style={styles.statCard}>
-                <Text style={styles.statLabel}>Cambio</Text>
-                <Text
-                  style={[
-                    styles.statValue,
-                    stats.change > 0 && styles.statPositive,
-                    stats.change < 0 && styles.statNegative,
-                  ]}
-                >
-                  {stats.change !== 0
-                    ? `${stats.change > 0 ? '+' : ''}${stats.change} kg`
-                    : '-'}
-                </Text>
-              </View>
-            </View>
+            </Card>
           )}
 
           {/* Chart */}
           {weights.length > 0 && (
-            <View style={styles.chartContainer}>
-              <Text style={styles.chartTitle}>Evolución</Text>
+            <Card title="Evolución" subtitle="Tus últimos 10 registros" style={styles.card}>
               <LineChart
                 data={getChartData()}
-                width={SCREEN_WIDTH - spacing.lg * 2}
+                width={CHART_WIDTH}
                 height={220}
                 chartConfig={{
-                  backgroundColor: colors.cardDark,
-                  backgroundGradientFrom: colors.cardDark,
-                  backgroundGradientTo: colors.cardDark,
+                  backgroundColor: colors.white,
+                  backgroundGradientFrom: colors.white,
+                  backgroundGradientTo: colors.white,
                   decimalPlaces: 0,
-                  color: (opacity = 1) => `rgba(90, 107, 255, ${opacity})`,
-                  labelColor: (opacity = 1) => `rgba(255, 255, 255, ${opacity})`,
+                  color: (opacity = 1) => withAlpha(colors.accentDeep, opacity),
+                  labelColor: (opacity = 1) => withAlpha(colors.gray400, opacity),
                   style: {
                     borderRadius: borderRadius.lg,
                   },
+                  propsForBackgroundLines: {
+                    stroke: colors.surface,
+                    strokeWidth: 1,
+                  },
                   propsForDots: {
-                    r: '6',
+                    r: '5',
                     strokeWidth: '2',
-                    stroke: colors.primary,
+                    stroke: colors.white,
+                    fill: colors.accentDeep,
                   },
                 }}
                 bezier
+                withInnerLines
+                withOuterLines={false}
                 style={styles.chart}
               />
-            </View>
+            </Card>
           )}
 
           {/* History List */}
-          <View style={styles.historyContainer}>
-            <Text style={styles.historyTitle}>Registros</Text>
+          <Card title="Registros" style={styles.card}>
             {weights.length === 0 ? (
               <View style={styles.emptyState}>
-                <Ionicons name="scale-outline" size={48} color={colors.gray400} />
+                <View style={styles.emptyIcon}>
+                  <Feather name="bar-chart-2" size={22} color={colors.ink} />
+                </View>
                 <Text style={styles.emptyText}>Sin registros aún</Text>
                 <Text style={styles.emptySubtext}>
                   Registra tu primer peso para empezar el seguimiento
                 </Text>
               </View>
             ) : (
-              weights.map((weight) => (
-                <View key={weight.id} style={styles.historyItem}>
-                  <View style={styles.historyLeft}>
-                    <View style={styles.historyDot} />
-                    <Text style={styles.historyDate}>{formatDate(weight.date)}</Text>
+              <View>
+                {weights.map((weight, index) => (
+                  <View
+                    key={weight.id}
+                    style={[styles.historyItem, index === 0 && styles.historyItemFirst]}
+                  >
+                    <View style={styles.historyLeft}>
+                      <View style={[styles.historyDot, index === 0 && styles.historyDotLatest]} />
+                      <Text style={styles.historyDate}>{formatDate(weight.date)}</Text>
+                    </View>
+                    <Text style={styles.historyWeight}>{weight.weight} kg</Text>
                   </View>
-                  <Text style={styles.historyWeight}>{weight.weight} kg</Text>
-                </View>
-              ))
+                ))}
+              </View>
             )}
-          </View>
-        </ScrollView>
-      </SafeAreaView>
-    </View>
+          </Card>
+        </Animated.View>
+
+        {/* Clears the tab bar. */}
+        <View style={{ height: 96 }} />
+      </ScrollView>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  loading: {
     flex: 1,
-    backgroundColor: colors.bgDark,
-  },
-  safeArea: {
-    flex: 1,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  backgroundContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-  },
-  gradientTop: {
-    position: 'absolute',
-    top: 50,
-    left: -150,
-    width: 250,
-    height: 250,
-    borderRadius: 125,
-  },
-  gradientBottom: {
-    position: 'absolute',
-    bottom: 80,
-    right: -150,
-    width: 250,
-    height: 250,
-    borderRadius: 125,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-  },
-  backButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: colors.white,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  headerTitle: {
-    fontSize: typography.fontSize.lg,
+  scroll: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingHorizontal: GUTTER,
+  },
+  hero: {
+    marginTop: 8,
+    marginBottom: 24,
+  },
+  heroLabel: {
     fontFamily: typography.fontFamily,
+    fontSize: 11,
     fontWeight: typography.fontWeight.bold,
-    color: colors.white,
-    textTransform: 'uppercase',
-  },
-  addButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  content: {
-    flex: 1,
-    paddingHorizontal: spacing.lg,
-  },
-  statsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginTop: spacing.lg,
-    marginHorizontal: -spacing.xs,
-  },
-  statCard: {
-    width: '50%',
-    padding: spacing.xs,
-  },
-  statCardInner: {
-    backgroundColor: colors.cardDark,
-    borderRadius: borderRadius.lg,
-    padding: spacing.md,
-  },
-  statLabel: {
-    fontSize: typography.fontSize.sm,
-    fontFamily: typography.fontFamily,
-    fontWeight: typography.fontWeight.medium,
+    letterSpacing: 1.2,
     color: colors.gray400,
-    marginBottom: spacing.xs,
+    marginBottom: 6,
+  },
+  heroValueRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 8,
+  },
+  heroValue: {
+    fontFamily: typography.fontFamily,
+    fontSize: 46,
+    fontWeight: typography.fontWeight.bold,
+    letterSpacing: -1.6,
+    color: colors.ink,
+  },
+  heroUnit: {
+    fontFamily: typography.fontFamily,
+    fontSize: 18,
+    fontWeight: typography.fontWeight.semiBold,
+    color: colors.gray400,
+  },
+  heroCaption: {
+    marginTop: 6,
+    fontFamily: typography.fontFamily,
+    fontSize: 13,
+    // gray400 is 5.3:1 on the surface tone; the design's muted grey is 2.5:1.
+    color: colors.gray400,
+  },
+  card: {
+    marginBottom: 12,
+  },
+  statRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  stat: {
+    flex: 1,
+    gap: 6,
   },
   statValue: {
-    fontSize: typography.fontSize.xxl,
     fontFamily: typography.fontFamily,
+    fontSize: 20,
     fontWeight: typography.fontWeight.bold,
-    color: colors.white,
+    color: colors.ink,
   },
-  statPositive: {
-    color: colors.error,
-  },
-  statNegative: {
-    color: colors.primary,
-  },
-  chartContainer: {
-    marginTop: spacing.xl,
-    backgroundColor: colors.cardDark,
-    borderRadius: borderRadius.lg,
-    padding: spacing.md,
-  },
-  chartTitle: {
-    fontSize: typography.fontSize.lg,
-    fontFamily: typography.fontFamily.semibold,
-    color: colors.white,
-    marginBottom: spacing.md,
+  statLabel: {
+    fontFamily: typography.fontFamily,
+    fontSize: 12,
+    color: colors.gray400,
   },
   chart: {
-    marginLeft: -spacing.md,
+    marginLeft: -16,
     borderRadius: borderRadius.lg,
-  },
-  historyContainer: {
-    marginTop: spacing.xl,
-    marginBottom: spacing.xxl,
-  },
-  historyTitle: {
-    fontSize: typography.fontSize.lg,
-    fontFamily: typography.fontFamily.semibold,
-    color: colors.white,
-    marginBottom: spacing.md,
   },
   emptyState: {
     alignItems: 'center',
-    paddingVertical: spacing.xxl,
+    paddingVertical: 20,
+    gap: 6,
+  },
+  emptyIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: colors.accentSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 6,
   },
   emptyText: {
-    fontSize: typography.fontSize.lg,
-    fontFamily: typography.fontFamily.semibold,
-    color: colors.white,
-    marginTop: spacing.md,
+    fontFamily: typography.fontFamily,
+    fontSize: 17,
+    fontWeight: typography.fontWeight.semiBold,
+    color: colors.ink,
   },
   emptySubtext: {
-    fontSize: typography.fontSize.md,
     fontFamily: typography.fontFamily,
-    fontWeight: typography.fontWeight.regular,
+    fontSize: 13,
+    lineHeight: 18,
     color: colors.gray400,
-    marginTop: spacing.xs,
     textAlign: 'center',
   },
   historyItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: colors.cardDark,
-    borderRadius: borderRadius.md,
-    padding: spacing.md,
-    marginBottom: spacing.sm,
+    paddingVertical: 14,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.surface,
+  },
+  historyItemFirst: {
+    borderTopWidth: 0,
+    paddingTop: 0,
   },
   historyLeft: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 10,
   },
   historyDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: colors.primary,
-    marginRight: spacing.sm,
+    backgroundColor: colors.surface,
+    borderWidth: 1.5,
+    borderColor: colors.gray400,
+  },
+  historyDotLatest: {
+    backgroundColor: colors.accentDeep,
+    borderColor: colors.accentDeep,
   },
   historyDate: {
-    fontSize: typography.fontSize.md,
     fontFamily: typography.fontFamily,
-    fontWeight: typography.fontWeight.medium,
-    color: colors.white,
+    fontSize: 14,
+    color: colors.gray400,
   },
   historyWeight: {
-    fontSize: typography.fontSize.lg,
     fontFamily: typography.fontFamily,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.white,
+    fontSize: 16,
+    fontWeight: typography.fontWeight.semiBold,
+    color: colors.ink,
   },
 });
