@@ -25,6 +25,7 @@ import { Post, ReactionType } from '../types/community';
 import { communityApi } from '../api/community';
 import { PostCard } from '../components/community';
 import Screen from '../components/ui/Screen';
+import AppHeader from '../components/ui/AppHeader';
 import PrimaryButton from '../components/ui/PrimaryButton';
 import { captureException } from '../utils/sentry';
 
@@ -47,10 +48,6 @@ export default function CommunityScreen() {
     intro.value = withTiming(1, { duration: 460, easing: Easing.out(Easing.cubic) });
   }, []);
 
-  const headerStyle = useAnimatedStyle(() => ({
-    opacity: intro.value,
-    transform: [{ translateY: (1 - intro.value) * 14 }],
-  }));
   const listStyle = useAnimatedStyle(() => ({
     opacity: withDelay(90, withTiming(intro.value, { duration: 400 })),
   }));
@@ -230,6 +227,7 @@ export default function CommunityScreen() {
   if (isLoading) {
     return (
       <Screen wash>
+        <AppHeader title="Comunidad" showBack={false} />
         <View style={styles.loading}>
           <ActivityIndicator size="large" color={colors.ink} />
         </View>
@@ -239,11 +237,15 @@ export default function CommunityScreen() {
 
   return (
     <Screen wash>
-      <Animated.View style={[styles.header, headerStyle]}>
-        <Text style={styles.title}>Comunidad</Text>
-        <Text style={styles.subtitle}>Lo que está entrenando la gente de Neural.</Text>
-        {!!feedError && <Text style={styles.error}>{feedError}</Text>}
-      </Animated.View>
+      {/*
+       * The design's header row (kJac5 > J6yyhw) carries a back arrow and an
+       * unlabeled "more" icon, but Comunidad is a tab root — nothing to go
+       * back to, and no action is defined for "more" anywhere in the API, so
+       * both are template leftovers rather than something to build. showBack
+       * is false and there's no trailing action.
+       */}
+      <AppHeader title="Comunidad" showBack={false} />
+      {!!feedError && <Text style={styles.error}>{feedError}</Text>}
 
       <Animated.View style={[styles.flex, listStyle]}>
         <FlatList
@@ -291,34 +293,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  header: {
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 20,
-    gap: 6,
-  },
-  title: {
-    fontFamily: typography.fontFamily,
-    fontSize: 34,
-    fontWeight: typography.fontWeight.bold,
-    letterSpacing: -1,
-    color: colors.ink,
-  },
-  subtitle: {
-    fontFamily: typography.fontFamily,
-    fontSize: 15,
-    lineHeight: 21,
-    color: colors.gray400,
-  },
   error: {
     marginTop: 4,
+    marginHorizontal: 16,
     fontFamily: typography.fontFamily,
     fontSize: 13,
     color: colors.error,
   },
   listContent: {
     paddingHorizontal: 16,
-    paddingBottom: 160,
+    // The floating tab bar alone only needs 132px, but this screen also has
+    // its own floating "Publicar" FAB sitting above it (bottom:100, height
+    // 52, so its top edge is at 152px) — 160px keeps the last card clear of
+    // both instead of tucking it under the button.
+    paddingBottom: 196,
   },
   listContentEmpty: {
     flexGrow: 1,
@@ -363,8 +351,10 @@ const styles = StyleSheet.create({
   },
   fab: {
     position: 'absolute',
-    // Clears the tab bar.
-    bottom: 100,
+    // The floating pill's top edge sits about 111 above the screen bottom on a
+    // notched phone (34 safe area + 8 lift + 69 tall). At 100 the FAB landed on
+    // top of it; this clears it with room to breathe.
+    bottom: 128,
     right: 16,
     flexDirection: 'row',
     alignItems: 'center',

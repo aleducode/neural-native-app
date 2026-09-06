@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import { LinearGradient } from 'expo-linear-gradient';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -22,24 +23,35 @@ import AppHeader from '../components/ui/AppHeader';
 import { colors, typography } from '../theme/colors';
 import { notificationsApi, Notification } from '../api/notifications';
 
-/** Ionicons are gone from the migrated screens; these are the Feather equivalents. */
-function getNotificationIcon(type: string): keyof typeof Feather.glyphMap {
+/**
+ * The design's status pill groups notification_type into three buckets by
+ * color (entreno, membresía, todo lo demás). Labels follow the same grouping
+ * so the pill always names a real category instead of the raw API type.
+ */
+function getNotificationStatus(type: string): { label: string; color: string } {
   switch (type) {
     case 'training_reminder':
     case 'training_cancelled':
-      return 'activity';
+      return { label: 'Entrenos', color: colors.accentDeep };
     case 'membership_expiring':
     case 'membership_expired':
-      return 'credit-card';
+      // #FFB638 is 1.9:1 on white -- fails as text. Kept only as the small
+      // dot below; the label itself renders in ink.
+      return { label: 'Membresía', color: '#FFB638' };
     case 'achievement':
-      return 'award';
+      return { label: 'Logros', color: colors.gray400 };
     case 'promotion':
-      return 'tag';
+      return { label: 'Promociones', color: colors.gray400 };
     case 'community':
-      return 'users';
+      return { label: 'Comunidad', color: colors.gray400 };
     default:
-      return 'bell';
+      return { label: 'Notificación', color: colors.gray400 };
   }
+}
+
+/** The design's "Start" time is the clock time the notification fired at. */
+function formatNotificationTime(iso: string): string {
+  return new Date(iso).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' });
 }
 
 export default function NotificationsScreen() {
@@ -165,7 +177,7 @@ export default function NotificationsScreen() {
 
     if (confirming) {
       return (
-        <View style={[styles.row, styles.confirmRow]}>
+        <View style={[styles.card, styles.confirmCard]}>
           <Text style={styles.confirmText} numberOfLines={2}>
             ¿Eliminar «{item.title}»?
           </Text>
@@ -202,6 +214,8 @@ export default function NotificationsScreen() {
       );
     }
 
+    const status = getNotificationStatus(item.notification_type);
+
     return (
       <Pressable
         onPress={() => handleNotificationPress(item)}
@@ -211,36 +225,47 @@ export default function NotificationsScreen() {
           item.is_read ? '' : ', sin leer'
         }`}
       >
-        <View style={[styles.icon, !item.is_read && styles.iconUnread]}>
-          <Feather
-            name={getNotificationIcon(item.notification_type)}
-            size={18}
-            color={item.is_read ? colors.gray400 : colors.accentDeep}
-          />
+        <View style={styles.timeCol}>
+          <View style={styles.times}>
+            <Text style={styles.timeStart}>{formatNotificationTime(item.created)}</Text>
+            <Text style={styles.timeEnd}>{item.time_ago}</Text>
+          </View>
+          {/* Timeline dot is the unread signal: accentDeep while unread, neutral once read. */}
+          <View style={styles.timeline}>
+            <View style={[styles.dot, !item.is_read && styles.dotUnread]} />
+            <View style={styles.timelineLine} />
+            <View style={styles.dot} />
+          </View>
         </View>
 
-        <View style={styles.content}>
-          <View style={styles.contentHead}>
+        <View style={styles.card}>
+          <View style={styles.titleRow}>
             <Text style={styles.title} numberOfLines={1}>
               {item.title}
             </Text>
-            {!item.is_read && <View style={styles.unreadDot} />}
+            <Pressable
+              onPress={() => handleAskDelete(item)}
+              hitSlop={10}
+              accessibilityRole="button"
+              accessibilityLabel={`Eliminar ${item.title}`}
+            >
+              <Feather name="more-vertical" size={16} color={colors.ink} />
+            </Pressable>
           </View>
-          <Text style={styles.body} numberOfLines={2}>
-            {item.body}
-          </Text>
-          <Text style={styles.time}>{item.time_ago}</Text>
-        </View>
 
-        <Pressable
-          onPress={() => handleAskDelete(item)}
-          hitSlop={10}
-          style={({ pressed }) => [styles.trash, pressed && styles.pressed]}
-          accessibilityRole="button"
-          accessibilityLabel={`Eliminar ${item.title}`}
-        >
-          <Feather name="trash-2" size={18} color={colors.gray400} />
-        </Pressable>
+          <View style={styles.statusRow}>
+            <View style={[styles.statusDot, { backgroundColor: status.color }]} />
+            <Text style={styles.statusLabel}>{status.label}</Text>
+            <View style={styles.hatchTrack}>
+              <LinearGradient
+                colors={[colors.accent, colors.accentDeep]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.hatchFill}
+              />
+            </View>
+          </View>
+        </View>
       </Pressable>
     );
   };
@@ -295,10 +320,22 @@ export default function NotificationsScreen() {
           ]}
           showsVerticalScrollIndicator={false}
           ListHeaderComponent={
-            deleteError ? (
-              <Text style={styles.listError} accessibilityLiveRegion="polite">
-                {deleteError}
-              </Text>
+            deleteError || notifications.length > 0 ? (
+              <View style={styles.listHeader}>
+                {!!deleteError && (
+                  <Text style={styles.listError} accessibilityLiveRegion="polite">
+                    {deleteError}
+                  </Text>
+                )}
+                {/* Column labels from the design; no "+" here -- the app doesn't create
+                    notifications, so "mark all as read" stays in AppHeader's action slot. */}
+                {notifications.length > 0 && (
+                  <View style={styles.listLabels}>
+                    <Text style={styles.listLabel}>Hora</Text>
+                    <Text style={styles.listLabel}>Notificación</Text>
+                  </View>
+                )}
+              </View>
             ) : null
           }
           ListEmptyComponent={renderEmptyState}
@@ -339,68 +376,120 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     color: colors.error,
   },
+  listHeader: {
+    gap: 12,
+  },
+  listLabels: {
+    flexDirection: 'row',
+    gap: 16,
+  },
+  listLabel: {
+    fontFamily: typography.fontFamily,
+    fontSize: 12,
+    color: colors.ink,
+  },
   row: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    backgroundColor: colors.white,
-    borderRadius: 20,
-    padding: 16,
+    gap: 16,
   },
   pressed: {
     opacity: 0.85,
   },
-  icon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.surface,
+  timeCol: {
+    width: 46,
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: 8,
   },
-  iconUnread: {
-    backgroundColor: colors.accentSoft,
+  times: {
+    alignItems: 'center',
+    gap: 4,
   },
-  content: {
+  timeStart: {
+    fontFamily: typography.fontFamily,
+    fontSize: 12,
+    fontWeight: typography.fontWeight.semiBold,
+    color: colors.ink,
+  },
+  timeEnd: {
+    fontFamily: typography.fontFamily,
+    fontSize: 12,
+    fontWeight: typography.fontWeight.semiBold,
+    color: colors.gray400,
+  },
+  // 6x92: two 6px dots plus a 72px connector, matching the design's timeline.
+  timeline: {
+    width: 6,
+    height: 92,
+    alignItems: 'center',
+    gap: 4,
+  },
+  dot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    // Decorative connector, not text -- #DEDEDE isn't in the theme scale.
+    backgroundColor: '#DEDEDE',
+  },
+  dotUnread: {
+    backgroundColor: colors.accentDeep,
+  },
+  timelineLine: {
+    width: 2,
+    height: 72,
+    backgroundColor: '#DEDEDE',
+  },
+  card: {
     flex: 1,
-    gap: 2,
+    backgroundColor: colors.white,
+    borderRadius: 16,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    gap: 16,
   },
-  contentHead: {
+  titleRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     gap: 8,
   },
   title: {
     flex: 1,
     fontFamily: typography.fontFamily,
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: typography.fontWeight.semiBold,
     color: colors.ink,
   },
-  unreadDot: {
+  statusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  statusDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: colors.accentDeep,
   },
-  body: {
+  statusLabel: {
     fontFamily: typography.fontFamily,
-    fontSize: 13,
-    lineHeight: 18,
-    color: colors.gray400,
+    fontSize: 12,
+    fontWeight: typography.fontWeight.regular,
+    color: colors.ink,
   },
-  time: {
-    fontFamily: typography.fontFamily,
-    fontSize: 11,
-    color: colors.gray400,
+  // Decorative divider from the design; not backed by any API field, so the
+  // filled portion is a fixed accent rather than a real progress value.
+  hatchTrack: {
+    flex: 1,
+    height: 6,
+    borderRadius: 32,
+    backgroundColor: '#DEDEDE',
+    overflow: 'hidden',
   },
-  trash: {
-    width: 32,
-    height: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
+  hatchFill: {
+    width: '40%',
+    height: 6,
+    borderRadius: 32,
   },
-  confirmRow: {
+  confirmCard: {
     flexDirection: 'column',
     alignItems: 'stretch',
     gap: 12,

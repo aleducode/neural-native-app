@@ -65,12 +65,17 @@ function PlanCard({ plan, isSelected, onPress }: PlanCardProps) {
       ]}
       accessibilityRole="radio"
       accessibilityState={{ selected: isSelected }}
-      accessibilityLabel={`${getPlanDisplayName(plan)}, ${formatPrice(plan.price)} mensual`}
+      accessibilityLabel={`${getPlanDisplayName(plan)}, ${formatPrice(plan.price)}, ${plan.duration} días`}
     >
       <View style={styles.planText}>
         <Text style={styles.planTitle}>{getPlanDisplayName(plan)}</Text>
+        {!!plan.description && (
+          <Text style={styles.planDesc} numberOfLines={1}>
+            {plan.description}
+          </Text>
+        )}
         <Text style={styles.planPrice}>{formatPrice(plan.price)}</Text>
-        <Text style={styles.planPeriod}>mensual</Text>
+        <Text style={styles.planPeriod}>{plan.duration} días</Text>
       </View>
 
       <View style={[styles.tick, isSelected && styles.tickOn]}>
@@ -227,10 +232,11 @@ export default function MembershipScreen() {
 
           {currentMembership && (
             <Card>
-              {/* Days left is the achievement on this screen, so it takes the accent. */}
+              {/* check-circle stands in for the design's "badge-check", which Feather doesn't have. */}
               <View style={styles.daysRow}>
-                <Text style={styles.daysValue}>{currentMembership.days_left}</Text>
+                <Feather name="check-circle" size={16} color={colors.accentDeep} />
                 <Text style={styles.daysLabel}>
+                  {currentMembership.days_left}{' '}
                   {currentMembership.days_left === 1 ? 'día restante' : 'días restantes'}
                 </Text>
               </View>
@@ -357,25 +363,18 @@ const styles = StyleSheet.create({
   },
   daysRow: {
     flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: 8,
-  },
-  daysValue: {
-    fontFamily: typography.fontFamily,
-    fontSize: 40,
-    fontWeight: typography.fontWeight.bold,
-    letterSpacing: -1,
-    color: colors.accentDeep,
+    alignItems: 'center',
+    gap: 6,
   },
   daysLabel: {
     fontFamily: typography.fontFamily,
-    fontSize: 14,
-    color: colors.gray400,
+    fontSize: 12,
+    color: colors.ink,
   },
   detailRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 4,
   },
   detailText: {
     fontFamily: typography.fontFamily,
@@ -398,7 +397,7 @@ const styles = StyleSheet.create({
     color: colors.ink,
   },
   plans: {
-    gap: 12,
+    gap: 8,
   },
   plan: {
     flexDirection: 'row',
@@ -406,7 +405,8 @@ const styles = StyleSheet.create({
     gap: 16,
     backgroundColor: colors.white,
     borderRadius: 20,
-    padding: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
     borderWidth: 2,
     borderColor: colors.white,
   },
@@ -418,19 +418,23 @@ const styles = StyleSheet.create({
   },
   planText: {
     flex: 1,
-    gap: 2,
+    gap: 4,
   },
   planTitle: {
     fontFamily: typography.fontFamily,
-    fontSize: 14,
+    fontSize: 20,
     fontWeight: typography.fontWeight.semiBold,
+    color: colors.ink,
+  },
+  planDesc: {
+    fontFamily: typography.fontFamily,
+    fontSize: 12,
     color: colors.gray400,
   },
   planPrice: {
     fontFamily: typography.fontFamily,
-    fontSize: 26,
-    fontWeight: typography.fontWeight.bold,
-    letterSpacing: -0.8,
+    fontSize: 16,
+    fontWeight: typography.fontWeight.semiBold,
     color: colors.ink,
   },
   planPeriod: {

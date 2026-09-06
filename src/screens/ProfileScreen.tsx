@@ -23,6 +23,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../context/AuthContext';
 import { colors, typography } from '../theme/colors';
 import { dashboardApi, DashboardResponse } from '../api/dashboard';
+import { profileApi, ProfileResponse } from '../api/profile';
 import { authApi } from '../api/auth';
 import Screen from '../components/ui/Screen';
 import AppHeader from '../components/ui/AppHeader';
@@ -62,10 +63,31 @@ function MenuRow({ icon, title, subtitle, onPress, first }: MenuRowProps) {
   );
 }
 
+interface StatRowProps {
+  label: string;
+  value: string | number;
+  unit: string;
+  divided?: boolean;
+}
+
+/** One line of the dark measurements box on the profile card (node V0CIi6). */
+function StatRow({ label, value, unit, divided }: StatRowProps) {
+  return (
+    <View style={[styles.statBoxRow, divided && styles.statBoxRowDivided]}>
+      <Text style={styles.statBoxLabel}>{label}</Text>
+      <View style={styles.statBoxValueRow}>
+        <Text style={styles.statBoxNum}>{value}</Text>
+        <Text style={styles.statBoxUnit}>{unit}</Text>
+      </View>
+    </View>
+  );
+}
+
 export default function ProfileScreen() {
   const navigation = useNavigation<any>();
   const { user, logout, updateUser } = useAuth();
   const [dashboardData, setDashboardData] = useState<DashboardResponse | null>(null);
+  const [profileData, setProfileData] = useState<ProfileResponse | null>(null);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   // The photo flow used to fail into an Alert. It belongs next to the avatar
   // that failed, where you can see what you were trying to change.
@@ -78,10 +100,21 @@ export default function ProfileScreen() {
     }
   }, []);
 
+  // The design's profile card shows age/weight/height (node c5EBjq/zY26j/D2YIKu),
+  // which live on /profile/, not /dashboard/ — so this screen now also reads
+  // profileApi, exactly the way EditProfileScreen already does.
+  const fetchProfile = useCallback(async () => {
+    const { data } = await profileApi.getProfile();
+    if (data) {
+      setProfileData(data);
+    }
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
       fetchDashboard();
-    }, [fetchDashboard])
+      fetchProfile();
+    }, [fetchDashboard, fetchProfile])
   );
 
   const intro = useSharedValue(0);
@@ -99,14 +132,20 @@ export default function ProfileScreen() {
   }));
 
   const userName = user ? `${user.first_name} ${user.last_name}`.trim() : 'Usuario';
-  const userEmail = user?.email || '';
   const userInitials = user
     ? `${user.first_name?.[0] || ''}${user.last_name?.[0] || ''}`.toUpperCase()
     : 'U';
   const userPhoto = user?.photo_url;
 
-  const membershipDays = dashboardData?.membership?.days_left ?? 0;
+  const age = profileData?.profile.age;
+  const weight = profileData?.latest_weight?.weight;
+  const height = profileData?.profile.height;
+
+  const membership = dashboardData?.membership;
+  const membershipDays = membership?.days_left ?? 0;
   const trainingsCount = dashboardData?.stats?.trainings ?? 0;
+  const trainingHours = dashboardData?.stats?.hours ?? 0;
+  const caloriesCount = dashboardData?.stats?.calories ?? 0;
   const strikeWeeks = dashboardData?.strike?.weeks ?? 0;
 
   const go = (screen: string) => {
@@ -170,42 +209,66 @@ export default function ProfileScreen() {
 
   return (
     <Screen tone="surface" wash>
-      {/* A tab root has nothing behind it, so it carries no back control. */}
+      {/* A tab root has nothing behind it, so it carries no back control. The
+          design's header also has a trailing "more" icon (node F68UI) with no
+          action anywhere in the file — every account action it could open
+          already has a home below (menu rows, sign-out button), so it's
+          dropped rather than wired to a made-up menu. */}
       <AppHeader title="Perfil" showBack={false} />
 
       <ScrollView
         contentContainerStyle={styles.scroll}
         showsVerticalScrollIndicator={false}
       >
-        <Animated.View style={[styles.identity, identityStyle]}>
-          <Pressable
-            onPress={handleChangePhoto}
-            disabled={isUploadingPhoto}
-            style={({ pressed }) => [styles.avatarWrap, pressed && styles.pressed]}
-            accessibilityRole="button"
-            accessibilityLabel="Cambiar foto de perfil"
-          >
-            {userPhoto ? (
-              <Image source={{ uri: userPhoto }} style={styles.avatar} />
-            ) : (
-              <View style={[styles.avatar, styles.avatarFallback]}>
-                <Text style={styles.avatarText}>{userInitials}</Text>
-              </View>
-            )}
+        <Animated.View style={identityStyle}>
+          {/* ProfileCard — node Q3yQ6G */}
+          <View style={styles.profileCard}>
+            <View style={styles.blobLeft} />
+            <View style={styles.blobRight} />
 
-            {isUploadingPhoto ? (
-              <View style={styles.avatarOverlay}>
-                <ActivityIndicator size="small" color={colors.white} />
-              </View>
-            ) : (
-              <View style={styles.cameraBadge}>
-                <Feather name="camera" size={14} color={colors.white} />
-              </View>
-            )}
-          </Pressable>
+            <View style={styles.profileRow}>
+              <Pressable
+                onPress={handleChangePhoto}
+                disabled={isUploadingPhoto}
+                style={({ pressed }) => [styles.photoWrap, pressed && styles.pressed]}
+                accessibilityRole="button"
+                accessibilityLabel="Cambiar foto de perfil"
+              >
+                {/* The design's Photo node (KGWd0) fills this slot with a
+                    repeated stock photo — replaced with the real avatar and
+                    its initials fallback, as everywhere else in the app. */}
+                {userPhoto ? (
+                  <Image source={{ uri: userPhoto }} style={styles.photo} />
+                ) : (
+                  <View style={[styles.photo, styles.photoFallback]}>
+                    <Text style={styles.photoFallbackText}>{userInitials}</Text>
+                  </View>
+                )}
 
-          <Text style={styles.name}>{userName}</Text>
-          {!!userEmail && <Text style={styles.email}>{userEmail}</Text>}
+                {isUploadingPhoto ? (
+                  <View style={styles.photoOverlay}>
+                    <ActivityIndicator size="small" color={colors.white} />
+                  </View>
+                ) : (
+                  <View style={styles.cameraBadge}>
+                    <Feather name="camera" size={13} color={colors.white} />
+                  </View>
+                )}
+              </Pressable>
+
+              <View style={styles.infoCol}>
+                <Text style={styles.profileName} numberOfLines={1}>
+                  {userName}
+                </Text>
+
+                <View style={styles.statBox}>
+                  <StatRow label="Edad" value={age ?? '--'} unit="años" divided />
+                  <StatRow label="Peso" value={weight ?? '--'} unit="Kg" divided />
+                  <StatRow label="Altura" value={height ?? '--'} unit="cm" />
+                </View>
+              </View>
+            </View>
+          </View>
 
           {!!photoError && (
             <View style={styles.errorRow}>
@@ -216,41 +279,128 @@ export default function ProfileScreen() {
         </Animated.View>
 
         <Animated.View style={bodyStyle}>
-          <Card title="Tu progreso" subtitle="Membresía, entrenos y racha">
-            <View style={styles.statRow}>
-              {(
-                [
-                  ['credit-card', membershipDays, 'Días', colors.link],
-                  ['activity', trainingsCount, 'Entrenos', colors.accentDeep],
-                  ['zap', strikeWeeks, 'Semanas', colors.error],
-                ] as const
-              ).map(([icon, value, label, tint]) => (
-                <View key={label} style={styles.stat}>
-                  <Feather name={icon} size={18} color={tint} />
-                  <Text style={styles.statValue}>{value}</Text>
-                  <Text style={styles.statLabel}>{label}</Text>
-                </View>
-              ))}
+          {/* WorkoutPlanCard (ftVQW) in the design highlights four arbitrary
+              weekdays and a 3-bar "level" meter with no backing data anywhere
+              in the API — the closed-testing equivalent of the brief's
+              "calendar numbers that match no real month". Replaced with the
+              plan name and active/inactive state, which are real fields on
+              GET /dashboard/. */}
+          <Pressable
+            onPress={() => go('Membership')}
+            style={({ pressed }) => [styles.membershipCard, pressed && styles.pressed]}
+            accessibilityRole="button"
+            accessibilityLabel={`Membresía. ${membership?.plan_name || 'Sin plan'}`}
+          >
+            <View style={styles.membershipTop}>
+              <Text style={styles.membershipLabel}>Membresía</Text>
+              {!!membership && (
+                <Text
+                  style={[
+                    styles.membershipStatus,
+                    membership.is_active ? styles.membershipStatusActive : styles.membershipStatusInactive,
+                  ]}
+                >
+                  {membership.is_active ? 'Activa' : 'Vencida'}
+                </Text>
+              )}
             </View>
-          </Card>
+            <Text style={styles.membershipPlan}>{membership?.plan_name || 'Sin plan activo'}</Text>
+          </Pressable>
+
+          {/* PointsCard (GdF5n) — maps directly to membership.days_left. */}
+          <Pressable
+            onPress={() => go('Membership')}
+            style={({ pressed }) => [styles.pointsCard, pressed && styles.pressed]}
+            accessibilityRole="button"
+            accessibilityLabel={`Tu membresía. ${membershipDays} días restantes`}
+          >
+            <View style={styles.pointsBlobTL} />
+            <View style={styles.pointsBlobBR} />
+            <Text style={styles.pointsLabel}>Tu membresía</Text>
+            <View style={styles.pointsRow}>
+              <Feather name="zap" size={22} color="#EDB61D" />
+              <Text style={styles.pointsValue}>{membershipDays}</Text>
+            </View>
+            <Text style={styles.pointsHint}>días restantes</Text>
+          </Pressable>
+
+          <Text style={styles.sectionLabel}>ACTIVIDAD RECIENTE</Text>
+
+          {/* StepsCard (a4WJz) — "Ver todo" takes the place of the old "Mi
+              calendario" menu row: same destination (go('Trainings')), just
+              relocated onto the card the design gives this data. Its 5-bar
+              graph (qPrrv) has no per-day series anywhere in the API, so it
+              is not reproduced rather than faked. */}
+          <View style={styles.stepsCard}>
+            <View style={styles.stepsTop}>
+              <View style={styles.stepsTitleWrap}>
+                <View style={styles.iconBtn}>
+                  <Feather name="activity" size={20} color={colors.accentDeep} />
+                </View>
+                <Text style={styles.stepsTitle}>Entrenos</Text>
+              </View>
+              <Pressable
+                onPress={() => go('Trainings')}
+                style={({ pressed }) => [styles.seeAllBtn, pressed && styles.pressed]}
+                accessibilityRole="button"
+                accessibilityLabel="Ver todos los entrenamientos"
+              >
+                <Text style={styles.seeAllLabel}>Ver todo</Text>
+              </Pressable>
+            </View>
+            <View style={styles.stepsBottom}>
+              <View style={styles.stepsValueRow}>
+                <Text style={styles.stepsValue}>{trainingsCount}</Text>
+                <Text style={styles.stepsUnit}>entrenos</Text>
+              </View>
+              <View style={styles.stepsSubRow}>
+                <Text style={styles.stepsSub}>este mes</Text>
+                <View style={styles.dot} />
+                <Text style={styles.stepsSub}>{trainingHours} h</Text>
+              </View>
+            </View>
+          </View>
+
+          <View style={styles.halfRow}>
+            {/* Calories (n3iaxl) */}
+            <View style={styles.halfCard}>
+              <Text style={styles.halfTitle}>Calorías</Text>
+              <View style={styles.halfValueRow}>
+                <Text style={styles.halfValue}>{caloriesCount}</Text>
+                <Text style={styles.halfUnit}>kcal</Text>
+              </View>
+              <View style={styles.stepsSubRow}>
+                <Text style={styles.stepsSub}>este mes</Text>
+                <View style={styles.dot} />
+                <Text style={styles.stepsSub}>promedio</Text>
+              </View>
+            </View>
+
+            {/* Energy Level / "Racha" (pqGOY). Its "récord: 4" chip has no
+                field in DashboardStrike (only weeks and is_current) — left
+                out instead of invented. */}
+            <View style={styles.halfCard}>
+              <Text style={styles.halfTitle}>Racha</Text>
+              <View style={styles.halfValueRow}>
+                <Text style={styles.halfValue}>{strikeWeeks}</Text>
+                <Text style={styles.halfUnit}>sem</Text>
+              </View>
+              <View style={styles.stepsSubRow}>
+                <Text style={styles.stepsSub}>
+                  {dashboardData?.strike?.is_current ? 'seguidas' : 'interrumpida'}
+                </Text>
+              </View>
+            </View>
+          </View>
 
           <Text style={styles.sectionLabel}>CUENTA</Text>
 
+          {/* "Mi calendario" and "Membresía" moved onto the cards above; these
+              two have no design equivalent on this screen but the navigation
+              they carry is still real and stays reachable. */}
           <Card style={styles.menuCard}>
             <MenuRow
               first
-              icon="calendar"
-              title="Mi calendario"
-              subtitle="Ver mis entrenamientos"
-              onPress={() => go('Trainings')}
-            />
-            <MenuRow
-              icon="credit-card"
-              title="Membresía"
-              subtitle={`${membershipDays} días restantes`}
-              onPress={() => go('Membership')}
-            />
-            <MenuRow
               icon="user"
               title="Editar perfil"
               subtitle="Información personal"
@@ -259,8 +409,6 @@ export default function ProfileScreen() {
             <MenuRow
               icon="bell"
               title="Notificaciones"
-              // The row opens the list of notifications, not a settings pane,
-              // so it no longer promises preferences it cannot show.
               subtitle="Tus avisos y novedades"
               onPress={() => go('Notifications')}
             />
@@ -275,8 +423,8 @@ export default function ProfileScreen() {
           />
         </Animated.View>
 
-        {/* Clears the tab bar. */}
-        <View style={{ height: 96 }} />
+        {/* Floating tab bar clearance. */}
+        <View style={{ height: 132 }} />
       </ScrollView>
     </Screen>
   );
@@ -285,69 +433,133 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   scroll: {
     paddingHorizontal: 16,
+    paddingTop: 8,
+    gap: 24,
   },
-  identity: {
-    marginTop: 8,
-    marginBottom: 24,
+  profileCard: {
+    height: 200,
+    borderRadius: 20,
+    backgroundColor: colors.accent,
+    overflow: 'hidden',
   },
-  avatarWrap: {
-    width: 88,
-    height: 88,
-    marginBottom: 16,
+  blobLeft: {
+    position: 'absolute',
+    left: -60,
+    top: -90,
+    width: 196,
+    height: 218,
+    borderRadius: 109,
+    backgroundColor: '#B4E83A',
   },
-  avatar: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
+  blobRight: {
+    position: 'absolute',
+    left: 270,
+    top: 110,
+    width: 112,
+    height: 124,
+    borderRadius: 62,
+    backgroundColor: '#B4E83A',
   },
-  avatarFallback: {
+  profileRow: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+  },
+  photoWrap: {
+    width: 162,
+    height: 200,
+  },
+  photo: {
+    width: 162,
+    height: 200,
+  },
+  photoFallback: {
     backgroundColor: colors.ink,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  avatarText: {
+  photoFallbackText: {
     fontFamily: typography.fontFamily,
-    fontSize: 28,
+    fontSize: 40,
     fontWeight: typography.fontWeight.bold,
     color: colors.white,
   },
-  avatarOverlay: {
+  photoOverlay: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
-    borderRadius: 44,
-    backgroundColor: 'rgba(17, 17, 17, 0.5)',
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: 'rgba(17, 17, 17, 0.5)',
   },
   cameraBadge: {
     position: 'absolute',
-    bottom: 0,
-    right: 0,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    bottom: 8,
+    right: 8,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     backgroundColor: colors.ink,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 3,
-    borderColor: colors.surface,
+    borderColor: colors.accent,
   },
-  name: {
+  infoCol: {
+    flex: 1,
+    gap: 16,
+    justifyContent: 'center',
+    paddingRight: 16,
+  },
+  profileName: {
     fontFamily: typography.fontFamily,
-    fontSize: 32,
-    fontWeight: typography.fontWeight.bold,
-    lineHeight: 38,
-    letterSpacing: -1,
+    fontSize: 20,
+    fontWeight: typography.fontWeight.semiBold,
     color: colors.ink,
   },
-  email: {
-    marginTop: 4,
+  statBox: {
+    gap: 8,
+    padding: 12,
+    borderRadius: 16,
+    backgroundColor: colors.ink,
+  },
+  statBoxRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingBottom: 8,
+  },
+  statBoxRowDivided: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#424242',
+  },
+  statBoxLabel: {
     fontFamily: typography.fontFamily,
-    fontSize: 14,
-    color: colors.gray400,
+    fontSize: 12,
+    fontWeight: typography.fontWeight.regular,
+    // #A5A5A5 as the design specifies — this box sits on #111111, where the
+    // kit's grays clear WCAG AA, unlike on white.
+    color: colors.iconMuted,
+  },
+  statBoxValueRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 2,
+  },
+  statBoxNum: {
+    fontFamily: typography.fontFamily,
+    fontSize: 16,
+    fontWeight: typography.fontWeight.semiBold,
+    color: colors.white,
+  },
+  statBoxUnit: {
+    fontFamily: typography.fontFamily,
+    fontSize: 12,
+    fontWeight: typography.fontWeight.regular,
+    color: colors.iconMuted,
   },
   errorRow: {
     flexDirection: 'row',
@@ -361,24 +573,95 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.error,
   },
-  statRow: {
+  membershipCard: {
+    marginTop: 24,
+    padding: 16,
+    borderRadius: 20,
+    backgroundColor: colors.white,
+    gap: 8,
+  },
+  membershipTop: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
   },
-  stat: {
-    flex: 1,
-    gap: 6,
-  },
-  statValue: {
-    fontFamily: typography.fontFamily,
-    fontSize: 24,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.ink,
-  },
-  statLabel: {
+  membershipLabel: {
     fontFamily: typography.fontFamily,
     fontSize: 12,
-    color: colors.gray400,
+    fontWeight: typography.fontWeight.semiBold,
+    color: colors.pureBlack,
+  },
+  membershipStatus: {
+    fontFamily: typography.fontFamily,
+    fontSize: 12,
+    fontWeight: typography.fontWeight.semiBold,
+  },
+  membershipStatusActive: {
+    color: colors.accentDeep,
+  },
+  membershipStatusInactive: {
+    color: colors.error,
+  },
+  membershipPlan: {
+    fontFamily: typography.fontFamily,
+    fontSize: 16,
+    fontWeight: typography.fontWeight.semiBold,
+    color: colors.ink,
+  },
+  pointsCard: {
+    marginTop: 12,
+    height: 118,
+    padding: 16,
+    borderRadius: 20,
+    backgroundColor: colors.ink,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    overflow: 'hidden',
+  },
+  pointsBlobTL: {
+    position: 'absolute',
+    left: -40,
+    top: -50,
+    width: 120,
+    height: 100,
+    borderRadius: 60,
+    backgroundColor: '#D9D9D9',
+    opacity: 0.08,
+  },
+  pointsBlobBR: {
+    position: 'absolute',
+    left: 280,
+    top: 70,
+    width: 120,
+    height: 100,
+    borderRadius: 60,
+    backgroundColor: '#D9D9D9',
+    opacity: 0.08,
+  },
+  pointsLabel: {
+    fontFamily: typography.fontFamily,
+    fontSize: 16,
+    fontWeight: typography.fontWeight.regular,
+    color: colors.white,
+  },
+  pointsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  pointsValue: {
+    fontFamily: typography.fontFamily,
+    fontSize: 24,
+    fontWeight: typography.fontWeight.semiBold,
+    color: colors.white,
+  },
+  pointsHint: {
+    fontFamily: typography.fontFamily,
+    fontSize: 12,
+    fontWeight: typography.fontWeight.regular,
+    color: '#787878',
+    textAlign: 'center',
   },
   sectionLabel: {
     fontFamily: typography.fontFamily,
@@ -388,6 +671,127 @@ const styles = StyleSheet.create({
     color: colors.gray400,
     marginTop: 24,
     marginBottom: 10,
+  },
+  stepsCard: {
+    marginTop: 12,
+    padding: 16,
+    borderRadius: 20,
+    backgroundColor: colors.white,
+    gap: 20,
+  },
+  stepsTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  stepsTitleWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  iconBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 32,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: '#DEDEDE',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stepsTitle: {
+    fontFamily: typography.fontFamily,
+    fontSize: 16,
+    fontWeight: typography.fontWeight.semiBold,
+    color: colors.ink,
+  },
+  seeAllBtn: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 32,
+    backgroundColor: colors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  seeAllLabel: {
+    fontFamily: typography.fontFamily,
+    fontSize: 12,
+    fontWeight: typography.fontWeight.regular,
+    color: colors.ink,
+  },
+  stepsBottom: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+  },
+  stepsValueRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 4,
+  },
+  stepsValue: {
+    fontFamily: typography.fontFamily,
+    fontSize: 24,
+    fontWeight: typography.fontWeight.semiBold,
+    color: colors.ink,
+  },
+  stepsUnit: {
+    fontFamily: typography.fontFamily,
+    fontSize: 12,
+    fontWeight: typography.fontWeight.regular,
+    color: colors.gray400,
+  },
+  stepsSubRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  stepsSub: {
+    fontFamily: typography.fontFamily,
+    fontSize: 12,
+    fontWeight: typography.fontWeight.regular,
+    color: colors.gray400,
+  },
+  dot: {
+    width: 3,
+    height: 3,
+    borderRadius: 1.5,
+    backgroundColor: colors.gray400,
+  },
+  halfRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 8,
+  },
+  halfCard: {
+    flex: 1,
+    padding: 16,
+    borderRadius: 20,
+    backgroundColor: colors.white,
+    gap: 8,
+  },
+  halfTitle: {
+    fontFamily: typography.fontFamily,
+    fontSize: 16,
+    fontWeight: typography.fontWeight.semiBold,
+    color: colors.ink,
+  },
+  halfValueRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 4,
+  },
+  halfValue: {
+    fontFamily: typography.fontFamily,
+    fontSize: 24,
+    fontWeight: typography.fontWeight.semiBold,
+    color: colors.ink,
+  },
+  halfUnit: {
+    fontFamily: typography.fontFamily,
+    fontSize: 12,
+    fontWeight: typography.fontWeight.regular,
+    color: colors.gray400,
   },
   menuCard: {
     padding: 0,

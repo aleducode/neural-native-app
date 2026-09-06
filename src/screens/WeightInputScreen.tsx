@@ -8,10 +8,13 @@ import {
   Dimensions,
   NativeSyntheticEvent,
   NativeScrollEvent,
+  AccessibilityActionEvent,
+  AccessibilityActionInfo,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
+import { LinearGradient } from 'expo-linear-gradient';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -34,6 +37,11 @@ const SCREEN_WIDTH = Dimensions.get('window').width;
 // padding of exactly half the screen leaves the pointer half a tick to the
 // left of the number it claims to select.
 const RULER_PADDING = SCREEN_WIDTH / 2 - TICK_WIDTH / 2;
+
+const ADJUSTABLE_ACTIONS: AccessibilityActionInfo[] = [
+  { name: 'increment' },
+  { name: 'decrement' },
+];
 
 export default function WeightInputScreen() {
   const navigation = useNavigation<any>();
@@ -112,6 +120,27 @@ export default function WeightInputScreen() {
     }
   };
 
+  const scrollToWeight = (value: number, animated: boolean) => {
+    const offset = (value - MIN_WEIGHT) * TICK_WIDTH;
+    scrollViewRef.current?.scrollTo({ x: offset, animated });
+  };
+
+  // Ruler drag is the primary input, but a screen reader user never drags a
+  // horizontal list reliably — the "adjustable" role exposes swipe up/down as
+  // a real increment/decrement instead.
+  const stepWeight = (delta: number) => {
+    const next = Math.max(MIN_WEIGHT, Math.min(MAX_WEIGHT, selectedWeight + delta));
+    setSelectedWeight(next);
+    setSaveError(null);
+    Haptics.selectionAsync();
+    scrollToWeight(next, true);
+  };
+
+  const handleAccessibilityAction = (event: AccessibilityActionEvent) => {
+    if (event.nativeEvent.actionName === 'increment') stepWeight(1);
+    else if (event.nativeEvent.actionName === 'decrement') stepWeight(-1);
+  };
+
   const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const offsetX = event.nativeEvent.contentOffset.x;
     const value = Math.round(offsetX / TICK_WIDTH) + MIN_WEIGHT;
@@ -136,8 +165,7 @@ export default function WeightInputScreen() {
     const clampedValue = Math.max(MIN_WEIGHT, Math.min(MAX_WEIGHT, value));
 
     // Snap to nearest value
-    const snapOffset = (clampedValue - MIN_WEIGHT) * TICK_WIDTH;
-    scrollViewRef.current?.scrollTo({ x: snapOffset, animated: true });
+    scrollToWeight(clampedValue, true);
   };
 
   const delta = previousWeight === null ? null : selectedWeight - previousWeight;
@@ -166,63 +194,88 @@ export default function WeightInputScreen() {
 
       <View style={styles.body}>
         <Animated.View style={[styles.head, headerStyle]}>
-          <Text style={styles.title}>Tu peso</Text>
-          <Text style={styles.subtitle}>Desliza la regla hasta el número y suelta.</Text>
+          <Text style={styles.title}>¿Cuál es{'\n'}tu peso?</Text>
+          <Text style={styles.subtitle}>Ingresa tu peso actual para seguir tu progreso.</Text>
         </Animated.View>
 
         <Animated.View style={[styles.stage, valueStyle]}>
-          {/* The value is the whole point of the screen, so it carries the
-              weight the ruler used to. */}
-          <View style={styles.valueRow}>
-            <Text
-              style={styles.value}
-              accessibilityRole="text"
-              accessibilityLabel={`${selectedWeight} kilogramos`}
+          <View style={styles.selectBlock}>
+            <View
+              style={styles.rulerTrack}
+              accessible
+              accessibilityRole="adjustable"
+              accessibilityLabel="Peso"
+              accessibilityValue={{ text: `${selectedWeight} kilogramos` }}
+              accessibilityActions={ADJUSTABLE_ACTIONS}
+              onAccessibilityAction={handleAccessibilityAction}
             >
-              {selectedWeight}
-            </Text>
-            <Text style={styles.unit}>kg</Text>
-          </View>
-          <Text style={styles.hint}>{hint}</Text>
+              {/* Centre pointer: the one place the brand gradient belongs here. */}
+              <View style={styles.pointer} pointerEvents="none">
+                <LinearGradient
+                  colors={[colors.accent, colors.accentDeep]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.pointerDiamond}
+                />
+              </View>
 
-          <View style={styles.ruler}>
-            {/* Centre pointer: the one place the brand accent belongs here. */}
-            <View style={styles.pointer} pointerEvents="none">
-              <View style={styles.pointerCap} />
-              <View style={styles.pointerBar} />
+              <ScrollView
+                ref={scrollViewRef}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.rulerContent}
+                onScroll={handleScroll}
+                onMomentumScrollEnd={handleScrollEnd}
+                onScrollEndDrag={handleScrollEnd}
+                scrollEventThrottle={16}
+                decelerationRate="fast"
+                snapToInterval={TICK_WIDTH}
+                importantForAccessibility="no-hide-descendants"
+              >
+                {weights.map((weight) => {
+                  const isMajor = weight % 10 === 0;
+                  const isMid = weight % 5 === 0 && !isMajor;
+
+                  return (
+                    <View key={weight} style={styles.tickContainer}>
+                      <View
+                        style={[styles.tick, isMid && styles.tickMid, isMajor && styles.tickMajor]}
+                      />
+                    </View>
+                  );
+                })}
+              </ScrollView>
             </View>
 
-            <ScrollView
-              ref={scrollViewRef}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.rulerContent}
-              onScroll={handleScroll}
-              onMomentumScrollEnd={handleScrollEnd}
-              onScrollEndDrag={handleScrollEnd}
-              scrollEventThrottle={16}
-              decelerationRate="fast"
-              snapToInterval={TICK_WIDTH}
-            >
-              {weights.map((weight) => {
-                const isMajor = weight % 10 === 0;
-                const isMinor5 = weight % 5 === 0 && !isMajor;
-
-                return (
-                  <View key={weight} style={styles.tickContainer}>
-                    <View
-                      style={[
-                        styles.tick,
-                        isMinor5 && styles.tickMinor5,
-                        isMajor && styles.tickMajor,
-                      ]}
-                    />
-                    {isMajor && <Text style={styles.tickLabel}>{weight}</Text>}
+            {/* The design's five-up strip, not a lone giant number: the ticks
+                pick the value, this reads it back at a glance. */}
+            <View style={styles.numbersRow}>
+              <Text style={styles.numberFar}>{selectedWeight - 2}</Text>
+              <Text style={styles.numberNear}>{selectedWeight - 1}</Text>
+              <View style={styles.numberBoxWrap}>
+                <LinearGradient
+                  colors={[colors.accent, colors.accentDeep]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.numberBox}
+                >
+                  <View style={styles.numberBoxInner}>
+                    <Text
+                      style={styles.numberCenter}
+                      accessibilityElementsHidden
+                      importantForAccessibility="no"
+                    >
+                      {selectedWeight}
+                    </Text>
                   </View>
-                );
-              })}
-            </ScrollView>
+                </LinearGradient>
+              </View>
+              <Text style={styles.numberNear}>{selectedWeight + 1}</Text>
+              <Text style={styles.numberFar}>{selectedWeight + 2}</Text>
+            </View>
           </View>
+
+          <Text style={styles.hint}>{hint}</Text>
         </Animated.View>
 
         <Animated.View style={[styles.footer, footerStyle]}>
@@ -248,120 +301,139 @@ const styles = StyleSheet.create({
   },
   body: {
     flex: 1,
-    paddingHorizontal: 24,
+    // Matches the design's container padding: 16 on each side, none at the
+    // bottom (the footer carries its own).
+    paddingHorizontal: 16,
     paddingBottom: 16,
   },
   head: {
     marginTop: 8,
     gap: 8,
+    alignItems: 'center',
   },
   title: {
     fontFamily: typography.fontFamily,
     fontSize: 36,
-    fontWeight: typography.fontWeight.bold,
-    lineHeight: 40,
-    letterSpacing: -1,
+    fontWeight: typography.fontWeight.semiBold,
+    lineHeight: 43, // 36 * 1.19, read out of the design
+    letterSpacing: -1.08,
     color: colors.ink,
+    textAlign: 'center',
   },
   subtitle: {
     fontFamily: typography.fontFamily,
-    fontSize: 15,
-    lineHeight: 21,
-    // gray400 is 5.3:1 on white. The design's muted grey is 2.7:1 and fails AA,
-    // so the role is kept and the value is not.
+    fontSize: 12,
+    lineHeight: 17,
+    textAlign: 'center',
+    maxWidth: 260,
+    // The design specifies #9D9D9D, which is 2.7:1 on white and fails AA.
+    // gray400 holds the same muted role at 5.3:1.
     color: colors.gray400,
   },
   stage: {
     flex: 1,
     justifyContent: 'center',
-    gap: 8,
+    alignItems: 'center',
+    gap: 32,
   },
-  valueRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    justifyContent: 'center',
-    gap: 8,
+  selectBlock: {
+    width: '100%',
+    alignItems: 'center',
+    gap: 4,
   },
-  value: {
-    fontFamily: typography.fontFamily,
-    fontSize: 76,
-    fontWeight: typography.fontWeight.bold,
-    letterSpacing: -3,
-    color: colors.ink,
-  },
-  unit: {
-    fontFamily: typography.fontFamily,
-    fontSize: 22,
-    fontWeight: typography.fontWeight.semiBold,
-    color: colors.gray400,
-  },
-  hint: {
-    fontFamily: typography.fontFamily,
-    fontSize: 13,
-    textAlign: 'center',
-    color: colors.gray400,
-  },
-  ruler: {
-    height: 92,
-    marginTop: 24,
-    // Bleeds past the 24pt gutter so the ruler reads as continuous.
-    marginHorizontal: -24,
+  rulerTrack: {
+    height: 60,
+    width: '100%',
+    // Bleeds past the 16pt gutter so the ruler reads as continuous.
+    marginHorizontal: -16,
     justifyContent: 'flex-start',
   },
   pointer: {
     position: 'absolute',
-    left: SCREEN_WIDTH / 2 - 5,
-    top: 0,
-    width: 10,
+    left: SCREEN_WIDTH / 2 - 13,
+    top: 4,
+    width: 26,
     alignItems: 'center',
     zIndex: 10,
   },
-  pointerCap: {
-    width: 10,
-    height: 10,
+  pointerDiamond: {
+    width: 22,
+    height: 22,
     borderRadius: 5,
-    backgroundColor: colors.accentDeep,
-  },
-  pointerBar: {
-    width: 3,
-    height: 46,
-    marginTop: 2,
-    borderRadius: 2,
-    backgroundColor: colors.accentDeep,
+    transform: [{ rotate: '45deg' }],
   },
   rulerContent: {
     paddingHorizontal: RULER_PADDING,
     alignItems: 'flex-start',
-    paddingTop: 14,
+    paddingTop: 30,
   },
   tickContainer: {
     width: TICK_WIDTH,
     alignItems: 'center',
   },
-  // Ticks are graphic rules, not text: they carry no information the number
-  // above doesn't already state, so they stay quiet.
+  // Ticks are graphic rules, not text: the numbers strip below already
+  // states every value, so ticks lost their labels and just mark rhythm.
   tick: {
-    width: 1.5,
-    height: 16,
-    borderRadius: 1,
+    width: 4,
+    height: 10,
+    borderRadius: 2,
     backgroundColor: colors.gray400,
-    opacity: 0.3,
   },
-  tickMinor5: {
-    height: 24,
-    opacity: 0.45,
+  tickMid: {
+    height: 13,
   },
   tickMajor: {
-    width: 2,
-    height: 34,
-    opacity: 1,
+    height: 16,
     backgroundColor: colors.ink,
   },
-  tickLabel: {
-    marginTop: 8,
+  numbersRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 9,
+    height: 74,
+  },
+  numberFar: {
     fontFamily: typography.fontFamily,
-    fontSize: 12,
-    fontWeight: typography.fontWeight.medium,
+    fontSize: 32,
+    fontWeight: typography.fontWeight.regular,
+    color: colors.ink,
+  },
+  numberNear: {
+    fontFamily: typography.fontFamily,
+    fontSize: 48,
+    fontWeight: typography.fontWeight.regular,
+    letterSpacing: -0.48,
+    color: colors.ink,
+  },
+  numberBoxWrap: {
+    height: 74,
+    justifyContent: 'center',
+  },
+  numberBox: {
+    minWidth: 110,
+    height: 74,
+    padding: 1,
+  },
+  numberBoxInner: {
+    flex: 1,
+    paddingHorizontal: 7,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.white,
+  },
+  numberCenter: {
+    fontFamily: typography.fontFamily,
+    fontSize: 64,
+    fontWeight: typography.fontWeight.semiBold,
+    lineHeight: 64,
+    letterSpacing: -2.56,
+    color: colors.ink,
+  },
+  hint: {
+    fontFamily: typography.fontFamily,
+    fontSize: 13,
+    textAlign: 'center',
     color: colors.gray400,
   },
   footer: {

@@ -120,7 +120,7 @@ export default function PostCard({
         </Pressable>
       )}
 
-      {post.training && <TrainingBadge training={post.training} />}
+      {post.training && <TrainingBadge training={post.training} variant="compact" />}
 
       {post.reactions_count > 0 && (
         <View style={styles.summary}>
@@ -130,7 +130,7 @@ export default function PostCard({
               <View key={type} style={styles.summaryItem}>
                 <Feather
                   name={REACTION_ICONS[type as ReactionType].icon as any}
-                  size={14}
+                  size={13}
                   color={colors.gray400}
                 />
                 <Text style={styles.summaryCount}>{count}</Text>
@@ -159,7 +159,7 @@ export default function PostCard({
               : 'Comentar'
           }
         >
-          <Feather name="message-circle" size={16} color={colors.gray400} />
+          <Feather name="message-circle" size={15} color={colors.gray400} />
           <Text style={styles.commentCount}>
             {post.comments_count > 0 ? post.comments_count : 'Comentar'}
           </Text>
@@ -180,10 +180,10 @@ export default function PostCard({
 const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.white,
-    borderRadius: 20,
-    padding: 16,
-    marginBottom: 12,
-    gap: 14,
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 8,
+    gap: 12,
   },
   cardPressed: {
     opacity: 0.92,
@@ -194,18 +194,18 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 10,
   },
   author: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 10,
   },
   avatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
   },
   avatarFallback: {
     backgroundColor: colors.ink,
@@ -214,23 +214,23 @@ const styles = StyleSheet.create({
   },
   avatarText: {
     fontFamily: typography.fontFamily,
-    fontSize: 15,
+    fontSize: 13,
     fontWeight: typography.fontWeight.bold,
     color: colors.white,
   },
   authorText: {
     flex: 1,
-    gap: 2,
+    gap: 1,
   },
   authorName: {
     fontFamily: typography.fontFamily,
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: typography.fontWeight.semiBold,
     color: colors.ink,
   },
   timeAgo: {
     fontFamily: typography.fontFamily,
-    fontSize: 12,
+    fontSize: 11,
     color: colors.gray400,
   },
   options: {
@@ -242,31 +242,31 @@ const styles = StyleSheet.create({
   },
   content: {
     fontFamily: typography.fontFamily,
-    fontSize: 15,
-    lineHeight: 22,
+    fontSize: 14,
+    lineHeight: 20,
     color: colors.ink,
   },
   imageWrap: {
-    borderRadius: 16,
+    borderRadius: 12,
     overflow: 'hidden',
   },
   image: {
     width: '100%',
-    height: 240,
+    height: 170,
   },
   summary: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
+    gap: 8,
   },
   summaryItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 3,
   },
   summaryCount: {
     fontFamily: typography.fontFamily,
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: typography.fontWeight.medium,
     color: colors.gray400,
   },
@@ -276,7 +276,10 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: colors.surface,
+    // The design's own divider is a translucent 10%-black hairline rather
+    // than a token color, so it's expressed directly instead of forcing it
+    // through a named theme color.
+    borderTopColor: 'rgba(0, 0, 0, 0.1)',
   },
   comment: {
     flexDirection: 'row',
@@ -285,10 +288,11 @@ const styles = StyleSheet.create({
     height: 36,
     paddingHorizontal: 12,
     borderRadius: 18,
+    backgroundColor: colors.surface,
   },
   commentCount: {
     fontFamily: typography.fontFamily,
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: typography.fontWeight.medium,
     color: colors.gray400,
   },

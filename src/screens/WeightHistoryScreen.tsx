@@ -4,12 +4,12 @@ import {
   Text,
   StyleSheet,
   ActivityIndicator,
-  Dimensions,
   ScrollView,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
+import { LinearGradient } from 'expo-linear-gradient';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -17,30 +17,65 @@ import Animated, {
   withDelay,
   Easing,
 } from 'react-native-reanimated';
-import { LineChart } from 'react-native-chart-kit';
 import { colors, typography, borderRadius } from '../theme/colors';
 import { profileApi, UserWeight } from '../api/profile';
 import Screen from '../components/ui/Screen';
 import AppHeader from '../components/ui/AppHeader';
 import Card from '../components/ui/Card';
 
-const SCREEN_WIDTH = Dimensions.get('window').width;
-
 const GUTTER = 16;
-// The chart lives inside a card, so it has the card's padding to clear too.
-const CHART_WIDTH = SCREEN_WIDTH - GUTTER * 2 - 32;
 
-/**
- * chart-kit asks for `rgba(r, g, b, opacity)` factories, so the token has to be
- * unpacked rather than handed over as a hex string. This keeps the chart on the
- * palette instead of on a literal.
- */
-function withAlpha(hex: string, opacity: number) {
-  const value = hex.replace('#', '');
-  const r = parseInt(value.slice(0, 2), 16);
-  const g = parseInt(value.slice(2, 4), 16);
-  const b = parseInt(value.slice(4, 6), 16);
-  return `rgba(${r}, ${g}, ${b}, ${opacity})`;
+// Design node WRrFz ("09 · Progreso corporal") draws its "Comparison" chart as
+// three columns whose bar height (79 / 123 / 161) encodes the value — no axis,
+// no chart-kit, just a rounded column. The app has react-native-svg installed
+// but no charting library and none gets added, so this is Views + the
+// gradient the same node uses for its progress fills (accent -> accentDeep).
+// The .pen buckets are "last month / last week / this week" (a body-score
+// concept the weight API doesn't return); ours plots the same last-10 series
+// the list below shows, so no number is invented.
+const CHART_HEIGHT = 140;
+const CHART_MIN_BAR = 28;
+const CHART_RADIUS = borderRadius.xs; // 8, matches the node's cornerRadius exactly
+
+function WeightChart({ weights }: { weights: UserWeight[] }) {
+  // Reverse to show oldest to newest, same slice the list below already uses.
+  const sortedWeights = [...weights].reverse().slice(-10);
+  if (sortedWeights.length === 0) return null;
+
+  const values = sortedWeights.map((w) => w.weight);
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const span = max - min || 1;
+
+  return (
+    <View style={styles.chartRow}>
+      {sortedWeights.map((w) => {
+        const ratio = (w.weight - min) / span;
+        const barHeight = CHART_MIN_BAR + ratio * (CHART_HEIGHT - CHART_MIN_BAR);
+        const date = new Date(w.date);
+        const label = `${date.getDate()}/${date.getMonth() + 1}`;
+
+        return (
+          <View key={w.id} style={styles.chartCol}>
+            <Text style={styles.chartValue} numberOfLines={1}>
+              {w.weight}
+            </Text>
+            <View style={styles.chartTrack}>
+              <LinearGradient
+                colors={[colors.accent, colors.accentDeep]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 0, y: 1 }}
+                style={[styles.chartFill, { height: barHeight }]}
+              />
+            </View>
+            <Text style={styles.chartLabel} numberOfLines={1}>
+              {label}
+            </Text>
+          </View>
+        );
+      })}
+    </View>
+  );
 }
 
 export default function WeightHistoryScreen() {
@@ -88,30 +123,6 @@ export default function WeightHistoryScreen() {
     navigation.navigate('WeightInput');
   };
 
-  const getChartData = () => {
-    // Reverse to show oldest to newest
-    const sortedWeights = [...weights].reverse().slice(-10);
-
-    if (sortedWeights.length === 0) {
-      return {
-        labels: [''],
-        datasets: [{ data: [0] }],
-      };
-    }
-
-    const labels = sortedWeights.map((w) => {
-      const date = new Date(w.date);
-      return `${date.getDate()}/${date.getMonth() + 1}`;
-    });
-
-    const data = sortedWeights.map((w) => w.weight);
-
-    return {
-      labels,
-      datasets: [{ data }],
-    };
-  };
-
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
     return date.toLocaleDateString('es-ES', {
@@ -124,7 +135,7 @@ export default function WeightHistoryScreen() {
   if (isLoading) {
     return (
       <Screen wash>
-        <AppHeader title="Peso" />
+        <AppHeader title="Tu progreso" />
         <View style={styles.loading}>
           <ActivityIndicator size="large" color={colors.ink} />
         </View>
@@ -140,7 +151,7 @@ export default function WeightHistoryScreen() {
   return (
     <Screen wash>
       <AppHeader
-        title="Peso"
+        title="Tu progreso"
         action={{ icon: 'plus', label: 'Registrar peso', onPress: handleAddWeight }}
       />
 
@@ -201,36 +212,7 @@ export default function WeightHistoryScreen() {
           {/* Chart */}
           {weights.length > 0 && (
             <Card title="Evolución" subtitle="Tus últimos 10 registros" style={styles.card}>
-              <LineChart
-                data={getChartData()}
-                width={CHART_WIDTH}
-                height={220}
-                chartConfig={{
-                  backgroundColor: colors.white,
-                  backgroundGradientFrom: colors.white,
-                  backgroundGradientTo: colors.white,
-                  decimalPlaces: 0,
-                  color: (opacity = 1) => withAlpha(colors.accentDeep, opacity),
-                  labelColor: (opacity = 1) => withAlpha(colors.gray400, opacity),
-                  style: {
-                    borderRadius: borderRadius.lg,
-                  },
-                  propsForBackgroundLines: {
-                    stroke: colors.surface,
-                    strokeWidth: 1,
-                  },
-                  propsForDots: {
-                    r: '5',
-                    strokeWidth: '2',
-                    stroke: colors.white,
-                    fill: colors.accentDeep,
-                  },
-                }}
-                bezier
-                withInnerLines
-                withOuterLines={false}
-                style={styles.chart}
-              />
+              <WeightChart weights={weights} />
             </Card>
           )}
 
@@ -265,8 +247,8 @@ export default function WeightHistoryScreen() {
           </Card>
         </Animated.View>
 
-        {/* Clears the tab bar. */}
-        <View style={{ height: 96 }} />
+        {/* Clears the floating tab bar: brief-mandated 132 clearance. */}
+        <View style={{ height: 132 }} />
       </ScrollView>
     </Screen>
   );
@@ -302,22 +284,24 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   heroValue: {
+    // Design node WRrFz > Score > "87": fontSize 64, letterSpacing -0.64.
     fontFamily: typography.fontFamily,
-    fontSize: 46,
+    fontSize: 64,
     fontWeight: typography.fontWeight.bold,
-    letterSpacing: -1.6,
+    letterSpacing: -0.64,
     color: colors.ink,
   },
   heroUnit: {
+    // Design's "/100" companion text: fontSize 20, muted.
     fontFamily: typography.fontFamily,
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: typography.fontWeight.semiBold,
     color: colors.gray400,
   },
   heroCaption: {
     marginTop: 6,
     fontFamily: typography.fontFamily,
-    fontSize: 13,
+    fontSize: 12,
     // gray400 is 5.3:1 on the surface tone; the design's muted grey is 2.5:1.
     color: colors.gray400,
   },
@@ -333,8 +317,9 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   statValue: {
+    // Matches the stat-value size used across WRrFz's own stat rows (24/600).
     fontFamily: typography.fontFamily,
-    fontSize: 20,
+    fontSize: 24,
     fontWeight: typography.fontWeight.bold,
     color: colors.ink,
   },
@@ -343,9 +328,38 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.gray400,
   },
-  chart: {
-    marginLeft: -16,
-    borderRadius: borderRadius.lg,
+  chartRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 8,
+  },
+  chartCol: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 6,
+  },
+  chartValue: {
+    fontFamily: typography.fontFamily,
+    fontSize: 12,
+    fontWeight: typography.fontWeight.semiBold,
+    color: colors.ink,
+  },
+  chartTrack: {
+    width: '100%',
+    height: CHART_HEIGHT,
+    justifyContent: 'flex-end',
+    borderRadius: CHART_RADIUS,
+    overflow: 'hidden',
+    backgroundColor: colors.surface,
+  },
+  chartFill: {
+    width: '100%',
+    borderRadius: CHART_RADIUS,
+  },
+  chartLabel: {
+    fontFamily: typography.fontFamily,
+    fontSize: 11,
+    color: colors.gray400,
   },
   emptyState: {
     alignItems: 'center',

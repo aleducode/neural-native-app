@@ -32,6 +32,17 @@ const { width: SCREEN_W } = Dimensions.get('window');
 
 const DAY_NAMES = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 
+// Two hexes straight from the .pen that have no equivalent in theme/colors.ts
+// (outside this screen's lane, so not adding tokens there): the icon-button
+// hairline stroke and the "Horas" stat tint.
+const STROKE_MUTED = '#DEDEDE';
+const HOURS_TINT = '#E2223F';
+
+// The racha progress track is a row of hairline ticks in the design (36 of
+// them across the card width) rather than a flat bar. Rendered as a fixed
+// count spaced with `space-between` so it holds up at any card width.
+const TRACK_HATCHES = Array.from({ length: 36 });
+
 /** Sunday-anchored week, formatted without timezone conversion so the day never shifts. */
 function getWeekDates() {
   const today = new Date();
@@ -198,7 +209,7 @@ export default function HomeScreen() {
                   : 'Notificaciones'
               }
             >
-              <Feather name="bell" size={20} color={colors.ink} />
+              <Feather name="bell" size={24} color={colors.ink} />
               {unreadNotifications > 0 && (
                 <View style={styles.badge}>
                   <Text style={styles.badgeText}>
@@ -263,16 +274,25 @@ export default function HomeScreen() {
               </View>
               <View style={styles.statRow}>
                 {(
+                  // Order and tint follow the design (verde/morado/rojo); the
+                  // design's icons (scale/footprints/droplet) are template
+                  // leftovers from a weight-loss/health kit, so they're swapped
+                  // for the Feather equivalents already in use here.
                   [
-                    ['activity', stats.trainings, 'Entrenos', colors.accentDeep],
-                    ['zap', stats.calories, 'Calorías', colors.link],
-                    ['clock', stats.hours, 'Horas', colors.error],
+                    ['zap', stats.calories, 'Calorías', 'kcal', colors.accentDeep],
+                    // "Entrenos" already names its own unit, and "Horas hrs"
+                    // says the same word twice. Only calories need one.
+                    ['activity', stats.trainings, 'Entrenos', '', colors.link],
+                    ['clock', stats.hours, 'Horas', 'h', HOURS_TINT],
                   ] as const
-                ).map(([icon, value, label, tint]) => (
+                ).map(([icon, value, label, unit, tint]) => (
                   <View key={label} style={styles.stat}>
-                    <Feather name={icon} size={18} color={tint} />
-                    <Text style={styles.statValue}>{value}</Text>
+                    <Feather name={icon} size={24} color={tint} />
                     <Text style={styles.statLabel}>{label}</Text>
+                    <View style={styles.statValueRow}>
+                      <Text style={styles.statValue}>{value}</Text>
+                      {!!unit && <Text style={styles.statUnit}>{unit}</Text>}
+                    </View>
                   </View>
                 ))}
               </View>
@@ -297,7 +317,10 @@ export default function HomeScreen() {
                 </View>
                 <View style={styles.streakTarget}>
                   <Text style={styles.streakTargetLabel}>Meta</Text>
-                  <Text style={styles.streakTargetValue}>{STREAK_TARGET} semanas</Text>
+                  <View style={styles.streakTargetRow}>
+                    <Text style={styles.streakTargetValue}>{STREAK_TARGET}</Text>
+                    <Text style={styles.streakTargetUnit}>semanas</Text>
+                  </View>
                 </View>
               </View>
 
@@ -306,6 +329,11 @@ export default function HomeScreen() {
                 accessibilityRole="progressbar"
                 accessibilityValue={{ min: 0, max: STREAK_TARGET, now: stats.strike }}
               >
+                <View style={styles.trackHatches} pointerEvents="none">
+                  {TRACK_HATCHES.map((_, i) => (
+                    <View key={i} style={styles.hatch} />
+                  ))}
+                </View>
                 <LinearGradient
                   colors={[colors.accent, colors.accentDeep]}
                   start={{ x: 0, y: 0.5 }}
@@ -374,9 +402,9 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   avatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
   },
   avatarFallback: {
     backgroundColor: colors.ink,
@@ -391,26 +419,27 @@ const styles = StyleSheet.create({
   },
   greeting: {
     flex: 1,
-    gap: 2,
+    gap: 3,
   },
   hello: {
     fontFamily: typography.fontFamily,
-    fontSize: 10,
-    fontWeight: typography.fontWeight.bold,
-    letterSpacing: 1.2,
+    fontSize: 12,
+    fontWeight: typography.fontWeight.regular,
     color: colors.gray400,
   },
   name: {
     fontFamily: typography.fontFamily,
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: typography.fontWeight.semiBold,
     color: colors.ink,
   },
   bell: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: colors.white,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: STROKE_MUTED,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -508,7 +537,9 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.white,
     borderRadius: 20,
-    paddingVertical: 16,
+    // Design padding is [12,16] (vertical, horizontal), not the uniform 16
+    // the shared Card.tsx uses.
+    paddingVertical: 12,
     paddingHorizontal: 16,
     marginBottom: 12,
     gap: 16,
@@ -535,13 +566,23 @@ const styles = StyleSheet.create({
   },
   stat: {
     flex: 1,
-    gap: 6,
+    gap: 8,
+  },
+  statValueRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 2,
   },
   statValue: {
     fontFamily: typography.fontFamily,
-    fontSize: 24,
-    fontWeight: typography.fontWeight.bold,
+    fontSize: 16,
+    fontWeight: typography.fontWeight.semiBold,
     color: colors.ink,
+  },
+  statUnit: {
+    fontFamily: typography.fontFamily,
+    fontSize: 12,
+    color: colors.gray400,
   },
   statLabel: {
     fontFamily: typography.fontFamily,
@@ -560,39 +601,58 @@ const styles = StyleSheet.create({
   },
   streakNumber: {
     fontFamily: typography.fontFamily,
-    fontSize: 34,
-    fontWeight: typography.fontWeight.bold,
+    fontSize: 24,
+    fontWeight: typography.fontWeight.medium,
     color: colors.ink,
   },
   streakUnit: {
     fontFamily: typography.fontFamily,
-    fontSize: 13,
+    fontSize: 12,
     color: colors.gray400,
   },
   streakTarget: {
     alignItems: 'flex-end',
-    gap: 2,
+    gap: 4,
   },
   streakTargetLabel: {
     fontFamily: typography.fontFamily,
-    fontSize: 11,
+    fontSize: 12,
     color: colors.gray400,
+  },
+  streakTargetRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 2,
   },
   streakTargetValue: {
     fontFamily: typography.fontFamily,
-    fontSize: 13,
+    fontSize: 16,
     fontWeight: typography.fontWeight.semiBold,
     color: colors.ink,
   },
+  streakTargetUnit: {
+    fontFamily: typography.fontFamily,
+    fontSize: 12,
+    color: colors.gray400,
+  },
   track: {
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: colors.surface,
+    height: 16,
+    borderRadius: 8,
     overflow: 'hidden',
+  },
+  trackHatches: {
+    ...StyleSheet.absoluteFillObject,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  hatch: {
+    width: 2,
+    height: '100%',
+    backgroundColor: STROKE_MUTED,
   },
   trackFill: {
     height: '100%',
-    borderRadius: 6,
+    borderRadius: 8,
   },
   bookCta: {
     flexDirection: 'row',
@@ -600,7 +660,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
     height: 44,
-    borderRadius: 22,
+    // 44 kept over the design's 32: with no icon+slots row next to it (that
+    // data isn't in the API — see report), this button is the card's only
+    // interactive element, so it keeps the app's minimum touch target.
+    borderRadius: 32,
     backgroundColor: colors.ink,
   },
   bookCtaText: {

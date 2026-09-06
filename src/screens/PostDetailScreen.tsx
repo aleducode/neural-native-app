@@ -381,9 +381,9 @@ const styles = StyleSheet.create({
   },
   postCard: {
     backgroundColor: colors.white,
-    borderRadius: 20,
-    padding: 16,
-    gap: 14,
+    borderRadius: 16,
+    padding: 14,
+    gap: 12,
   },
   pressed: {
     opacity: 0.7,
@@ -457,7 +457,7 @@ const styles = StyleSheet.create({
   reactionRow: {
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: colors.surface,
+    borderTopColor: 'rgba(0, 0, 0, 0.1)',
   },
   commentsTitle: {
     marginTop: 24,

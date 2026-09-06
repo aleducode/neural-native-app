@@ -27,6 +27,12 @@ import AppHeader from '../components/ui/AppHeader';
 import Card from '../components/ui/Card';
 import PrimaryButton from '../components/ui/PrimaryButton';
 
+// Design node qM8hZ ("07 · Mis entrenos") draws the divider between the
+// start/end time dots as a flat #DEDEDE line. It's a decorative rule, not
+// text, so the WCAG substitution the brief calls out for muted text doesn't
+// apply to it.
+const TIMELINE_LINE = '#DEDEDE';
+
 interface ConfirmSheetProps {
   visible: boolean;
   title: string;
@@ -295,7 +301,7 @@ export default function TrainingsScreen() {
     return (
       <Screen tone="surface" wash>
         <AppHeader
-          title="Entrenos"
+          title="Mis entrenos"
           showBack={false}
           action={{ icon: 'plus', label: 'Agendar entrenamiento', onPress: handleSchedule }}
         />
@@ -310,7 +316,7 @@ export default function TrainingsScreen() {
     <Screen tone="surface" wash>
       {/* A tab root has nothing behind it, so it carries no back control. */}
       <AppHeader
-        title="Entrenos"
+        title="Mis entrenos"
         showBack={false}
         action={{ icon: 'plus', label: 'Agendar entrenamiento', onPress: handleSchedule }}
       />
@@ -362,6 +368,35 @@ export default function TrainingsScreen() {
 
                   <Card style={styles.trainingCard}>
                     <View style={styles.cardRow}>
+                      {/* Timeline column: qM8hZ > Container > Exercise List > Items >
+                          Item > Time Col (times stacked + start/end dots joined by a
+                          line). Dots and line dim to gray400 for past sessions instead
+                          of staying accentDeep, mirroring how the rest of the card
+                          steps a completed session back.
+
+                          The rail runs beside the times rather than under them:
+                          the design's 46-wide column was sized for "09:12", and
+                          this gym's "08:00 PM" wrapped onto two lines and left
+                          the dots dangling. Now each dot marks its own hour. */}
+                      <View style={styles.timelineCol}>
+                        <View style={styles.timelineBar}>
+                          <View style={[styles.timelineDot, isPast && styles.timelineDotMuted]} />
+                          <View style={styles.timelineLine} />
+                          <View style={[styles.timelineDot, isPast && styles.timelineDotMuted]} />
+                        </View>
+                        <View style={styles.timesBox}>
+                          <Text style={styles.timeStart} numberOfLines={1}>
+                            {training.slot.hour_init}
+                          </Text>
+                          <Text style={styles.timeEnd} numberOfLines={1}>
+                            {training.slot.hour_end}
+                          </Text>
+                        </View>
+                      </View>
+
+                      {/* Name above, state below. Side by side, a wide
+                          "Completado" pill squeezed the training name down to
+                          "Funcional traini...". */}
                       <View style={styles.info}>
                         <Text
                           style={[styles.trainingType, isPast && styles.trainingTypePast]}
@@ -369,25 +404,22 @@ export default function TrainingsScreen() {
                         >
                           {training.training_type?.name || training.slot.training_type?.name}
                         </Text>
-                        <Text style={styles.time}>
-                          {training.slot.hour_init} - {training.slot.hour_end}
-                        </Text>
-                      </View>
 
-                      {isPast ? (
-                        <View style={styles.doneBadge}>
-                          <Feather name="check" size={13} color={colors.gray400} />
-                          <Text style={styles.doneText}>Completado</Text>
-                        </View>
-                      ) : training.is_today ? (
-                        <View style={styles.todayBadge}>
-                          <Text style={styles.todayText}>Hoy</Text>
-                        </View>
-                      ) : (
-                        <View style={styles.nextBadge}>
-                          <Text style={styles.nextText}>Próximo</Text>
-                        </View>
-                      )}
+                        {isPast ? (
+                          <View style={styles.doneBadge}>
+                            <Feather name="check" size={13} color={colors.gray400} />
+                            <Text style={styles.doneText}>Completado</Text>
+                          </View>
+                        ) : training.is_today ? (
+                          <View style={styles.todayBadge}>
+                            <Text style={styles.todayText}>Hoy</Text>
+                          </View>
+                        ) : (
+                          <View style={styles.nextBadge}>
+                            <Text style={styles.nextText}>Próximo</Text>
+                          </View>
+                        )}
+                      </View>
                     </View>
 
                     {!!failed && (
@@ -426,9 +458,6 @@ export default function TrainingsScreen() {
               <ActivityIndicator size="small" color={colors.gray400} />
             </View>
           )}
-
-          {/* Clears the tab bar. */}
-          <View style={{ height: 120 }} />
         </ScrollView>
       ) : (
         <Animated.View style={[styles.empty, listStyle]}>
@@ -461,6 +490,8 @@ const styles = StyleSheet.create({
   },
   scroll: {
     paddingHorizontal: 16,
+    // Tab root behind the floating tab bar: brief-mandated 132 clearance.
+    paddingBottom: 132,
   },
   head: {
     marginTop: 8,
@@ -498,24 +529,58 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
   },
+  timelineCol: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  timesBox: {
+    gap: 10,
+  },
+  timeStart: {
+    fontFamily: typography.fontFamily,
+    fontSize: 12,
+    fontWeight: typography.fontWeight.semiBold,
+    color: colors.ink,
+  },
+  timeEnd: {
+    fontFamily: typography.fontFamily,
+    fontSize: 12,
+    fontWeight: typography.fontWeight.semiBold,
+    color: colors.gray400,
+  },
+  timelineBar: {
+    alignItems: 'center',
+  },
+  timelineDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: colors.accentDeep,
+  },
+  timelineDotMuted: {
+    backgroundColor: colors.gray400,
+  },
+  timelineLine: {
+    width: 2,
+    height: 22,
+    backgroundColor: TIMELINE_LINE,
+  },
   info: {
     flex: 1,
-    gap: 2,
+    gap: 8,
+    alignItems: 'flex-start',
+    justifyContent: 'center',
   },
   trainingType: {
     fontFamily: typography.fontFamily,
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: typography.fontWeight.semiBold,
     color: colors.ink,
   },
   trainingTypePast: {
     // Past sessions step back through the badge, not through opacity: dimming
     // the whole card was what pushed this text under the contrast floor.
-    color: colors.gray400,
-  },
-  time: {
-    fontFamily: typography.fontFamily,
-    fontSize: 13,
     color: colors.gray400,
   },
   doneBadge: {

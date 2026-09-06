@@ -7,10 +7,13 @@ import {
   ActivityIndicator,
   NativeSyntheticEvent,
   NativeScrollEvent,
+  AccessibilityActionEvent,
+  AccessibilityActionInfo,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
+import { LinearGradient } from 'expo-linear-gradient';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -46,6 +49,11 @@ const currentYear = new Date().getFullYear();
 const MIN_YEAR = 1940;
 const MAX_YEAR = currentYear - 10; // At least 10 years old
 
+const ADJUSTABLE_ACTIONS: AccessibilityActionInfo[] = [
+  { name: 'increment' },
+  { name: 'decrement' },
+];
+
 interface WheelPickerProps {
   data: (string | number)[];
   selectedIndex: number;
@@ -68,6 +76,10 @@ function WheelPicker({ data, selectedIndex, onValueChange, width, label }: Wheel
     }, 100);
   }, []);
 
+  const scrollToIndex = (index: number, animated: boolean) => {
+    scrollViewRef.current?.scrollTo({ y: index * ITEM_HEIGHT, animated });
+  };
+
   const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const offsetY = event.nativeEvent.contentOffset.y;
     const index = Math.round(offsetY / ITEM_HEIGHT);
@@ -86,18 +98,37 @@ function WheelPicker({ data, selectedIndex, onValueChange, width, label }: Wheel
     const clampedIndex = Math.max(0, Math.min(data.length - 1, index));
 
     // Snap to nearest item
-    scrollViewRef.current?.scrollTo({
-      y: clampedIndex * ITEM_HEIGHT,
-      animated: true,
-    });
-
+    scrollToIndex(clampedIndex, true);
     onValueChange(clampedIndex);
   };
 
+  // Dragging a vertical wheel is not something a screen reader user can do
+  // reliably, so the wheel exposes itself as an adjustable control: a swipe
+  // up/down moves one step without touching the scroll surface at all.
+  const handleAccessibilityAction = (event: AccessibilityActionEvent) => {
+    const delta = event.nativeEvent.actionName === 'increment' ? 1 : -1;
+    const nextIndex = Math.max(0, Math.min(data.length - 1, selectedIndex + delta));
+    if (nextIndex === selectedIndex) return;
+    Haptics.selectionAsync();
+    lastHapticIndex.current = nextIndex;
+    scrollToIndex(nextIndex, true);
+    onValueChange(nextIndex);
+  };
+
   return (
-    <View style={[styles.wheelColumn, { width }]}>
-      <Text style={styles.wheelLabel}>{label}</Text>
-      <View style={styles.wheelContainer}>
+    <View
+      style={[styles.wheelColumn, { width }]}
+      accessible
+      accessibilityRole="adjustable"
+      accessibilityLabel={label}
+      accessibilityValue={{ text: String(data[selectedIndex]) }}
+      accessibilityActions={ADJUSTABLE_ACTIONS}
+      onAccessibilityAction={handleAccessibilityAction}
+    >
+      <Text style={styles.wheelLabel} importantForAccessibility="no">
+        {label}
+      </Text>
+      <View style={styles.wheelContainer} importantForAccessibility="no-hide-descendants">
         <ScrollView
           ref={scrollViewRef}
           showsVerticalScrollIndicator={false}
@@ -114,15 +145,14 @@ function WheelPicker({ data, selectedIndex, onValueChange, width, label }: Wheel
           {data.map((item, index) => {
             const distance = Math.abs(index - selectedIndex);
             const isSelected = distance === 0;
+            const isNear = distance === 1;
             return (
               <View key={index} style={styles.wheelItem}>
                 <Text
                   style={[
                     styles.wheelItemText,
-                    // The selected row has to win outright: everything either
-                    // side steps back in size, weight and presence.
+                    isNear && styles.wheelItemTextNear,
                     isSelected && styles.wheelItemTextSelected,
-                    !isSelected && { opacity: distance === 1 ? 0.6 : 0.3 },
                   ]}
                 >
                   {item}
@@ -270,27 +300,29 @@ export default function BirthdateInputScreen() {
 
       <View style={styles.body}>
         <Animated.View style={[styles.head, headerStyle]}>
-          <Text style={styles.title}>Tu fecha{'\n'}de nacimiento</Text>
-          <Text style={styles.subtitle}>Desliza cada rueda hasta tu fecha.</Text>
+          <Text style={styles.title}>¿Cuál es tu{'\n'}fecha de nacimiento?</Text>
+          <Text style={styles.subtitle}>
+            Cuéntanos tu fecha de nacimiento para personalizar tus entrenamientos.
+          </Text>
         </Animated.View>
 
         <Animated.View style={[styles.stage, valueStyle]}>
-          <View style={styles.valueBlock}>
-            <Text
-              style={styles.value}
-              accessibilityRole="text"
-              accessibilityLabel={`Fecha seleccionada: ${formatDisplayDate()}`}
-            >
-              {formatDisplayDate()}
-            </Text>
-            <Text style={styles.hint}>
-              {age >= 0 ? `${age} ${age === 1 ? 'año' : 'años'}` : 'Fecha futura'}
-            </Text>
-          </View>
-
-          <View style={styles.wheels}>
-            {/* Selection band: the row under the band is the answer. */}
-            <View style={styles.selectionBand} pointerEvents="none" />
+          <View
+            style={styles.wheels}
+            accessibilityLabel={`Fecha seleccionada: ${formatDisplayDate()}`}
+          >
+            {/* Selection band: the design's gradient-bordered box, sized to
+                the whole answer row instead of a single number. */}
+            <View style={styles.selectionBandWrap} pointerEvents="none">
+              <LinearGradient
+                colors={[colors.accent, colors.accentDeep]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.selectionBand}
+              >
+                <View style={styles.selectionBandInner} />
+              </LinearGradient>
+            </View>
 
             <View style={styles.pickersRow}>
               {/* Day Picker */}
@@ -321,6 +353,10 @@ export default function BirthdateInputScreen() {
               />
             </View>
           </View>
+
+          <Text style={styles.hint}>
+            {age >= 0 ? `${age} ${age === 1 ? 'año' : 'años'}` : 'Fecha futura'}
+          </Text>
         </Animated.View>
 
         <Animated.View style={[styles.footer, footerStyle]}>
@@ -359,61 +395,64 @@ const styles = StyleSheet.create({
   },
   body: {
     flex: 1,
-    paddingHorizontal: 24,
+    // Matches the design's container padding: 16 on each side, none at the
+    // bottom (the footer carries its own).
+    paddingHorizontal: 16,
     paddingBottom: 16,
   },
   head: {
     marginTop: 8,
     gap: 8,
+    alignItems: 'center',
   },
   title: {
     fontFamily: typography.fontFamily,
-    fontSize: 34,
-    fontWeight: typography.fontWeight.bold,
-    lineHeight: 38,
-    letterSpacing: -1,
+    fontSize: 36,
+    fontWeight: typography.fontWeight.semiBold,
+    lineHeight: 43, // 36 * 1.19, read out of the design
+    letterSpacing: -1.08,
     color: colors.ink,
+    textAlign: 'center',
   },
   subtitle: {
     fontFamily: typography.fontFamily,
-    fontSize: 15,
-    lineHeight: 21,
+    fontSize: 12,
+    lineHeight: 17,
+    textAlign: 'center',
+    maxWidth: 260,
+    // The design specifies #9D9D9D, which is 2.7:1 on white and fails AA.
+    // gray400 holds the same muted role at 5.3:1.
     color: colors.gray400,
   },
   stage: {
     flex: 1,
     justifyContent: 'center',
-    gap: 20,
-  },
-  valueBlock: {
     alignItems: 'center',
-    gap: 4,
-  },
-  value: {
-    fontFamily: typography.fontFamily,
-    fontSize: 30,
-    fontWeight: typography.fontWeight.bold,
-    letterSpacing: -0.8,
-    color: colors.ink,
-  },
-  hint: {
-    fontFamily: typography.fontFamily,
-    fontSize: 13,
-    color: colors.gray400,
+    gap: 32,
   },
   wheels: {
     height: PICKER_HEIGHT + 24,
     alignItems: 'center',
     justifyContent: 'flex-end',
   },
-  selectionBand: {
+  selectionBandWrap: {
     position: 'absolute',
     left: 0,
     right: 0,
     // Sits over the middle row of the wheels, which start below the labels.
     bottom: (PICKER_HEIGHT - ITEM_HEIGHT) / 2,
     height: ITEM_HEIGHT,
-    borderRadius: 16,
+    alignItems: 'center',
+  },
+  selectionBand: {
+    width: DAY_WIDTH + MONTH_WIDTH + YEAR_WIDTH,
+    height: ITEM_HEIGHT,
+    borderRadius: 14,
+    padding: 1,
+  },
+  selectionBandInner: {
+    flex: 1,
+    borderRadius: 13,
     backgroundColor: colors.surface,
   },
   pickersRow: {
@@ -441,16 +480,28 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  // Hierarchy comes from size and weight, not opacity — every row in the
+  // design reads at full strength, and only the selected one is bigger.
   wheelItemText: {
     fontFamily: typography.fontFamily,
-    fontSize: 17,
-    fontWeight: typography.fontWeight.medium,
-    color: colors.gray400,
+    fontSize: 15,
+    fontWeight: typography.fontWeight.regular,
+    color: colors.ink,
+  },
+  wheelItemTextNear: {
+    fontSize: 20,
+    letterSpacing: -0.2,
   },
   wheelItemTextSelected: {
-    fontSize: 22,
-    fontWeight: typography.fontWeight.bold,
+    fontSize: 26,
+    fontWeight: typography.fontWeight.semiBold,
+    letterSpacing: -1,
     color: colors.ink,
+  },
+  hint: {
+    fontFamily: typography.fontFamily,
+    fontSize: 13,
+    color: colors.gray400,
   },
   footer: {
     gap: 14,
