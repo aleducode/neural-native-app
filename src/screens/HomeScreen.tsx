@@ -27,7 +27,8 @@ import { useAuth } from '../context/AuthContext';
 import { colors, typography } from '../theme/colors';
 import { dashboardApi, DashboardResponse } from '../api/dashboard';
 import { notificationsApi } from '../api/notifications';
-import { profileApi } from '../api/profile';
+import { profileApi, type UserWeight, type WeightListResponse } from '../api/profile';
+import WeightCard from '../components/WeightCard';
 import ProfileSetupSheet, { MissingField } from '../components/ProfileSetupSheet';
 import pushNotificationService from '../services/pushNotifications';
 
@@ -107,6 +108,15 @@ export default function HomeScreen() {
   // Once the sheet has had its turn it stays down until the next launch, even
   // if the member comes back to Home with a field still empty.
   const [nudgeShown, setNudgeShown] = useState(false);
+  const [weights, setWeights] = useState<UserWeight[]>([]);
+  const [weightStats, setWeightStats] = useState<WeightListResponse['stats'] | null>(null);
+
+  const fetchWeights = useCallback(async () => {
+    const { data } = await profileApi.getWeights();
+    if (!data) return;
+    setWeights(data.weights);
+    setWeightStats(data.stats);
+  }, []);
 
   const fetchProfileGaps = useCallback(async () => {
     const { data } = await profileApi.getProfile();
@@ -166,15 +176,21 @@ export default function HomeScreen() {
       fetchDashboard();
       fetchNotificationCount();
       fetchProfileGaps();
+      fetchWeights();
       readSnooze();
-    }, [fetchDashboard, fetchNotificationCount, fetchProfileGaps, readSnooze])
+    }, [fetchDashboard, fetchNotificationCount, fetchProfileGaps, fetchWeights, readSnooze])
   );
 
   const closeNudge = useCallback(() => setNudgeShown(true), []);
 
   const onRefresh = async () => {
     setIsRefreshing(true);
-    await Promise.all([fetchDashboard(), fetchNotificationCount(), fetchProfileGaps()]);
+    await Promise.all([
+      fetchDashboard(),
+      fetchNotificationCount(),
+      fetchProfileGaps(),
+      fetchWeights(),
+    ]);
     setIsRefreshing(false);
   };
 
@@ -393,6 +409,15 @@ export default function HomeScreen() {
                 />
               </View>
             </View>
+
+            {/* The weight block from "09 · Progreso corporal", cut to a card.
+                It renders only once there is a weight to show — before that,
+                the sheet is already asking for it. */}
+            <WeightCard
+              weights={weights}
+              stats={weightStats}
+              onPress={() => navigation.navigate('WeightHistory')}
+            />
 
             <Pressable
               style={({ pressed }) => [styles.card, pressed && styles.pressed]}
