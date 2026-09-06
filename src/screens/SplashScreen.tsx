@@ -27,13 +27,12 @@ const BLOB_PATH =
 const BLOB_W = Math.min(SCREEN_W - 72, 300);
 const BLOB_H = BLOB_W * (380.74 / 343);
 
-const PANE_W = Math.min(SCREEN_W - 96, 258);
-const PANE_H = 118;
+const PANE_W = Math.min(SCREEN_W - 128, 226);
+const PANE_H = 96;
 
-// The shape is hollow through its middle band, so a pane centred on it would
-// sit half over colour and half over the hole. Riding its bottom edge instead
-// reads as a deliberate overlap and keeps a solid backdrop under the logo.
-const PANE_DROP = BLOB_H * 0.40;
+// The mark is hollow through its middle band, and the pane sits centred in
+// that opening. The negative space frames the logo instead of fighting it,
+// so nothing has to be nudged off centre.
 
 const SWEEP_W = PANE_W * 0.5;
 const SWEEP_FROM = -PANE_W * 0.7;
@@ -103,7 +102,7 @@ export default function SplashScreen({ onFinish }: SplashScreenProps) {
   const paneStyle = useAnimatedStyle(() => ({
     opacity: paneIn.value,
     transform: [
-      { translateY: PANE_DROP + (1 - paneIn.value) * 14 },
+      { translateY: (1 - paneIn.value) * 14 },
       { scale: 0.9 + paneIn.value * 0.1 },
     ],
   }));

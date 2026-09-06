@@ -52,8 +52,10 @@ export const colors = {
 
   // Liquid glass: a translucent pane needs a fill, a lit top edge and a
   // dimmer bottom edge. Without a real backdrop blur these carry the effect.
-  glassFill: 'rgba(255, 255, 255, 0.10)',
-  glassFillStrong: 'rgba(255, 255, 255, 0.18)',
+  // Frosted, not merely tinted: at 10% the pane showed everything behind it
+  // and read as a smudge rather than a surface.
+  glassFill: 'rgba(255, 255, 255, 0.62)',
+  glassFillStrong: 'rgba(255, 255, 255, 0.82)',
   glassEdgeTop: 'rgba(255, 255, 255, 0.55)',
   glassEdgeBottom: 'rgba(255, 255, 255, 0.08)',
   glassSpecular: 'rgba(255, 255, 255, 0.35)',
