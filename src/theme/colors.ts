@@ -40,6 +40,30 @@ export const colors = {
   // Status colors
   error: '#FF4D4D',
   success: '#5a6bff',
+
+  // Design system (Gainly-derived). Additive: nothing above is removed,
+  // so the twenty screens that already read these tokens keep working.
+  ink: '#111111',
+  surface: '#F4F4F4',
+  muted: '#9D9D9D',
+  accent: '#C6FF40',
+  accentDeep: '#17DD42',
+  accentSoft: '#E8FCEC',
+
+  // Liquid glass: a translucent pane needs a fill, a lit top edge and a
+  // dimmer bottom edge. Without a real backdrop blur these carry the effect.
+  glassFill: 'rgba(255, 255, 255, 0.10)',
+  glassFillStrong: 'rgba(255, 255, 255, 0.18)',
+  glassEdgeTop: 'rgba(255, 255, 255, 0.55)',
+  glassEdgeBottom: 'rgba(255, 255, 255, 0.08)',
+  glassSpecular: 'rgba(255, 255, 255, 0.35)',
+
+  // Exact values read out of the design file, kept as named roles so the
+  // screens don't carry raw hexes.
+  pureBlack: '#000000',
+  iconMuted: '#A5A5A5',
+  placeholder: '#939393',
+  link: '#5E3AE4',
 };
 
 export const spacing = {

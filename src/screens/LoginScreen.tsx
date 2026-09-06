@@ -1,29 +1,48 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
+  Pressable,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
   Alert,
   Image,
+  ActivityIndicator,
   Dimensions,
+  type TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
-import { useAuth } from '../context/AuthContext';
-import { colors, typography, spacing, borderRadius } from '../theme/colors';
+import { StatusBar } from 'expo-status-bar';
+import * as Haptics from 'expo-haptics';
+import Checkbox from 'expo-checkbox';
+import Svg, { Path, Defs, LinearGradient as SvgGradient, Stop } from 'react-native-svg';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  withDelay,
+  Easing,
+} from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
-import Input from '../components/Input';
-import Button from '../components/Button';
+import { useNavigation } from '@react-navigation/native';
+import { useAuth } from '../context/AuthContext';
+import { colors, typography } from '../theme/colors';
+import AuthField from '../components/AuthField';
 import { captureException, addBreadcrumb } from '../utils/sentry';
 import { testLoginFlowError, testSentryError, testBiometricPermissionDenied, testNotificationPermissionDenied } from '../utils/testSentry';
 
-const { height: SCREEN_HEIGHT } = Dimensions.get('window');
-const CONTENT_PADDING = spacing.xxl;
+const { width: SCREEN_W } = Dimensions.get('window');
+
+// Same brand shape as the splash, bled off the top corner so the screen keeps
+// a trace of the intro instead of dropping to a blank sheet.
+const BLOB_VIEWBOX = '0 0 343 380.74';
+const BLOB_PATH =
+  'M0 142.78c0 0 0 152.29 0 152.29 0 0 47.64 0 47.64 0 5 0 9.96 0.99 14.58 2.9 4.63 1.91 8.83 4.72 12.37 8.25 3.54 3.54 6.34 7.74 8.26 12.36 1.91 4.62 2.9 9.57 2.9 14.57 0 0 0 47.59 0 47.59 0 0 114.33 0 114.33 0 0 0 142.92-142.78 142.92-142.78 0 0 0-152.29 0-152.29 0 0-47.64 0-47.64 0-5 0-9.96-0.99-14.58-2.9-4.63-1.92-8.83-4.72-12.37-8.26-3.54-3.53-6.34-7.73-8.26-12.35-1.91-4.62-2.9-9.57-2.9-14.57 0 0 0-47.59 0-47.59 0 0-114.33 0-114.33 0 0 0-142.92 142.78-142.92 142.78z m161.97 142.77c0 0-66.69 0-66.69 0 0 0 0-104.7 0-104.7 0 0 85.75-85.67 85.75-85.67 0 0 66.69 0 66.69 0 0 0 0 104.71 0 104.71 0 0-85.75 85.66-85.75 85.66z';
+
+const DECOR_W = SCREEN_W * 0.95;
+const DECOR_H = DECOR_W * (380.74 / 343);
 
 export default function LoginScreen() {
   const navigation = useNavigation<any>();
@@ -32,14 +51,37 @@ export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [remember, setRemember] = useState(true);
+  const [fieldErrors, setFieldErrors] = useState<{ email?: string; password?: string }>({});
+
+  const passwordRef = useRef<TextInput>(null);
+
+  // Short staggered entrance. Anything longer makes a login feel slow, which
+  // is the opposite of premium.
+  const intro = useSharedValue(0);
+  useEffect(() => {
+    intro.value = withTiming(1, { duration: 460, easing: Easing.out(Easing.cubic) });
+  }, []);
+
+  const headerStyle = useAnimatedStyle(() => ({
+    opacity: intro.value,
+    transform: [{ translateY: (1 - intro.value) * 18 }],
+  }));
+  const formStyle = useAnimatedStyle(() => ({
+    opacity: withDelay(80, withTiming(intro.value, { duration: 400 })),
+    transform: [{ translateY: withDelay(80, withTiming((1 - intro.value) * 18, { duration: 400 })) }],
+  }));
+  const footerStyle = useAnimatedStyle(() => ({
+    opacity: withDelay(160, withTiming(intro.value, { duration: 400 })),
+  }));
 
   const handleBiometricLogin = React.useCallback(async () => {
     addBreadcrumb('Biometric login attempt', 'auth', {
       biometricType,
     });
-    
+
     setIsLoading(true);
-    
+
     try {
     const { success, error } = await loginWithBiometric();
     setIsLoading(false);
@@ -85,10 +127,19 @@ export default function LoginScreen() {
     const emailValue = email?.trim() || '';
     const passwordValue = password?.trim() || '';
 
-    if (!emailValue || !passwordValue) {
-      Alert.alert('Error', 'Por favor ingresa tu correo y contraseña');
+    // Validation belongs beside the field that failed, not in a modal the user
+    // has to dismiss before they can see which one it was.
+    const next: { email?: string; password?: string } = {};
+    if (!emailValue) next.email = 'Ingresa tu correo';
+    else if (!/\S+@\S+\.\S+/.test(emailValue)) next.email = 'Ese correo no parece válido';
+    if (!passwordValue) next.password = 'Ingresa tu contraseña';
+
+    if (Object.keys(next).length > 0) {
+      setFieldErrors(next);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
       return;
     }
+    setFieldErrors({});
 
     // Track login attempt
     try {
@@ -105,10 +156,11 @@ export default function LoginScreen() {
     }
 
     setIsLoading(true);
-    
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
     try {
       const { success, error } = await login({ email: emailValue, password: passwordValue }, false);
-    
+
     if (success) {
         try {
           addBreadcrumb('Login successful', 'auth', {
@@ -117,7 +169,8 @@ export default function LoginScreen() {
         } catch (err) {
           // Non-critical error in breadcrumb
         }
-        
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
       // After successful login, ask user if they want to enable biometric login
       // Only ask if biometric is available and not already enabled
       if (biometricAvailable && !biometricEnabled) {
@@ -154,6 +207,7 @@ export default function LoginScreen() {
       }
     } else {
       setIsLoading(false);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       if (error) {
           // Track login errors (but not as exceptions - these are expected)
           try {
@@ -183,187 +237,210 @@ export default function LoginScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Subtle Background Gradients */}
-      <View style={styles.backgroundContainer}>
-        <LinearGradient
-          colors={['rgba(90, 107, 255, 0.15)', 'transparent']}
-          style={styles.gradientTop}
-        />
-        <LinearGradient
-          colors={['rgba(90, 107, 255, 0.15)', 'transparent']}
-          style={styles.gradientBottom}
-        />
+      <StatusBar style="dark" />
+
+      <View style={styles.decor} pointerEvents="none">
+        <Svg width={DECOR_W} height={DECOR_H} viewBox={BLOB_VIEWBOX}>
+          <Defs>
+            <SvgGradient id="loginBrand" x1="0" y1="1" x2="1" y2="0">
+              <Stop offset="0" stopColor={colors.accent} stopOpacity={0.55} />
+              <Stop offset="1" stopColor={colors.accentDeep} stopOpacity={0.35} />
+            </SvgGradient>
+          </Defs>
+          <Path d={BLOB_PATH} fill="url(#loginBrand)" fillRule="evenodd" />
+        </Svg>
       </View>
 
       <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.keyboardView}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+          style={styles.flex}
         >
           <ScrollView
-            contentContainerStyle={styles.scrollContent}
+            contentContainerStyle={styles.scroll}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
           >
-            <View style={styles.centerContainer}>
-              {/* Header Title */}
-              <Text style={styles.title}>INICIAR SESIÓN</Text>
+            <Animated.View style={[styles.header, headerStyle]}>
+              <Image
+                source={require('../../assets/neural.png')}
+                style={styles.logo}
+                resizeMode="contain"
+              />
+              <Text style={styles.title}>Hola de{'\n'}nuevo</Text>
+              <Text style={styles.subtitle}>
+                Entra para reservar tu próximo entrenamiento.
+              </Text>
+            </Animated.View>
 
-              {/* Premium Card */}
-              <View style={styles.card}>
-                {/* Logo */}
-                <View style={styles.logoContainer}>
-                  <Image
-                    source={require('../../assets/neural.png')}
-                    style={styles.logo}
-                    resizeMode="contain"
-                  />
-                </View>
+            <Animated.View style={[styles.form, formStyle]}>
+              <AuthField
+                kind="email"
+                label="Correo electrónico"
+                value={email}
+                error={fieldErrors.email}
+                editable={!isLoading}
+                returnKeyType="next"
+                onSubmitEditing={() => passwordRef.current?.focus()}
+                onChangeText={(text) => {
+                  try {
+                    // Ensure we always set a string, even if text is null/undefined
+                    setEmail(text || '');
+                    if (fieldErrors.email) setFieldErrors((e) => ({ ...e, email: undefined }));
+                    addBreadcrumb('User typing email', 'user_action', {
+                      emailLength: (text || '').length,
+                    });
+                  } catch (error) {
+                    captureException(error as Error, {
+                      context: 'emailInput',
+                      action: 'onChangeText',
+                      textType: typeof text,
+                    });
+                  }
+                }}
+              />
 
-                {/* Form */}
-                <View style={styles.form}>
-                  <Input
-                    placeholder="Email"
-                    value={email || ''}
-                    onChangeText={(text) => {
-                      try {
-                        // Ensure we always set a string, even if text is null/undefined
-                        setEmail(text || '');
-                        addBreadcrumb('User typing email', 'user_action', {
-                          emailLength: (text || '').length,
-                        });
-                      } catch (error) {
-                        captureException(error as Error, {
-                          context: 'emailInput',
-                          action: 'onChangeText',
-                          textType: typeof text,
-                        });
-                      }
-                    }}
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                    editable={!isLoading}
-                  />
+              <AuthField
+                ref={passwordRef}
+                kind="password"
+                label="Contraseña"
+                value={password}
+                error={fieldErrors.password}
+                editable={!isLoading}
+                returnKeyType="go"
+                onSubmitEditing={handleLogin}
+                onChangeText={(text) => {
+                  setPassword(text);
+                  if (fieldErrors.password) setFieldErrors((e) => ({ ...e, password: undefined }));
+                }}
+              />
 
-                  <Input
-                    placeholder="Contraseña"
-                    value={password}
-                    onChangeText={setPassword}
-                    secureTextEntry
-                    autoCapitalize="none"
-                    editable={!isLoading}
-                  />
-
-                  {/* Forgot Password */}
-                  <TouchableOpacity
-                    style={styles.forgotPassword}
-                    onPress={() => {}}
+              <View style={styles.row}>
+                <Pressable
+                  style={styles.remember}
+                  onPress={() => setRemember((r) => !r)}
+                  disabled={isLoading}
+                  hitSlop={8}
+                >
+                  <Checkbox
+                    value={remember}
+                    onValueChange={setRemember}
                     disabled={isLoading}
-                  >
-                    <Text style={styles.forgotPasswordText}>¿Olvidaste tu contraseña?</Text>
-                  </TouchableOpacity>
-                </View>
-
-                {/* Login Button */}
-                <View style={styles.buttonContainer}>
-                  <Button
-                    title={isLoading ? '' : 'Ingresar'}
-                    onPress={handleLogin}
-                    disabled={isLoading}
-                    loading={isLoading}
+                    color={remember ? colors.ink : undefined}
+                    style={styles.checkbox}
                   />
-                </View>
+                  <Text style={styles.rememberText}>Mantener sesión</Text>
+                </Pressable>
 
-                {/* Biometric Login Button - Only show if biometric is enabled */}
-                {biometricEnabled && (
+                <Pressable onPress={() => {}} disabled={isLoading} hitSlop={8}>
+                  {({ pressed }) => (
+                    <Text style={[styles.forgot, pressed && styles.pressedText]}>
+                      ¿Olvidaste tu contraseña?
+                    </Text>
+                  )}
+                </Pressable>
+              </View>
+
+              <Pressable
+                onPress={handleLogin}
+                disabled={isLoading}
+                accessibilityRole="button"
+                accessibilityLabel="Ingresar"
+                style={({ pressed }) => [
+                  styles.cta,
+                  pressed && styles.ctaPressed,
+                  isLoading && styles.ctaLoading,
+                ]}
+              >
+                {isLoading ? (
+                  <ActivityIndicator size="small" color={colors.white} />
+                ) : (
                   <>
-                    <View style={styles.dividerContainer}>
-                      <View style={styles.dividerLine} />
-                      <Text style={styles.dividerText}>o</Text>
-                      <View style={styles.dividerLine} />
-                    </View>
-                    <TouchableOpacity
-                      style={styles.biometricButton}
-                      onPress={handleBiometricLogin}
-                      disabled={isLoading}
-                      activeOpacity={0.7}
-                    >
-                      <Ionicons
-                        name={biometricType === 'Face ID' ? 'scan-outline' : 'finger-print-outline'}
-                        size={20}
-                        color={colors.primary}
-                      />
-                      <Text style={styles.biometricButtonText}>
-                        Ingresar con {biometricType}
-                      </Text>
-                    </TouchableOpacity>
+                    <Text style={styles.ctaLabel}>Ingresar</Text>
+                    <Ionicons name="arrow-forward" size={19} color={colors.white} />
                   </>
                 )}
+              </Pressable>
 
-                {/* Register Link */}
-                <View style={styles.registerContainer}>
-                  <Text style={styles.registerText}>¿No tienes cuenta? </Text>
-                  <TouchableOpacity
-                    onPress={() => navigation.navigate('Register')}
-                    disabled={isLoading}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={styles.registerLink}>Regístrate</Text>
-                  </TouchableOpacity>
-                </View>
+              {biometricEnabled && (
+                <Pressable
+                  onPress={handleBiometricLogin}
+                  disabled={isLoading}
+                  accessibilityRole="button"
+                  style={({ pressed }) => [styles.biometric, pressed && styles.pressed]}
+                >
+                  <Ionicons
+                    name={biometricType === 'Face ID' ? 'scan-outline' : 'finger-print-outline'}
+                    size={20}
+                    color={colors.ink}
+                  />
+                  <Text style={styles.biometricText}>Entrar con {biometricType}</Text>
+                </Pressable>
+              )}
+            </Animated.View>
 
-                {/* Test Sentry Button - Solo visible en desarrollo */}
-                {__DEV__ && (
-                  <TouchableOpacity
-                    style={styles.testButton}
-                    onPress={() => {
-                      Alert.alert(
-                        'Test Sentry',
-                        '¿Qué error quieres simular?',
-                        Array.from([
-                          {
-                            text: 'Error de Login',
-                            onPress: () => {
-                              testLoginFlowError();
-                              Alert.alert('Enviado', 'Error de prueba enviado a Sentry.');
-                            },
-                          },
-                          {
-                            text: 'Permiso Biometría',
-                            onPress: () => {
-                              testBiometricPermissionDenied();
-                              Alert.alert('Enviado', 'Error de permisos de biometría enviado a Sentry.');
-                            },
-                          },
-                          {
-                            text: 'Permiso Notificaciones',
-                            onPress: () => {
-                              testNotificationPermissionDenied();
-                              Alert.alert('Enviado', 'Error de permisos de notificaciones enviado a Sentry.');
-                            },
-                          },
-                          {
-                            text: 'Error Simple',
-                            onPress: () => {
-                              testSentryError();
-                              Alert.alert('Enviado', 'Error de prueba enviado a Sentry.');
-                            },
-                          },
-                          {
-                            text: 'Cancelar',
-                            style: 'cancel' as const,
-                          },
-                        ])
-                      );
-                    }}
-                    disabled={isLoading}
-                  >
-                    <Text style={styles.testButtonText}>🧪 Test Sentry</Text>
-                  </TouchableOpacity>
+            <Animated.View style={[styles.footer, footerStyle]}>
+              <Text style={styles.footerText}>¿Todavía no tienes cuenta?</Text>
+              <Pressable
+                onPress={() => navigation.navigate('Register')}
+                disabled={isLoading}
+                hitSlop={8}
+              >
+                {({ pressed }) => (
+                  <Text style={[styles.footerLink, pressed && styles.pressedText]}>Regístrate</Text>
                 )}
-              </View>
-            </View>
+              </Pressable>
+            </Animated.View>
+
+            {__DEV__ && (
+              <Pressable
+                style={styles.testButton}
+                onPress={() => {
+                  Alert.alert(
+                    'Test Sentry',
+                    '¿Qué error quieres simular?',
+                    Array.from([
+                      {
+                        text: 'Error de Login',
+                        onPress: () => {
+                          testLoginFlowError();
+                          Alert.alert('Enviado', 'Error de prueba enviado a Sentry.');
+                        },
+                      },
+                      {
+                        text: 'Permiso Biometría',
+                        onPress: () => {
+                          testBiometricPermissionDenied();
+                          Alert.alert('Enviado', 'Error de permisos de biometría enviado a Sentry.');
+                        },
+                      },
+                      {
+                        text: 'Permiso Notificaciones',
+                        onPress: () => {
+                          testNotificationPermissionDenied();
+                          Alert.alert('Enviado', 'Error de permisos de notificaciones enviado a Sentry.');
+                        },
+                      },
+                      {
+                        text: 'Error Simple',
+                        onPress: () => {
+                          testSentryError();
+                          Alert.alert('Enviado', 'Error de prueba enviado a Sentry.');
+                        },
+                      },
+                      {
+                        text: 'Cancelar',
+                        style: 'cancel' as const,
+                      },
+                    ])
+                  );
+                }}
+                disabled={isLoading}
+              >
+                <Text style={styles.testButtonText}>🧪 Test Sentry</Text>
+              </Pressable>
+            )}
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
@@ -374,158 +451,170 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.bgDark,
+    backgroundColor: colors.white,
+  },
+  flex: {
+    flex: 1,
+  },
+  decor: {
+    position: 'absolute',
+    // Pulled far enough out that only the solid corner of the mark reads;
+    // the shape is hollow through its middle and that hole looks like a
+    // rendering fault when it lands inside the frame.
+    top: -DECOR_H * 0.62,
+    right: -DECOR_W * 0.52,
   },
   safeArea: {
     flex: 1,
   },
-  keyboardView: {
-    flex: 1,
-  },
-  scrollContent: {
+  scroll: {
     flexGrow: 1,
-    paddingHorizontal: CONTENT_PADDING,
-    justifyContent: 'center',
-    minHeight: SCREEN_HEIGHT * 0.9,
+    paddingHorizontal: 24,
+    paddingTop: 8,
+    paddingBottom: 24,
   },
-  centerContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    paddingVertical: spacing.xxl,
-  },
-  backgroundContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-  },
-  gradientTop: {
-    position: 'absolute',
-    top: 80,
-    left: -120,
-    width: 240,
-    height: 240,
-    borderRadius: 120,
-  },
-  gradientBottom: {
-    position: 'absolute',
-    bottom: 120,
-    right: -120,
-    width: 240,
-    height: 240,
-    borderRadius: 120,
-  },
-  title: {
-    fontSize: 38,
-    fontFamily: typography.fontFamily,
-    fontWeight: typography.fontWeight.bold,
-    lineHeight: 48,
-    color: colors.white,
-    textTransform: 'uppercase',
-    marginBottom: spacing.xxl,
-    textAlign: 'center',
-    letterSpacing: 0.5,
-  },
-  card: {
-    backgroundColor: colors.white,
-    borderRadius: borderRadius.xxl,
-    padding: spacing.xxl,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.12,
-    shadowRadius: 24,
-    elevation: 12,
-  },
-  logoContainer: {
-    alignItems: 'center',
-    marginBottom: spacing.xxl,
-    paddingTop: spacing.md,
+  header: {
+    marginTop: 52,
+    marginBottom: 40,
   },
   logo: {
-    width: 120,
-    height: 43,
+    width: 132,
+    height: 34,
+    marginBottom: 36,
+  },
+  title: {
+    fontFamily: typography.fontFamily,
+    fontSize: 40,
+    fontWeight: typography.fontWeight.bold,
+    lineHeight: 44,
+    letterSpacing: -1,
+    color: colors.ink,
+  },
+  subtitle: {
+    marginTop: 12,
+    fontFamily: typography.fontFamily,
+    fontSize: 15,
+    lineHeight: 21,
+    // gray400 sits at 5.3:1 on white. The design's #9D9D9D is 2.7:1 and fails
+    // AA, so the muted role is kept but that value is not.
+    color: colors.gray400,
   },
   form: {
-    marginBottom: spacing.xl,
-    gap: spacing.md,
+    gap: 20,
   },
-  forgotPassword: {
-    alignItems: 'flex-end',
-    marginTop: spacing.xs,
-    marginBottom: spacing.xs,
-  },
-  forgotPasswordText: {
-    fontSize: typography.fontSize.sm,
-    fontFamily: typography.fontFamily,
-    fontWeight: typography.fontWeight.medium,
-    color: colors.gray400,
-  },
-  buttonContainer: {
-    marginTop: spacing.lg,
-    marginBottom: spacing.md,
-  },
-  dividerContainer: {
+  row: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: spacing.xl,
+    justifyContent: 'space-between',
+    marginTop: 2,
   },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: colors.gray200,
+  remember: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
   },
-  dividerText: {
-    fontSize: typography.fontSize.sm,
+  checkbox: {
+    width: 20,
+    height: 20,
+    borderRadius: 6,
+    borderColor: colors.gray400,
+  },
+  rememberText: {
     fontFamily: typography.fontFamily,
-    fontWeight: typography.fontWeight.regular,
-    color: colors.gray400,
-    paddingHorizontal: spacing.lg,
+    fontSize: 14,
+    color: colors.ink,
   },
-  biometricButton: {
+  forgot: {
+    fontFamily: typography.fontFamily,
+    fontSize: 14,
+    fontWeight: typography.fontWeight.semiBold,
+    color: colors.ink,
+    textDecorationLine: 'underline',
+  },
+  pressedText: {
+    opacity: 0.5,
+  },
+  pressed: {
+    opacity: 0.7,
+  },
+  cta: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: spacing.md,
-    gap: spacing.sm,
-    marginBottom: spacing.lg,
+    gap: 10,
+    height: 58,
+    borderRadius: 29,
+    backgroundColor: colors.ink,
+    marginTop: 8,
+    // A primary action should look pressable before it is pressed.
+    ...Platform.select({
+      ios: {
+        shadowColor: colors.ink,
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.22,
+        shadowRadius: 20,
+      },
+      android: { elevation: 6 },
+    }),
   },
-  biometricButtonText: {
-    fontSize: typography.fontSize.md,
+  ctaPressed: {
+    transform: [{ scale: 0.98 }],
+    opacity: 0.92,
+  },
+  ctaLoading: {
+    opacity: 0.75,
+  },
+  ctaLabel: {
     fontFamily: typography.fontFamily,
-    fontWeight: typography.fontWeight.medium,
-    color: colors.primary,
+    fontSize: 17,
+    fontWeight: typography.fontWeight.semiBold,
+    color: colors.white,
+    letterSpacing: 0.2,
   },
-  registerContainer: {
+  biometric: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    height: 54,
+    borderRadius: 27,
+    backgroundColor: colors.surface,
+  },
+  biometricText: {
+    fontFamily: typography.fontFamily,
+    fontSize: 15,
+    fontWeight: typography.fontWeight.semiBold,
+    color: colors.ink,
+  },
+  footer: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    paddingTop: spacing.md,
-    marginTop: spacing.sm,
+    gap: 6,
+    marginTop: 'auto',
+    paddingTop: 40,
   },
-  registerText: {
-    fontSize: typography.fontSize.sm,
+  footerText: {
     fontFamily: typography.fontFamily,
-    fontWeight: typography.fontWeight.medium,
-    color: colors.textDark,
+    fontSize: 14,
+    color: colors.gray400,
   },
-  registerLink: {
-    fontSize: typography.fontSize.sm,
+  footerLink: {
     fontFamily: typography.fontFamily,
+    fontSize: 14,
     fontWeight: typography.fontWeight.bold,
-    color: colors.primary,
+    color: colors.ink,
   },
   testButton: {
-    marginTop: spacing.md,
-    padding: spacing.sm,
-    backgroundColor: colors.gray200,
-    borderRadius: borderRadius.xs,
+    marginTop: 20,
+    padding: 10,
+    backgroundColor: colors.surface,
+    borderRadius: 12,
     alignItems: 'center',
   },
   testButtonText: {
-    fontSize: typography.fontSize.xs,
     fontFamily: typography.fontFamily,
-    fontWeight: typography.fontWeight.medium,
-    color: colors.gray500,
+    fontSize: 12,
+    color: colors.gray400,
   },
 });

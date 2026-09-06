@@ -1,3 +1,10 @@
+export type AuthStackParamList = {
+  Login: undefined;
+  Register: undefined;
+  ForgotPassword: undefined;
+  VerificationCode: { email: string };
+};
+
 export type RootStackParamList = {
   MainTabs: undefined;
   Calendar: { initialDate?: string } | undefined;

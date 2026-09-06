@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { ActivityIndicator, View } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
@@ -23,6 +23,7 @@ import CreatePostScreen from './src/screens/CreatePostScreen';
 import PostDetailScreen from './src/screens/PostDetailScreen';
 import UserProfileScreen from './src/screens/UserProfileScreen';
 import { colors } from './src/theme/colors';
+import SplashScreen from './src/screens/SplashScreen';
 import ErrorBoundary from './src/components/ErrorBoundary';
 import { initSentry } from './src/utils/sentry';
 
@@ -60,13 +61,12 @@ function MainStack() {
 
 function RootNavigator() {
   const { isAuthenticated, isLoading, user } = useAuth();
+  const [introPlayed, setIntroPlayed] = useState(false);
 
-  if (isLoading) {
-    return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.bgDark }}>
-        <ActivityIndicator size="large" color={colors.primary} />
-      </View>
-    );
+  // Hold the splash until the session check finishes AND the intro has run,
+  // so a fast cold start doesn't flash the animation for a single frame.
+  if (isLoading || !introPlayed) {
+    return <SplashScreen onFinish={() => setIntroPlayed(true)} />;
   }
 
   if (!isAuthenticated) {
