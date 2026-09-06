@@ -1,5 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, Image, ImageProps, StyleProp, ViewStyle } from 'react-native';
+import {
+  View,
+  StyleSheet,
+  Image,
+  ImageProps,
+  StyleProp,
+  ViewStyle,
+  ImageStyle,
+} from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -10,7 +18,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { colors } from '../../theme/colors';
 
-interface SkeletonImageProps extends Omit<ImageProps, 'source'> {
+interface SkeletonImageProps extends Omit<ImageProps, 'source' | 'style'> {
   source: { uri: string } | number;
   style?: StyleProp<ViewStyle>;
   skeletonStyle?: StyleProp<ViewStyle>;
@@ -87,7 +95,7 @@ export default function SkeletonImage({
           <Image
             {...imageProps}
             source={source}
-            style={[styles.image, style]}
+            style={[styles.image, style as StyleProp<ImageStyle>]}
             onLoadStart={() => setIsLoading(true)}
             onLoadEnd={() => setIsLoading(false)}
             onError={() => {
@@ -104,7 +112,9 @@ export default function SkeletonImage({
 const styles = StyleSheet.create({
   container: {
     overflow: 'hidden',
-    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    // The placeholder sits on white cards now, so it has to be a light tone;
+    // the old translucent white was invisible against them.
+    backgroundColor: colors.surface,
   },
   skeleton: {
     position: 'absolute',
@@ -112,7 +122,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    backgroundColor: colors.surface,
     overflow: 'hidden',
   },
   shimmer: {
@@ -121,7 +131,8 @@ const styles = StyleSheet.create({
     left: '-50%',
     width: '50%',
     height: '100%',
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    backgroundColor: colors.white,
+    opacity: 0.7,
     transform: [{ skewX: '-20deg' }],
   },
   imageWrapper: {
