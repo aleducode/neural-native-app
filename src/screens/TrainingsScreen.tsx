@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Feather } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import Animated, {
   useSharedValue,
@@ -24,7 +25,6 @@ import { slotsApi } from '../api/slots';
 import { Training } from '../types';
 import Screen from '../components/ui/Screen';
 import AppHeader from '../components/ui/AppHeader';
-import Card from '../components/ui/Card';
 import PrimaryButton from '../components/ui/PrimaryButton';
 
 // Design node qM8hZ ("07 · Mis entrenos") draws the divider between the
@@ -32,6 +32,61 @@ import PrimaryButton from '../components/ui/PrimaryButton';
 // text, so the WCAG substitution the brief calls out for muted text doesn't
 // apply to it.
 const TIMELINE_LINE = '#DEDEDE';
+
+/** "HH:MM AM/PM" -> minutes since midnight. */
+function toMinutes(time: string): number {
+  const match = time.match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
+  if (!match) return 0;
+
+  let hours = parseInt(match[1], 10);
+  const minutes = parseInt(match[2], 10);
+  const period = match[3]?.toUpperCase();
+
+  if (period === 'PM' && hours !== 12) hours += 12;
+  if (period === 'AM' && hours === 12) hours = 0;
+
+  return hours * 60 + minutes;
+}
+
+/** "05:00 PM" -> "17:00", the format the design's narrow time column expects. */
+function to24h(time: string): string {
+  const total = toMinutes(time);
+  return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
+}
+
+/**
+ * How far along the session is: finished sessions read full, one running right
+ * now fills as it runs, and anything still ahead reads empty.
+ */
+function sessionProgress(training: Training, isPast: boolean): number {
+  if (isPast) return 1;
+  if (!training.is_today) return 0;
+
+  const now = new Date();
+  const minutesNow = now.getHours() * 60 + now.getMinutes();
+  const start = toMinutes(training.slot.hour_init);
+  const end = toMinutes(training.slot.hour_end);
+
+  if (minutesNow <= start || end <= start) return 0;
+  return Math.min((minutesNow - start) / (end - start), 1);
+}
+
+/** The design's hatch bar: 28 hairlines behind the fill. */
+const HATCH = Array.from({ length: 28 }, (_, i) => i);
+
+/** One column of the metrics row: a value, a small unit, and a label. */
+function Metric({ value, unit, label }: { value: string; unit: string; label: string }) {
+  return (
+    <View style={styles.metric}>
+      <View style={styles.metricValueRow}>
+        <Text style={styles.metricValue}>{value}</Text>
+        <Text style={styles.metricUnit}>{unit}</Text>
+      </View>
+      <Text style={styles.metricLabel}>{label}</Text>
+    </View>
+  );
+}
+
 
 interface ConfirmSheetProps {
   visible: boolean;
@@ -358,6 +413,20 @@ export default function TrainingsScreen() {
                 trainings[index - 1]?.slot.date !== training.slot.date;
               const failed = cancelError?.id === training.id ? cancelError.message : null;
 
+              const duration =
+                toMinutes(training.slot.hour_end) - toMinutes(training.slot.hour_init);
+              const taken = Math.max(
+                training.slot.max_places - training.slot.available_places,
+                0
+              );
+              const progress = sessionProgress(training, isPast);
+              const statusLabel = isPast ? 'Completado' : training.is_today ? 'Hoy' : 'Próximo';
+              const statusStyle = isPast
+                ? styles.statusDone
+                : training.is_today
+                  ? styles.statusToday
+                  : styles.statusNext;
+
               return (
                 <View key={training.id}>
                   {showDateHeader && (
@@ -366,38 +435,26 @@ export default function TrainingsScreen() {
                     </Text>
                   )}
 
-                  <Card style={styles.trainingCard}>
-                    <View style={styles.cardRow}>
-                      {/* Timeline column: qM8hZ > Container > Exercise List > Items >
-                          Item > Time Col (times stacked + start/end dots joined by a
-                          line). Dots and line dim to gray400 for past sessions instead
-                          of staying accentDeep, mirroring how the rest of the card
-                          steps a completed session back.
-
-                          The rail runs beside the times rather than under them:
-                          the design's 46-wide column was sized for "09:12", and
-                          this gym's "08:00 PM" wrapped onto two lines and left
-                          the dots dangling. Now each dot marks its own hour. */}
-                      <View style={styles.timelineCol}>
-                        <View style={styles.timelineBar}>
-                          <View style={[styles.timelineDot, isPast && styles.timelineDotMuted]} />
-                          <View style={styles.timelineLine} />
-                          <View style={[styles.timelineDot, isPast && styles.timelineDotMuted]} />
-                        </View>
-                        <View style={styles.timesBox}>
-                          <Text style={styles.timeStart} numberOfLines={1}>
-                            {training.slot.hour_init}
-                          </Text>
-                          <Text style={styles.timeEnd} numberOfLines={1}>
-                            {training.slot.hour_end}
-                          </Text>
-                        </View>
+                  <View style={styles.item}>
+                    {/* Time column: qM8hZ > Items > Item > Time Col — 46 wide,
+                        times stacked at 12/600 over a 6x92 rail. The design
+                        writes "06:00 / 07:00" with no meridiem, which is why 46
+                        is enough; this API returns "08:00 PM", so the column
+                        shows 24-hour time and the AM/PM stops wrapping. */}
+                    <View style={styles.timeCol}>
+                      <View style={styles.times}>
+                        <Text style={styles.timeStart}>{to24h(training.slot.hour_init)}</Text>
+                        <Text style={styles.timeEnd}>{to24h(training.slot.hour_end)}</Text>
                       </View>
+                      <View style={styles.rail}>
+                        <View style={[styles.railDot, isPast && styles.railDotMuted]} />
+                        <View style={styles.railLine} />
+                        <View style={[styles.railDot, isPast && styles.railDotMuted]} />
+                      </View>
+                    </View>
 
-                      {/* Name above, state below. Side by side, a wide
-                          "Completado" pill squeezed the training name down to
-                          "Funcional traini...". */}
-                      <View style={styles.info}>
+                    <View style={styles.card}>
+                      <View style={styles.titleRow}>
                         <Text
                           style={[styles.trainingType, isPast && styles.trainingTypePast]}
                           numberOfLines={1}
@@ -405,49 +462,73 @@ export default function TrainingsScreen() {
                           {training.training_type?.name || training.slot.training_type?.name}
                         </Text>
 
-                        {isPast ? (
-                          <View style={styles.doneBadge}>
-                            <Feather name="check" size={13} color={colors.gray400} />
-                            <Text style={styles.doneText}>Completado</Text>
-                          </View>
-                        ) : training.is_today ? (
-                          <View style={styles.todayBadge}>
-                            <Text style={styles.todayText}>Hoy</Text>
-                          </View>
-                        ) : (
-                          <View style={styles.nextBadge}>
-                            <Text style={styles.nextText}>Próximo</Text>
-                          </View>
+                        {/* The design draws this on every card. It is the only
+                            action a training has, so it appears only when there
+                            is one — and it replaces the separate Cancelar
+                            button rather than sitting beside it. */}
+                        {canCancel && (
+                          <Pressable
+                            onPress={() => handleCancel(training)}
+                            disabled={cancellingId === training.id}
+                            hitSlop={12}
+                            accessibilityRole="button"
+                            accessibilityLabel="Cancelar este entrenamiento"
+                            style={({ pressed }) => pressed && styles.pressed}
+                          >
+                            {cancellingId === training.id ? (
+                              <ActivityIndicator size="small" color={colors.gray400} />
+                            ) : (
+                              <Feather name="more-vertical" size={16} color={colors.ink} />
+                            )}
+                          </Pressable>
                         )}
+                      </View>
+
+                      <View style={styles.statusRow}>
+                        <Text style={[styles.status, statusStyle]} numberOfLines={1}>
+                          {statusLabel}
+                        </Text>
+
+                        {/* The hatch bar carries real progress: a finished
+                            session is full, one running right now fills as it
+                            runs, and one still ahead is empty. */}
+                        <View style={styles.hatch}>
+                          <View style={styles.hatchTicks} pointerEvents="none">
+                            {HATCH.map((i) => (
+                              <View key={i} style={styles.hatchTick} />
+                            ))}
+                          </View>
+                          {progress > 0 && (
+                            <LinearGradient
+                              colors={[colors.accent, colors.accentDeep]}
+                              start={{ x: 0, y: 0 }}
+                              end={{ x: 1, y: 0 }}
+                              style={[styles.hatchFill, { width: `${progress * 100}%` }]}
+                            />
+                          )}
+                        </View>
+                      </View>
+
+                      {/* The design's third metric is calories and the second is
+                          heart rate; neither exists on a Training, and the mock
+                          itself shows them as 0. These two are real. */}
+                      <View style={styles.metrics}>
+                        <Metric value={String(duration)} unit="min" label="Duración" />
+                        <Metric
+                          value={String(taken)}
+                          unit={`/${training.slot.max_places}`}
+                          label="Cupos"
+                        />
                       </View>
                     </View>
+                  </View>
 
-                    {!!failed && (
-                      <View style={styles.errorRow}>
-                        <Feather name="alert-circle" size={14} color={colors.error} />
-                        <Text style={styles.errorText}>{failed}</Text>
-                      </View>
-                    )}
-
-                    {canCancel && (
-                      <Pressable
-                        style={({ pressed }) => [styles.cancelButton, pressed && styles.pressed]}
-                        onPress={() => handleCancel(training)}
-                        disabled={cancellingId === training.id}
-                        accessibilityRole="button"
-                        accessibilityLabel="Cancelar este entrenamiento"
-                      >
-                        {cancellingId === training.id ? (
-                          <ActivityIndicator size="small" color={colors.error} />
-                        ) : (
-                          <>
-                            <Feather name="x" size={14} color={colors.error} />
-                            <Text style={styles.cancelText}>Cancelar</Text>
-                          </>
-                        )}
-                      </Pressable>
-                    )}
-                  </Card>
+                  {!!failed && (
+                    <View style={styles.errorRow}>
+                      <Feather name="alert-circle" size={14} color={colors.error} />
+                      <Text style={styles.errorText}>{failed}</Text>
+                    </View>
+                  )}
                 </View>
               );
             })}
@@ -483,6 +564,157 @@ export default function TrainingsScreen() {
 }
 
 const styles = StyleSheet.create({
+  // qM8hZ > Container > Exercise List > Items > Item: a 46-wide time column and
+  // a white card at radius 16, padding [8,12], stacked at 16, 16 apart.
+  item: {
+    flexDirection: 'row',
+    gap: 16,
+    marginBottom: 4,
+  },
+  timeCol: {
+    width: 46,
+    alignItems: 'center',
+    gap: 8,
+  },
+  times: {
+    alignItems: 'center',
+    gap: 4,
+  },
+  timeStart: {
+    fontFamily: typography.fontFamily,
+    fontSize: 12,
+    fontWeight: typography.fontWeight.semiBold,
+    color: colors.ink,
+  },
+  timeEnd: {
+    fontFamily: typography.fontFamily,
+    fontSize: 12,
+    fontWeight: typography.fontWeight.semiBold,
+    // The design's #A5A5A5 is 2.5:1 here; gray400 keeps the muted role at 5.3:1.
+    color: colors.gray400,
+  },
+  rail: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  railDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: colors.accentDeep,
+  },
+  railDotMuted: {
+    backgroundColor: colors.gray400,
+  },
+  railLine: {
+    flex: 1,
+    width: 2,
+    minHeight: 24,
+    backgroundColor: TIMELINE_LINE,
+  },
+  card: {
+    flex: 1,
+    backgroundColor: colors.white,
+    borderRadius: 16,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    gap: 16,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  trainingType: {
+    flex: 1,
+    fontFamily: typography.fontFamily,
+    fontSize: 16,
+    fontWeight: typography.fontWeight.semiBold,
+    color: colors.ink,
+  },
+  trainingTypePast: {
+    color: colors.gray400,
+  },
+  pressed: {
+    opacity: 0.6,
+  },
+  statusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  status: {
+    fontFamily: typography.fontFamily,
+    fontSize: 12,
+  },
+  statusDone: {
+    // The design writes this in #17DD42, which is 1.8:1 on white. #109D2F is
+    // the same green read at 4.9:1, and the design already uses it elsewhere.
+    color: '#109D2F',
+  },
+  statusToday: {
+    // The mock's amber is 1.9:1. Today's session is the one that matters, so it
+    // takes ink and weight instead of a colour nobody can read.
+    color: colors.ink,
+    fontWeight: typography.fontWeight.semiBold,
+  },
+  statusNext: {
+    color: colors.gray400,
+  },
+  hatch: {
+    flex: 1,
+    height: 6,
+    borderRadius: 32,
+    overflow: 'hidden',
+    justifyContent: 'center',
+  },
+  hatchTicks: {
+    ...StyleSheet.absoluteFillObject,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  hatchTick: {
+    width: 2,
+    height: 6,
+    backgroundColor: TIMELINE_LINE,
+  },
+  hatchFill: {
+    height: '100%',
+    borderRadius: 32,
+  },
+  metrics: {
+    flexDirection: 'row',
+    gap: 16,
+    paddingVertical: 4,
+  },
+  metric: {
+    flex: 1,
+    gap: 4,
+  },
+  metricValueRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 4,
+  },
+  metricValue: {
+    fontFamily: typography.fontFamily,
+    fontSize: 16,
+    fontWeight: typography.fontWeight.semiBold,
+    color: colors.ink,
+  },
+  metricUnit: {
+    fontFamily: typography.fontFamily,
+    fontSize: 12,
+    color: colors.gray400,
+  },
+  metricLabel: {
+    fontFamily: typography.fontFamily,
+    fontSize: 12,
+    color: colors.gray400,
+  },
+
   loading: {
     flex: 1,
     alignItems: 'center',
@@ -520,110 +752,6 @@ const styles = StyleSheet.create({
     marginTop: 20,
     marginBottom: 10,
   },
-  trainingCard: {
-    marginBottom: 10,
-    gap: 12,
-  },
-  cardRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  timelineCol: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  timesBox: {
-    gap: 10,
-  },
-  timeStart: {
-    fontFamily: typography.fontFamily,
-    fontSize: 12,
-    fontWeight: typography.fontWeight.semiBold,
-    color: colors.ink,
-  },
-  timeEnd: {
-    fontFamily: typography.fontFamily,
-    fontSize: 12,
-    fontWeight: typography.fontWeight.semiBold,
-    color: colors.gray400,
-  },
-  timelineBar: {
-    alignItems: 'center',
-  },
-  timelineDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: colors.accentDeep,
-  },
-  timelineDotMuted: {
-    backgroundColor: colors.gray400,
-  },
-  timelineLine: {
-    width: 2,
-    height: 22,
-    backgroundColor: TIMELINE_LINE,
-  },
-  info: {
-    flex: 1,
-    gap: 8,
-    alignItems: 'flex-start',
-    justifyContent: 'center',
-  },
-  trainingType: {
-    fontFamily: typography.fontFamily,
-    fontSize: 16,
-    fontWeight: typography.fontWeight.semiBold,
-    color: colors.ink,
-  },
-  trainingTypePast: {
-    // Past sessions step back through the badge, not through opacity: dimming
-    // the whole card was what pushed this text under the contrast floor.
-    color: colors.gray400,
-  },
-  doneBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 10,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: colors.surface,
-  },
-  doneText: {
-    fontFamily: typography.fontFamily,
-    fontSize: 12,
-    fontWeight: typography.fontWeight.semiBold,
-    color: colors.gray400,
-  },
-  todayBadge: {
-    justifyContent: 'center',
-    paddingHorizontal: 12,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: colors.accent,
-  },
-  todayText: {
-    fontFamily: typography.fontFamily,
-    fontSize: 12,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.ink,
-  },
-  nextBadge: {
-    justifyContent: 'center',
-    paddingHorizontal: 12,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: colors.accentSoft,
-  },
-  nextText: {
-    fontFamily: typography.fontFamily,
-    fontSize: 12,
-    fontWeight: typography.fontWeight.semiBold,
-    color: colors.accentDeep,
-  },
   errorRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -634,24 +762,6 @@ const styles = StyleSheet.create({
     fontFamily: typography.fontFamily,
     fontSize: 13,
     color: colors.error,
-  },
-  cancelButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 77, 77, 0.10)',
-  },
-  cancelText: {
-    fontFamily: typography.fontFamily,
-    fontSize: 14,
-    fontWeight: typography.fontWeight.semiBold,
-    color: colors.error,
-  },
-  pressed: {
-    opacity: 0.85,
   },
   loadingMore: {
     paddingVertical: 20,
