@@ -330,12 +330,16 @@ export default function ProfileScreen() {
               calendario" menu row: same destination (go('Trainings')), just
               relocated onto the card the design gives this data. Its 5-bar
               graph (qPrrv) has no per-day series anywhere in the API, so it
-              is not reproduced rather than faked. */}
+              is not reproduced rather than faked. Its icon (node nW8k1,
+              icon="footprints") isn't in Feather's glyphmap — swapped for
+              "activity", the same icon HomeScreen and CreatePostScreen
+              already use for this "Entrenos" concept, so the substitution
+              stays consistent app-wide rather than one-off. */}
           <View style={styles.stepsCard}>
             <View style={styles.stepsTop}>
               <View style={styles.stepsTitleWrap}>
                 <View style={styles.iconBtn}>
-                  <Feather name="activity" size={20} color={colors.accentDeep} />
+                  <Feather name="activity" size={24} color={colors.accentDeep} />
                 </View>
                 <Text style={styles.stepsTitle}>Entrenos</Text>
               </View>
@@ -397,7 +401,13 @@ export default function ProfileScreen() {
 
           {/* "Mi calendario" and "Membresía" moved onto the cards above; these
               two have no design equivalent on this screen but the navigation
-              they carry is still real and stays reachable. */}
+              they carry is still real and stays reachable. "Historial de
+              peso" is new: WeightHistoryScreen (route "WeightHistory") only
+              had one way in — the confirmation step after logging a new
+              weight from EditProfile — with nothing to open it on demand.
+              The design has no row for it either, so it follows the same
+              MenuRow pattern as the rows beside it instead of being left
+              unreachable. */}
           <Card style={styles.menuCard}>
             <MenuRow
               first
@@ -405,6 +415,12 @@ export default function ProfileScreen() {
               title="Editar perfil"
               subtitle="Información personal"
               onPress={() => go('EditProfile')}
+            />
+            <MenuRow
+              icon="bar-chart-2"
+              title="Historial de peso"
+              subtitle="Tu progreso corporal"
+              onPress={() => go('WeightHistory')}
             />
             <MenuRow
               icon="bell"

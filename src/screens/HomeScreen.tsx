@@ -28,7 +28,7 @@ import { colors, typography } from '../theme/colors';
 import { dashboardApi, DashboardResponse } from '../api/dashboard';
 import { notificationsApi } from '../api/notifications';
 import { profileApi } from '../api/profile';
-import ProfileNudge, { MissingField } from '../components/ProfileNudge';
+import ProfileSetupSheet, { MissingField } from '../components/ProfileSetupSheet';
 import pushNotificationService from '../services/pushNotifications';
 
 const NUDGE_SNOOZE_KEY = 'neural_profile_nudge_until';
@@ -104,6 +104,9 @@ export default function HomeScreen() {
   // enforces them, so members reach the app without any of the three.
   const [missingProfile, setMissingProfile] = useState<MissingField[]>([]);
   const [nudgeSnoozed, setNudgeSnoozed] = useState(true);
+  // Once the sheet has had its turn it stays down until the next launch, even
+  // if the member comes back to Home with a field still empty.
+  const [nudgeShown, setNudgeShown] = useState(false);
 
   const fetchProfileGaps = useCallback(async () => {
     const { data } = await profileApi.getProfile();
@@ -129,6 +132,7 @@ export default function HomeScreen() {
 
   const snoozeNudge = useCallback(async () => {
     setNudgeSnoozed(true);
+    setNudgeShown(true);
     try {
       await AsyncStorage.setItem(NUDGE_SNOOZE_KEY, String(Date.now() + NUDGE_SNOOZE_MS));
     } catch {
@@ -165,6 +169,8 @@ export default function HomeScreen() {
       readSnooze();
     }, [fetchDashboard, fetchNotificationCount, fetchProfileGaps, readSnooze])
   );
+
+  const closeNudge = useCallback(() => setNudgeShown(true), []);
 
   const onRefresh = async () => {
     setIsRefreshing(true);
@@ -312,12 +318,6 @@ export default function HomeScreen() {
               })}
             </View>
 
-            {/* Above the week's numbers, because those numbers are the ones the
-                missing data would sharpen. */}
-            {!nudgeSnoozed && (
-              <ProfileNudge missing={missingProfile} onDismiss={snoozeNudge} />
-            )}
-
             <View style={styles.card}>
               <View style={styles.cardHead}>
                 <Text style={styles.cardTitle}>Resumen</Text>
@@ -415,6 +415,13 @@ export default function HomeScreen() {
           <View style={{ height: 132 }} />
         </ScrollView>
       </SafeAreaView>
+
+      <ProfileSetupSheet
+        visible={!nudgeSnoozed && !nudgeShown && missingProfile.length > 0}
+        missing={missingProfile}
+        onLater={snoozeNudge}
+        onClose={closeNudge}
+      />
     </View>
   );
 }

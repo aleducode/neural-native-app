@@ -66,19 +66,20 @@ export default function EditProfileScreen() {
 
   const [firstName, setFirstName] = useState(user?.first_name || '');
   const [lastName, setLastName] = useState(user?.last_name || '');
+  const [phone, setPhone] = useState(user?.phone_number || '');
   const [isSaving, setIsSaving] = useState(false);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [profileData, setProfileData] = useState<ProfileResponse | null>(null);
   const [dashboardData, setDashboardData] = useState<DashboardResponse | null>(null);
   // Everything that can fail on this screen now fails beside the thing that
-  // failed: the name field, the avatar, or the save button.
+  // failed: the name field, the phone field, the avatar, or the save button.
   const [nameError, setNameError] = useState<string | undefined>(undefined);
+  const [phoneError, setPhoneError] = useState<string | undefined>(undefined);
   const [photoError, setPhotoError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
 
   const userEmail = user?.email || '';
-  const userPhone = user?.phone_number || '';
   const userPhoto = user?.photo_url;
   const userInitials = user
     ? `${user.first_name?.[0] || ''}${user.last_name?.[0] || ''}`.toUpperCase()
@@ -182,11 +183,21 @@ export default function EditProfileScreen() {
     }
     setNameError(undefined);
 
+    // Same "required" rule RegisterScreen uses for this field (no format
+    // regex there either — the backend is the source of truth for format).
+    if (!phone.trim()) {
+      setPhoneError('Ingresa tu teléfono');
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      return;
+    }
+    setPhoneError(undefined);
+
     setIsSaving(true);
 
     const { data, error } = await authApi.updateProfile({
       first_name: firstName.trim(),
       last_name: lastName.trim(),
+      phone_number: phone.trim(),
     });
 
     setIsSaving(false);
@@ -207,7 +218,9 @@ export default function EditProfileScreen() {
   };
 
   const hasChanges =
-    firstName !== (user?.first_name || '') || lastName !== (user?.last_name || '');
+    firstName !== (user?.first_name || '') ||
+    lastName !== (user?.last_name || '') ||
+    phone !== (user?.phone_number || '');
 
   return (
     <Screen tone="plain" wash edges={['top', 'bottom']}>
@@ -351,7 +364,14 @@ export default function EditProfileScreen() {
 
             {/* Correo and teléfono have no place in the design's InfoCard —
                 it only models the name and the three measurements — so this
-                keeps its own card rather than being forced into that one. */}
+                keeps its own card rather than being forced into that one.
+                Teléfono is editable: it's explicitly one of the fields the
+                product owner asked to be able to edit, and User.phone_number
+                is a real, writable field on the same PATCH /auth/me/ call
+                this screen already makes for first/last name — there's no
+                actual restriction to enforce. Correo stays read-only: it's
+                the login identifier (auth email), it wasn't part of what was
+                asked, and there's no endpoint here to change it safely. */}
             <View style={styles.contactCard}>
               <AuthField
                 kind="email"
@@ -363,14 +383,18 @@ export default function EditProfileScreen() {
               <AuthField
                 kind="phone"
                 label="Teléfono"
-                value={userPhone}
-                editable={false}
-                onChangeText={() => {}}
+                value={phone}
+                error={phoneError}
+                editable={!isSaving}
+                returnKeyType="done"
+                onChangeText={(text) => {
+                  setPhone(text);
+                  if (phoneError) setPhoneError(undefined);
+                }}
               />
-              {/* Two of the four fields cannot be edited here, so the screen
-                  says why instead of leaving them looking broken. */}
               <Text style={styles.readOnlyNote}>
-                El correo y el teléfono los gestiona Neural. Escríbenos si necesitas cambiarlos.
+                El correo es tu usuario de acceso y lo gestiona Neural. Escríbenos si necesitas
+                cambiarlo.
               </Text>
             </View>
 
