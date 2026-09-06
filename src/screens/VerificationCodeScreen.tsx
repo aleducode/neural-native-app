@@ -289,8 +289,16 @@ export default function VerificationCodeScreen({
               <View style={styles.header}>
                 <Text style={styles.title}>Ingresa el{'\n'}código</Text>
                 <Text style={styles.subtitle}>
-                  Enviamos un código de 6 dígitos a{' '}
-                  <Text style={styles.subtitleStrong}>{email}</Text>.
+                  Enviamos un código de 6 dígitos
+                  {email ? (
+                    <>
+                      {' a '}
+                      <Text style={styles.subtitleStrong}>{email}</Text>
+                    </>
+                  ) : (
+                    ' a tu correo'
+                  )}
+                  .
                 </Text>
               </View>
             </Animated.View>

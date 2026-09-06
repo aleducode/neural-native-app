@@ -333,7 +333,11 @@ export default function LoginScreen() {
                   <Text style={styles.rememberText}>Mantener sesión</Text>
                 </Pressable>
 
-                <Pressable onPress={() => {}} disabled={isLoading} hitSlop={8}>
+                <Pressable
+                  onPress={() => navigation.navigate('ForgotPassword')}
+                  disabled={isLoading}
+                  hitSlop={8}
+                >
                   {({ pressed }) => (
                     <Text style={[styles.forgot, pressed && styles.pressedText]}>
                       ¿Olvidaste tu contraseña?

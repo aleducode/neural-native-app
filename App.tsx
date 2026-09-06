@@ -8,6 +8,8 @@ import { AuthProvider, useAuth } from './src/context/AuthContext';
 import BottomTabs from './src/navigation/BottomTabs';
 import LoginScreen from './src/screens/LoginScreen';
 import RegisterScreen from './src/screens/RegisterScreen';
+import ForgotPasswordScreen from './src/screens/ForgotPasswordScreen';
+import VerificationCodeScreen from './src/screens/VerificationCodeScreen';
 import PendingScreen from './src/screens/PendingScreen';
 import MembershipScreen from './src/screens/MembershipScreen';
 import EditProfileScreen from './src/screens/EditProfileScreen';
@@ -34,6 +36,8 @@ function AuthStack() {
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="Login" component={LoginScreen} />
       <Stack.Screen name="Register" component={RegisterScreen} />
+      <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
+      <Stack.Screen name="VerificationCode" component={VerificationCodeScreen} />
     </Stack.Navigator>
   );
 }
