@@ -62,7 +62,7 @@ export const slotsApi = {
    */
   async getCalendarDays(startDate: string, endDate: string): Promise<{ data?: CalendarDay[]; error?: string }> {
     const response = await api.get<CalendarResponse>(
-      `/training/slots/calendar/?start_date=${startDate}&end_date=${endDate}`
+      `/training/calendar/?start_date=${startDate}&end_date=${endDate}`
     );
 
     if (response.data) {

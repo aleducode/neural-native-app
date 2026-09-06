@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
+  Image,
   StyleSheet,
   ScrollView,
   ActivityIndicator,
@@ -22,7 +23,12 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { colors, typography } from '../theme/colors';
 import Screen from '../components/ui/Screen';
 import AppHeader from '../components/ui/AppHeader';
-import Card from '../components/ui/Card';
+import MonthCalendar, {
+  toISODate,
+  parseISODate,
+  startOfMonth,
+} from '../components/calendar/MonthCalendar';
+import { trainingImage } from '../theme/trainingImages';
 import { slotsApi } from '../api/slots';
 import { Slot } from '../types';
 import { RootStackParamList } from '../navigation/RootNavigator';
@@ -30,44 +36,15 @@ import { RootStackParamList } from '../navigation/RootNavigator';
 type CalendarNavigationProp = StackNavigationProp<RootStackParamList>;
 type CalendarRouteProp = RouteProp<RootStackParamList, 'Calendar'>;
 
-interface WeekDayData {
-  date: Date;
-  dayName: string;
-  dayNumber: string;
-  fullDate: string; // YYYY-MM-DD format for API
-}
-
-// Spanish day abbreviations
-const DAY_NAMES = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
-const LONG_DAY_NAMES = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
-const MONTH_NAMES = [
-  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+const SHORT_MONTHS = [
+  'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun',
+  'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic',
 ];
 
-function getWeekDays(): WeekDayData[] {
-  const today = new Date();
-  const currentDay = today.getDay(); // 0 = Sunday, 1 = Monday, etc.
-  const days: WeekDayData[] = [];
-
-  // Calculate week starting from Sunday (same logic as HomeScreen)
-  for (let i = 0; i < 7; i++) {
-    const date = new Date(today);
-    date.setDate(today.getDate() - currentDay + i);
-
-    const dayName = DAY_NAMES[date.getDay()];
-    const dayNumber = date.getDate().toString();
-    // Format as YYYY-MM-DD without timezone conversion to avoid day shifts
-    const fullDate = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-
-    days.push({ date, dayName, dayNumber, fullDate });
-  }
-
-  return days;
-}
-
-function formatMonthYear(date: Date): string {
-  return `${MONTH_NAMES[date.getMonth()]} ${date.getFullYear()}`;
+/** "6 Sep 2026", the format the design puts in the date chip. */
+function formatChip(iso: string): string {
+  const d = parseISODate(iso);
+  return `${d.getDate()} ${SHORT_MONTHS[d.getMonth()]} ${d.getFullYear()}`;
 }
 
 /** "HH:MM AM/PM" -> minutes since midnight. */
@@ -86,69 +63,69 @@ function parseTimeToMinutes(time: string): number {
 }
 
 /**
- * One bookable slot.
+ * One bookable slot, laid out as the design's card: a 198-wide column of text
+ * against a 113x118 tile, 184 tall, with the type in green above the hour.
  *
- * The meter reads as *availability*, never occupancy: the bar is how much room
- * is left, so it shrinks towards empty as the class fills. A progress bar that
- * grew — and went green — as places ran out would say the opposite of what is
- * happening.
+ * The design puts one photo on every card; the API exposes a training type, so
+ * the tile picks the cut-out that matches it and four identical 60-minute
+ * functional slots stop looking like four copies of the same row.
  */
 function SlotRow({ slot, onPress }: { slot: Slot; onPress: () => void }) {
   const { training_type, hour_init, hour_end, available_places, max_places } = slot;
 
   const duration = parseTimeToMinutes(hour_end) - parseTimeToMinutes(hour_init);
   const isFull = available_places <= 0;
-  const freeRatio = max_places > 0 ? Math.max(Math.min(available_places / max_places, 1), 0) : 0;
 
   const body = (
     <>
-      <View style={styles.slotTop}>
-        <View style={styles.slotHeadings}>
-          <Text style={[styles.slotHour, isFull && styles.slotMutedStrong]} numberOfLines={1}>
-            {hour_init}
-          </Text>
-          <Text style={styles.slotType} numberOfLines={1}>
+      <View style={styles.slotInfo}>
+        <View style={styles.slotHead}>
+          <Text style={[styles.slotType, isFull && styles.slotTypeFull]} numberOfLines={1}>
             {training_type.name}
           </Text>
-        </View>
-
-        {isFull ? (
-          <View style={styles.fullBadge}>
-            <Text style={styles.fullBadgeText}>LLENO</Text>
-          </View>
-        ) : (
-          <View style={styles.slotChevron}>
-            <Feather name="chevron-right" size={18} color={colors.ink} />
-          </View>
-        )}
-      </View>
-
-      <View style={styles.slotMetaRow}>
-        <View style={styles.slotMeta}>
-          <Feather name="clock" size={13} color={colors.gray400} />
-          <Text style={styles.slotMetaText}>{duration} min</Text>
-        </View>
-
-        {training_type.is_group && (
-          <View style={styles.slotMeta}>
-            <Feather name="users" size={13} color={colors.gray400} />
-            <Text style={styles.slotMetaText}>
-              {available_places}/{max_places} cupos
+          <View style={styles.slotDetails}>
+            <Text style={styles.slotHour} numberOfLines={1}>
+              {hour_init} – {hour_end}
+            </Text>
+            <Text style={styles.slotDesc} numberOfLines={1}>
+              {training_type.is_group ? 'Entrenamiento grupal' : 'Entrenamiento individual'}
             </Text>
           </View>
-        )}
+        </View>
+
+        {/* Two rows, always: the design's card is 184 tall with a two-line
+            Durations block, and a solo session that dropped the capacity row
+            left a hole where the space-between pushed them apart. */}
+        <View style={styles.slotMetas}>
+          <View style={styles.slotMeta}>
+            <Feather
+              name={training_type.is_group ? 'users' : 'user'}
+              size={16}
+              color={colors.ink}
+            />
+            <Text style={styles.slotMetaText}>
+              {!training_type.is_group
+                ? 'Sesión individual'
+                : isFull
+                  ? 'Lleno'
+                  : `${available_places} cupos`}
+            </Text>
+          </View>
+          <View style={styles.slotMeta}>
+            <Feather name="clock" size={16} color={colors.ink} />
+            <Text style={styles.slotMetaText}>{duration} minutos</Text>
+          </View>
+        </View>
       </View>
 
-      {training_type.is_group && (
-        <View
-          style={styles.track}
-          accessibilityRole="progressbar"
-          accessibilityLabel="Cupos disponibles"
-          accessibilityValue={{ min: 0, max: max_places, now: available_places }}
-        >
-          <View style={[styles.trackFill, { width: `${freeRatio * 100}%` }]} />
-        </View>
-      )}
+      <View style={[styles.tile, isFull && styles.tileFull]}>
+        <Image
+          source={trainingImage(training_type)}
+          style={[styles.tileImage, isFull && styles.tileImageFull]}
+          resizeMode="contain"
+          accessible={false}
+        />
+      </View>
     </>
   );
 
@@ -157,18 +134,24 @@ function SlotRow({ slot, onPress }: { slot: Slot; onPress: () => void }) {
   if (isFull) {
     return (
       <View
+        style={styles.slotCard}
         accessible
-        accessibilityLabel={`${training_type.name} a las ${hour_init}. Lleno, sin cupos disponibles.`}
+        accessibilityLabel={`${training_type.name} de ${hour_init} a ${hour_end}. Lleno, sin cupos disponibles.`}
       >
-        <Card style={styles.slotCard}>{body}</Card>
+        {body}
       </View>
     );
   }
 
   return (
-    <Card style={styles.slotCard} onPress={onPress}>
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [styles.slotCard, pressed && styles.slotCardPressed]}
+      accessibilityRole="button"
+      accessibilityLabel={`${training_type.name} de ${hour_init} a ${hour_end}, ${available_places} cupos disponibles`}
+    >
       {body}
-    </Card>
+    </Pressable>
   );
 }
 
@@ -176,74 +159,30 @@ export default function CalendarScreen() {
   const navigation = useNavigation<CalendarNavigationProp>();
   const route = useRoute<CalendarRouteProp>();
   const initialDate = route.params?.initialDate;
-  
-  // Calculate week days starting from initialDate if provided, otherwise from today
-  // Uses the same logic as HomeScreen: calculate the week containing the given date
-  const getInitialWeekDays = useCallback((): WeekDayData[] => {
-    if (initialDate) {
-      // Parse the date string (YYYY-MM-DD) to avoid timezone issues
-      const [year, month, day] = initialDate.split('-').map(Number);
-      const targetDate = new Date(year, month - 1, day); // month is 0-indexed
-      const dayOfWeek = targetDate.getDay(); // 0 = Sunday, 1 = Monday, etc.
-      const days: WeekDayData[] = [];
-      
-      // Calculate week starting from Sunday (same logic as HomeScreen)
-      for (let i = 0; i < 7; i++) {
-        const date = new Date(year, month - 1, day - dayOfWeek + i);
-        
-        const dayName = DAY_NAMES[date.getDay()];
-        const dayNumber = date.getDate().toString();
-        // Format as YYYY-MM-DD without timezone conversion
-        const fullDate = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-        
-        days.push({ date, dayName, dayNumber, fullDate });
-      }
-      
-      return days;
-    }
-    return getWeekDays();
-  }, [initialDate]);
-  
-  // Initialize weekDays and selectedDate based on initialDate
-  const initialWeekDays = getInitialWeekDays();
-  const [weekDays, setWeekDays] = useState<WeekDayData[]>(initialWeekDays);
-  const [selectedDate, setSelectedDate] = useState<string>(() => {
-    // If initialDate is provided, verify it exists in the calculated week
-    if (initialDate) {
-      const foundDay = initialWeekDays.find(d => d.fullDate === initialDate);
-      if (foundDay) {
-        return initialDate;
-      }
-      // If not found, use the first day (shouldn't happen, but fallback)
-      return initialWeekDays[0]?.fullDate || '';
-    }
-    return initialWeekDays[0]?.fullDate || '';
-  });
-  
-  // Update week days and selected date when initialDate changes (e.g., when navigating from HomeScreen)
+
+  const [selectedDate, setSelectedDate] = useState<string>(
+    () => initialDate || toISODate(new Date())
+  );
+  const [visibleMonth, setVisibleMonth] = useState<Date>(() =>
+    startOfMonth(parseISODate(initialDate || toISODate(new Date())))
+  );
+
+  // Arriving from the home week strip carries a date; follow it, and bring the
+  // grid to the month that date lives in.
   useEffect(() => {
-    if (initialDate) {
-      const newWeekDays = getInitialWeekDays();
-      setWeekDays(newWeekDays);
-      // Verify the initialDate exists in the new week days before setting it
-      const foundDay = newWeekDays.find(d => d.fullDate === initialDate);
-      if (foundDay) {
-        // Use setTimeout to ensure state updates happen after render
-        setTimeout(() => {
-          setSelectedDate(initialDate);
-        }, 0);
-      } else {
-        // Fallback: use the first day if initialDate not found (shouldn't happen)
-        console.warn('InitialDate not found in calculated week:', initialDate, 'Available dates:', newWeekDays.map(d => d.fullDate));
-        setSelectedDate(newWeekDays[0]?.fullDate || '');
-      }
-    }
-  }, [initialDate, getInitialWeekDays]);
+    if (!initialDate) return;
+    setSelectedDate(initialDate);
+    setVisibleMonth(startOfMonth(parseISODate(initialDate)));
+  }, [initialDate]);
+
   const [slots, setSlots] = useState<Slot[]>([]);
   const [alreadyScheduled, setAlreadyScheduled] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const [availableDates, setAvailableDates] = useState<Set<string>>(new Set());
+  const [isLoadingMonth, setIsLoadingMonth] = useState(false);
 
   // Short staggered entrance, in the same register as the rest of the app.
   const intro = useSharedValue(0);
@@ -289,9 +228,39 @@ export default function CalendarScreen() {
     fetchSlots(selectedDate);
   }, [selectedDate, fetchSlots]);
 
-  const handleDayPress = (fullDate: string) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setSelectedDate(fullDate);
+  /**
+   * Which days of the visible month have slots — this is what draws the rings.
+   *
+   * It fails quietly: a month with no rings is a calendar that still works,
+   * so a failure here must not take the day's schedule down with it.
+   */
+  useEffect(() => {
+    let cancelled = false;
+    const first = startOfMonth(visibleMonth);
+    const last = new Date(visibleMonth.getFullYear(), visibleMonth.getMonth() + 1, 0);
+
+    setIsLoadingMonth(true);
+    slotsApi.getCalendarDays(toISODate(first), toISODate(last)).then(({ data }) => {
+      if (cancelled) return;
+      setAvailableDates(new Set((data ?? []).filter((d) => d.has_slots).map((d) => d.date)));
+      setIsLoadingMonth(false);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [visibleMonth]);
+
+  const handleSelectDate = (iso: string) => {
+    setSelectedDate(iso);
+    const picked = parseISODate(iso);
+    if (picked.getMonth() !== visibleMonth.getMonth()) {
+      setVisibleMonth(startOfMonth(picked));
+    }
+  };
+
+  const handleChangeMonth = (delta: number) => {
+    setVisibleMonth((m) => new Date(m.getFullYear(), m.getMonth() + delta, 1));
   };
 
   const handleSlotPress = (slot: Slot) => {
@@ -303,163 +272,140 @@ export default function CalendarScreen() {
     fetchSlots(selectedDate, true);
   };
 
-  const selectedDayData = weekDays.find(d => d.fullDate === selectedDate);
+  const chip = useMemo(() => formatChip(selectedDate), [selectedDate]);
 
   return (
     <Screen wash>
-      <AppHeader title="Calendario" />
+      <AppHeader
+        title="Calendario"
+        action={{
+          icon: 'list',
+          label: 'Mis entrenamientos',
+          onPress: () => navigation.navigate('MainTabs', { screen: 'Trainings' } as never),
+        }}
+      />
 
-      <Animated.View style={[styles.head, headStyle]}>
-        <Text style={styles.editorial} numberOfLines={1}>
-          {selectedDayData
-            ? `${LONG_DAY_NAMES[selectedDayData.date.getDay()]} ${selectedDayData.date.getDate()}`
-            : 'Calendario'}
-        </Text>
-        <Text style={styles.editorialMeta}>
-          {selectedDayData ? formatMonthYear(selectedDayData.date) : ''}
-        </Text>
-
-        {/* Week selector */}
-        <View style={styles.week}>
-          {weekDays.map((day) => {
-            const on = selectedDate === day.fullDate;
-            return (
-              <Pressable
-                key={day.fullDate}
-                style={styles.dayCell}
-                onPress={() => handleDayPress(day.fullDate)}
-                accessibilityRole="button"
-                accessibilityState={{ selected: on }}
-                accessibilityLabel={`${day.dayName} ${day.dayNumber}`}
-              >
-                <Text style={[styles.dayName, on && styles.dayNameOn]}>{day.dayName}</Text>
-                <View style={[styles.dayPill, on && styles.dayPillOn]}>
-                  <Text style={[styles.dayNumber, on && styles.dayNumberOn]}>{day.dayNumber}</Text>
-                </View>
-              </Pressable>
-            );
-          })}
-        </View>
-      </Animated.View>
-
-      <Animated.View style={[styles.body, bodyStyle]}>
-        {alreadyScheduled && (
-          <View style={styles.banner}>
-            <Feather name="check-circle" size={18} color={colors.ink} />
-            <Text style={styles.bannerText}>
-              Ya tienes un entrenamiento agendado para este día
-            </Text>
-          </View>
-        )}
-
-        <Text style={styles.sectionLabel}>ENTRENAMIENTOS DISPONIBLES</Text>
-
-        {isLoading ? (
-          <View style={styles.centered}>
-            <ActivityIndicator size="large" color={colors.ink} />
-          </View>
-        ) : error ? (
-          // Inline, beside the block that failed — never an Alert the user has
-          // to dismiss before seeing what went wrong.
-          <View style={styles.errorBlock}>
-            <Feather name="alert-circle" size={18} color={colors.ink} />
-            <View style={styles.errorTexts}>
-              <Text style={styles.errorTitle}>No pudimos cargar los horarios</Text>
-              <Text style={styles.errorDetail}>{error}</Text>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scroll}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={handleRefresh}
+            tintColor={colors.ink}
+          />
+        }
+      >
+        <Animated.View style={[styles.block, headStyle]}>
+          <View style={styles.chipRow}>
+            <View style={styles.chipIcon}>
+              <Feather name="calendar" size={20} color={colors.gray400} />
             </View>
+            <Text style={styles.chipText}>{chip}</Text>
           </View>
-        ) : slots.length === 0 ? (
-          <View style={styles.centered}>
-            <Feather name="calendar" size={28} color={colors.gray400} />
-            <Text style={styles.emptyTitle}>Sin entrenamientos</Text>
-            <Text style={styles.emptyText}>
-              No hay entrenamientos disponibles para este día
-            </Text>
-          </View>
-        ) : (
-          <ScrollView
-            showsVerticalScrollIndicator={false}
-            refreshControl={
-              <RefreshControl
-                refreshing={isRefreshing}
-                onRefresh={handleRefresh}
-                tintColor={colors.ink}
-              />
-            }
-            contentContainerStyle={styles.slotsList}
-          >
-            {slots.map((slot) => (
-              <SlotRow key={slot.id} slot={slot} onPress={() => handleSlotPress(slot)} />
-            ))}
-          </ScrollView>
-        )}
-      </Animated.View>
+
+          <Text style={styles.headline}>¿Listo para reservar tu próximo entrenamiento?</Text>
+        </Animated.View>
+
+        <Animated.View style={headStyle}>
+          <MonthCalendar
+            month={visibleMonth}
+            selectedDate={selectedDate}
+            availableDates={availableDates}
+            loadingAvailability={isLoadingMonth}
+            onSelectDate={handleSelectDate}
+            onChangeMonth={handleChangeMonth}
+          />
+        </Animated.View>
+
+        <Animated.View style={[styles.block, bodyStyle]}>
+          {alreadyScheduled && (
+            <View style={styles.banner}>
+              <Feather name="check-circle" size={18} color={colors.ink} />
+              <Text style={styles.bannerText}>
+                Ya tienes un entrenamiento agendado para este día
+              </Text>
+            </View>
+          )}
+
+          <Text style={styles.sectionTitle}>Entrenamientos disponibles</Text>
+
+          {isLoading ? (
+            <View style={styles.centered}>
+              <ActivityIndicator size="large" color={colors.ink} />
+            </View>
+          ) : error ? (
+            // Inline, beside the block that failed — never an Alert the user has
+            // to dismiss before seeing what went wrong.
+            <View style={styles.errorBlock}>
+              <Feather name="alert-circle" size={18} color={colors.ink} />
+              <View style={styles.errorTexts}>
+                <Text style={styles.errorTitle}>No pudimos cargar los horarios</Text>
+                <Text style={styles.errorDetail}>{error}</Text>
+              </View>
+            </View>
+          ) : slots.length === 0 ? (
+            <View style={styles.centered}>
+              <Feather name="calendar" size={28} color={colors.gray400} />
+              <Text style={styles.emptyTitle}>Sin entrenamientos</Text>
+              <Text style={styles.emptyText}>
+                No hay entrenamientos disponibles para este día
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.slotsList}>
+              {slots.map((slot) => (
+                <SlotRow key={slot.id} slot={slot} onPress={() => handleSlotPress(slot)} />
+              ))}
+            </View>
+          )}
+        </Animated.View>
+      </ScrollView>
     </Screen>
   );
 }
 
+// Every measurement below is taken from the design's "Agendar" screen: a
+// 343-wide container stacked at 24, a 16px gutter, cards at radius 20 with
+// 12/16 padding and a 184 height.
 const styles = StyleSheet.create({
-  head: {
+  scroll: {
     paddingHorizontal: 16,
     paddingTop: 4,
+    paddingBottom: 132,
+    gap: 24,
   },
-  editorial: {
-    fontFamily: typography.fontFamily,
-    fontSize: 34,
-    fontWeight: typography.fontWeight.bold,
-    letterSpacing: -1,
-    color: colors.ink,
+  block: {
+    gap: 12,
   },
-  editorialMeta: {
-    marginTop: 4,
-    fontFamily: typography.fontFamily,
-    fontSize: 14,
-    // gray400 is 5.3:1 on the surface tone. The design's #9D9D9D is 2.7:1.
-    color: colors.gray400,
-  },
-  week: {
+  chipRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 20,
-    marginBottom: 8,
-  },
-  dayCell: {
     alignItems: 'center',
-    gap: 6,
+    gap: 12,
   },
-  dayName: {
-    fontFamily: typography.fontFamily,
-    fontSize: 11,
-    color: colors.gray400,
-  },
-  dayNameOn: {
-    color: colors.ink,
-    fontWeight: typography.fontWeight.semiBold,
-  },
-  dayPill: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: colors.white,
+  chipIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: '#DEDEDE',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  dayPillOn: {
-    backgroundColor: colors.ink,
-  },
-  dayNumber: {
+  chipText: {
     fontFamily: typography.fontFamily,
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: typography.fontWeight.semiBold,
     color: colors.ink,
   },
-  dayNumberOn: {
-    color: colors.white,
-  },
-  body: {
-    flex: 1,
-    paddingHorizontal: 16,
-    paddingTop: 12,
+  headline: {
+    fontFamily: typography.fontFamily,
+    // 36/1.19 with -0.36 tracking, exactly as the design sets it.
+    fontSize: 36,
+    lineHeight: 43,
+    letterSpacing: -0.36,
+    color: colors.ink,
   },
   banner: {
     flexDirection: 'row',
@@ -471,7 +417,6 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     paddingHorizontal: 14,
     paddingVertical: 12,
-    marginBottom: 16,
   },
   bannerText: {
     flex: 1,
@@ -481,20 +426,102 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     color: colors.ink,
   },
-  sectionLabel: {
+  sectionTitle: {
     fontFamily: typography.fontFamily,
-    fontSize: 11,
-    fontWeight: typography.fontWeight.bold,
-    letterSpacing: 1.2,
+    fontSize: 20,
+    fontWeight: typography.fontWeight.semiBold,
+    letterSpacing: -0.2,
+    color: colors.ink,
+  },
+  slotsList: {
+    gap: 12,
+  },
+  slotCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    height: 184,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    backgroundColor: colors.white,
+  },
+  slotCardPressed: {
+    opacity: 0.85,
+  },
+  slotInfo: {
+    flex: 1,
+    height: '100%',
+    justifyContent: 'space-between',
+    paddingRight: 12,
+  },
+  slotHead: {
+    gap: 12,
+  },
+  slotType: {
+    fontFamily: typography.fontFamily,
+    fontSize: 12,
+    // The design's #109D2F, which unlike the brand green holds 4.9:1 on white.
+    color: '#109D2F',
+  },
+  slotTypeFull: {
     color: colors.gray400,
-    marginBottom: 12,
+  },
+  slotDetails: {
+    gap: 4,
+  },
+  slotHour: {
+    fontFamily: typography.fontFamily,
+    fontSize: 20,
+    fontWeight: typography.fontWeight.semiBold,
+    letterSpacing: -0.2,
+    color: colors.ink,
+  },
+  slotDesc: {
+    fontFamily: typography.fontFamily,
+    fontSize: 12,
+    // The design specifies #A5A5A5 — 2.5:1 on white. gray400 keeps the muted
+    // role at 5.3:1.
+    color: colors.gray400,
+  },
+  slotMetas: {
+    gap: 12,
+  },
+  slotMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  slotMetaText: {
+    fontFamily: typography.fontFamily,
+    fontSize: 12,
+    color: colors.gray400,
+  },
+  tile: {
+    width: 113,
+    height: 118,
+    borderRadius: 12,
+    backgroundColor: colors.accentSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  tileFull: {
+    backgroundColor: colors.surface,
+  },
+  tileImage: {
+    width: '100%',
+    height: '100%',
+  },
+  tileImageFull: {
+    // A full slot reads as unavailable at a glance, tile included.
+    opacity: 0.45,
   },
   centered: {
-    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    paddingBottom: 80,
+    paddingVertical: 56,
   },
   emptyTitle: {
     fontFamily: typography.fontFamily,
@@ -530,85 +557,5 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
     color: colors.gray400,
-  },
-  slotsList: {
-    paddingBottom: 100,
-    gap: 12,
-  },
-  slotCard: {
-    gap: 12,
-  },
-  slotTop: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  slotHeadings: {
-    flex: 1,
-    gap: 2,
-  },
-  slotHour: {
-    fontFamily: typography.fontFamily,
-    fontSize: 20,
-    fontWeight: typography.fontWeight.bold,
-    letterSpacing: -0.4,
-    color: colors.ink,
-  },
-  slotMutedStrong: {
-    color: colors.gray400,
-  },
-  slotType: {
-    fontFamily: typography.fontFamily,
-    fontSize: 13,
-    color: colors.gray400,
-  },
-  slotChevron: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  fullBadge: {
-    // Solid ink reads at 16:1. A red-on-pink badge would have been 3:1 and
-    // failed AA at this size.
-    backgroundColor: colors.ink,
-    borderRadius: 100,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-  },
-  fullBadgeText: {
-    fontFamily: typography.fontFamily,
-    fontSize: 10,
-    fontWeight: typography.fontWeight.bold,
-    letterSpacing: 1,
-    color: colors.white,
-  },
-  slotMetaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-  },
-  slotMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-  },
-  slotMetaText: {
-    fontFamily: typography.fontFamily,
-    fontSize: 13,
-    color: colors.gray400,
-  },
-  track: {
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: colors.surface,
-    overflow: 'hidden',
-  },
-  trackFill: {
-    height: '100%',
-    borderRadius: 3,
-    backgroundColor: colors.ink,
   },
 });
