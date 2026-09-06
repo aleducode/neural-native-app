@@ -104,7 +104,8 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: typography.fontSize.lg,
-    fontFamily: typography.fontFamily.semibold,
+    fontFamily: typography.fontFamily,
+    fontWeight: typography.fontWeight.semiBold,
     color: colors.textDark,
     marginBottom: 4,
   },

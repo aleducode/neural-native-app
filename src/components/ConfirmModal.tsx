@@ -148,7 +148,8 @@ const styles = StyleSheet.create({
   },
   cancelButtonText: {
     fontSize: typography.fontSize.md,
-    fontFamily: typography.fontFamily.semibold,
+    fontFamily: typography.fontFamily,
+    fontWeight: typography.fontWeight.semiBold,
     color: colors.textDark,
     textTransform: 'uppercase',
   },
@@ -162,7 +163,8 @@ const styles = StyleSheet.create({
   },
   confirmButtonText: {
     fontSize: typography.fontSize.md,
-    fontFamily: typography.fontFamily.semibold,
+    fontFamily: typography.fontFamily,
+    fontWeight: typography.fontWeight.semiBold,
     color: colors.textDark,
     textTransform: 'uppercase',
   },

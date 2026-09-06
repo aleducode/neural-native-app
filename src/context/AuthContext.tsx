@@ -119,11 +119,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         setUserState(data.user);
 
         // Set user context in Sentry for error tracking
-        setUserContext({
-          id: data.user.id,
-          email: data.user.email,
-          username: data.user.username || data.user.email,
-        });
+        setUserContext({ id: data.user.id, email: data.user.email });
 
         // Save credentials for biometric login if requested
         if (saveForBiometric && biometricAvailable) {
