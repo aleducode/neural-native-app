@@ -56,14 +56,34 @@ function Orb() {
 /**
  * Floating pill navigation, imported from the design.
  *
- * The kit puts four tabs around the orb; this app has five destinations and
- * dropping one would be a product decision, not a visual one — so all five
- * stay and the orb sits among them as a sixth, action slot.
+ * The design's bar holds five slots: four icons around the orb. Community takes
+ * the orb, so it keeps its route but not an icon; the rest sit around it in a
+ * fixed order that does not depend on how the navigator lists its screens.
  */
+const ORB_ROUTE = 'Community';
+
+/**
+ * Left to right, as the bar reads. Anything unlisted falls in at the end.
+ * Home stays in the first slot: that is where every platform puts it and where
+ * a thumb goes back to.
+ */
+const ORDER = ['Home', 'Calendar', 'Trainings', 'Profile'];
 export default function FloatingTabBar({ state, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
 
-  const go = (routeName: string, index: number) => {
+  const tabs = state.routes
+    .map((route, index) => ({ route, index }))
+    .filter(({ route }) => route.name !== ORB_ROUTE)
+    .sort((a, b) => {
+      const ai = ORDER.indexOf(a.route.name);
+      const bi = ORDER.indexOf(b.route.name);
+      return (ai < 0 ? ORDER.length : ai) - (bi < 0 ? ORDER.length : bi);
+    });
+
+  const orbIndex = state.routes.findIndex((r) => r.name === ORB_ROUTE);
+  const orbFocused = state.index === orbIndex;
+
+  const go = (routeName: string, index: number, impact?: Haptics.ImpactFeedbackStyle) => {
     const isFocused = state.index === index;
     const event = navigation.emit({
       type: 'tabPress',
@@ -71,18 +91,21 @@ export default function FloatingTabBar({ state, navigation }: BottomTabBarProps)
       canPreventDefault: true,
     });
     if (!isFocused && !event.defaultPrevented) {
-      Haptics.selectionAsync();
+      if (impact) Haptics.impactAsync(impact);
+      else Haptics.selectionAsync();
       navigation.navigate(routeName);
     }
   };
 
-  const book = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    navigation.navigate('Calendar' as never);
+  // The orb is a tab like the others, so it goes through tabPress and can be
+  // prevented or reset to the stack root the same way.
+  const openOrb = () => {
+    if (orbIndex < 0) return;
+    go(ORB_ROUTE, orbIndex, Haptics.ImpactFeedbackStyle.Medium);
   };
 
-  // The orb sits after the second tab, so the two halves stay balanced.
-  const ORB_AT = 2;
+  // Dead centre of the four remaining icons, as in the design.
+  const ORB_AT = Math.floor(tabs.length / 2);
 
   return (
     <View
@@ -90,20 +113,22 @@ export default function FloatingTabBar({ state, navigation }: BottomTabBarProps)
       pointerEvents="box-none"
     >
       <View style={styles.pill}>
-        {state.routes.map((route, index) => {
+        {tabs.map(({ route, index }, position) => {
           const focused = state.index === index;
           const label = (route.name in ICONS ? route.name : 'Home') as keyof typeof ICONS;
 
           return (
             <React.Fragment key={route.key}>
-              {index === ORB_AT && (
+              {position === ORB_AT && (
                 <Pressable
-                  onPress={book}
+                  onPress={openOrb}
                   style={({ pressed }) => [styles.orb, pressed && styles.orbPressed]}
-                  accessibilityRole="button"
-                  accessibilityLabel="Agendar entrenamiento"
+                  accessibilityRole="tab"
+                  accessibilityState={{ selected: orbFocused }}
+                  accessibilityLabel={TAB_LABELS[ORB_ROUTE]}
                 >
                   <Orb />
+                  {orbFocused && <View style={styles.orbActive} />}
                 </Pressable>
               )}
 
@@ -189,5 +214,15 @@ const styles = StyleSheet.create({
   },
   orbPressed: {
     transform: [{ scale: 0.92 }],
+  },
+  orbActive: {
+    // The other slots say "you are here" by turning lime. The orb is already
+    // lime, so it grows a ring instead.
+    position: 'absolute',
+    width: ORB_SIZE,
+    height: ORB_SIZE,
+    borderRadius: ORB_SIZE / 2,
+    borderWidth: 1.5,
+    borderColor: colors.accent,
   },
 });
