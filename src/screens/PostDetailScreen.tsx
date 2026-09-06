@@ -1,24 +1,34 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   FlatList,
   ActivityIndicator,
-  TouchableOpacity,
+  Pressable,
   Alert,
   Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
+import * as Haptics from 'expo-haptics';
 import { Feather } from '@expo/vector-icons';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  Easing,
+} from 'react-native-reanimated';
 import { useNavigation, useRoute, useFocusEffect, RouteProp } from '@react-navigation/native';
-import { colors, typography, spacing, borderRadius } from '../theme/colors';
+import { useAuth } from '../context/AuthContext';
+import { colors, typography } from '../theme/colors';
 import { Post, Comment, ReactionType, REACTION_ICONS } from '../types/community';
 import { communityApi } from '../api/community';
 import { CommentItem, CommentInput, ReactionBar, TrainingBadge } from '../components/community';
 import FullScreenImage from '../components/community/FullScreenImage';
+import Screen from '../components/ui/Screen';
+import AppHeader from '../components/ui/AppHeader';
 import { RootStackParamList } from '../navigation/RootNavigator';
+import { captureException } from '../utils/sentry';
 
 type PostDetailRouteProp = RouteProp<RootStackParamList, 'PostDetail'>;
 
@@ -26,6 +36,7 @@ export default function PostDetailScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<PostDetailRouteProp>();
   const { postId } = route.params;
+  const { user } = useAuth();
 
   const [post, setPost] = useState<Post | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
@@ -33,18 +44,28 @@ export default function PostDetailScreen() {
   const [isLoadingComments, setIsLoadingComments] = useState(true);
   const [showReactionPicker, setShowReactionPicker] = useState(false);
   const [showFullScreenImage, setShowFullScreenImage] = useState(false);
+  const [commentError, setCommentError] = useState<string | null>(null);
+
+  const intro = useSharedValue(0);
+  useEffect(() => {
+    intro.value = withTiming(1, { duration: 460, easing: Easing.out(Easing.cubic) });
+  }, []);
+  const bodyStyle = useAnimatedStyle(() => ({
+    opacity: intro.value,
+    transform: [{ translateY: (1 - intro.value) * 14 }],
+  }));
 
   const fetchPostAndComments = useCallback(async () => {
     setIsLoading(true);
     setIsLoadingComments(true);
 
-    // Fetch post details (we'll simulate with the feed for now)
-    const feedResponse = await communityApi.getFeed(1);
-    if (feedResponse.data) {
-      const foundPost = feedResponse.data.posts.find((p) => p.id === postId);
-      if (foundPost) {
-        setPost(foundPost);
-      }
+    // The detail endpoint, not page 1 of the feed: a comment notification lands
+    // here on a post that has usually already scrolled off the first page.
+    const { data, error } = await communityApi.getPostDetail(postId);
+    if (data?.post) {
+      setPost(data.post);
+    } else if (error) {
+      captureException(new Error(error), { context: 'communityPostDetail', postId });
     }
     setIsLoading(false);
 
@@ -62,9 +83,7 @@ export default function PostDetailScreen() {
     }, [fetchPostAndComments])
   );
 
-  const handleBack = () => {
-    navigation.goBack();
-  };
+  const isMine = !!user && !!post && post.author.id === user.id;
 
   const handleReactionPress = async (reactionType: ReactionType) => {
     if (!post) return;
@@ -117,11 +136,13 @@ export default function PostDetailScreen() {
 
     if (data) {
       setComments((prev) => [...prev, data]);
+      setCommentError(null);
       if (post) {
         setPost({ ...post, comments_count: post.comments_count + 1 });
       }
     } else if (error) {
-      Alert.alert('Error', 'No se pudo agregar el comentario.');
+      setCommentError('No se pudo agregar el comentario. Intenta de nuevo.');
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     }
   };
 
@@ -144,172 +165,183 @@ export default function PostDetailScreen() {
     ]);
   };
 
+  const deletePost = async () => {
+    const { error } = await communityApi.deletePost(postId);
+
+    if (error) {
+      captureException(new Error(error), { context: 'communityDeletePost', postId });
+      setCommentError('No pudimos eliminar la publicación. Intenta de nuevo.');
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      return;
+    }
+
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    if (navigation.canGoBack?.()) navigation.goBack();
+    else navigation.navigate('MainTabs');
+  };
+
+  // Deleting a post cannot be undone, so the confirmation stays an alert.
+  const handleDeletePost = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    Alert.alert(
+      'Eliminar publicación',
+      '¿Seguro que quieres eliminarla? No se puede deshacer.',
+      [
+        { text: 'Cancelar', style: 'cancel' as const },
+        { text: 'Eliminar', style: 'destructive' as const, onPress: deletePost },
+      ]
+    );
+  };
+
   const renderPostHeader = () => {
     if (!post) return null;
 
     return (
-      <View style={styles.postContainer}>
-        {/* Author Header */}
-        <TouchableOpacity
-          style={styles.authorRow}
-          onPress={() => navigation.navigate('UserProfile', { userId: post.author.id })}
-          activeOpacity={0.7}
-        >
-          {post.author.photo_url ? (
-            <Image source={{ uri: post.author.photo_url }} style={styles.avatar} />
-          ) : (
-            <View style={styles.avatarPlaceholder}>
-              <Text style={styles.avatarText}>{post.author.initials}</Text>
+      <Animated.View style={bodyStyle}>
+        <View style={styles.postCard}>
+          <Pressable
+            style={({ pressed }) => [styles.authorRow, pressed && styles.pressed]}
+            onPress={() => navigation.navigate('UserProfile', { userId: post.author.id })}
+            accessibilityRole="button"
+            accessibilityLabel={`Ver el perfil de ${post.author.name}`}
+          >
+            {post.author.photo_url ? (
+              <Image source={{ uri: post.author.photo_url }} style={styles.avatar} />
+            ) : (
+              <View style={[styles.avatar, styles.avatarFallback]}>
+                <Text style={styles.avatarText}>{post.author.initials}</Text>
+              </View>
+            )}
+            <View style={styles.authorText}>
+              <Text style={styles.authorName} numberOfLines={1}>
+                {post.author.name}
+              </Text>
+              <Text style={styles.timeAgo}>{post.time_ago}</Text>
+            </View>
+          </Pressable>
+
+          {post.content ? <Text style={styles.content}>{post.content}</Text> : null}
+
+          {post.image_url && (
+            <Pressable
+              style={styles.imageWrap}
+              onPress={() => setShowFullScreenImage(true)}
+              accessibilityRole="imagebutton"
+              accessibilityLabel="Ver la foto en pantalla completa"
+            >
+              <Image source={{ uri: post.image_url }} style={styles.image} resizeMode="cover" />
+            </Pressable>
+          )}
+
+          {post.training && <TrainingBadge training={post.training} />}
+
+          {post.reactions_count > 0 && (
+            <View style={styles.summary}>
+              {Object.entries(post.reactions_summary)
+                .filter(([_, count]) => count > 0)
+                .map(([type, count]) => (
+                  <View key={type} style={styles.summaryItem}>
+                    <Feather
+                      name={REACTION_ICONS[type as ReactionType].icon as any}
+                      size={14}
+                      color={colors.gray400}
+                    />
+                    <Text style={styles.summaryCount}>{count}</Text>
+                  </View>
+                ))}
             </View>
           )}
-          <View style={styles.authorInfo}>
-            <Text style={styles.authorName}>{post.author.name}</Text>
-            <Text style={styles.timeAgo}>{post.time_ago}</Text>
+
+          <View style={styles.reactionRow}>
+            <ReactionBar
+              userReaction={post.user_reaction}
+              onReactionPress={handleReactionPress}
+              showPicker={showReactionPicker}
+              onClosePicker={() => setShowReactionPicker(false)}
+              onMainPress={handleMainPress}
+              onMainLongPress={handleMainLongPress}
+            />
           </View>
-        </TouchableOpacity>
-
-        {/* Content */}
-        {post.content ? <Text style={styles.content}>{post.content}</Text> : null}
-
-        {/* Image */}
-        {post.image_url && (
-          <TouchableOpacity
-            activeOpacity={0.9}
-            onPress={() => setShowFullScreenImage(true)}
-          >
-            <Image source={{ uri: post.image_url }} style={styles.postImage} resizeMode="cover" />
-          </TouchableOpacity>
-        )}
-
-        {/* Training Badge */}
-        {post.training && <TrainingBadge training={post.training} />}
-
-        {/* Reactions Summary */}
-        {post.reactions_count > 0 && (
-          <View style={styles.reactionsSummary}>
-            {Object.entries(post.reactions_summary)
-              .filter(([_, count]) => count > 0)
-              .map(([type, count]) => (
-                <View key={type} style={styles.reactionSummaryItem}>
-                  <Feather
-                    name={REACTION_ICONS[type as ReactionType].icon as any}
-                    size={16}
-                    color={colors.gray400}
-                  />
-                  <Text style={styles.reactionCount}>{count}</Text>
-                </View>
-              ))}
-          </View>
-        )}
-
-        {/* Reaction Bar */}
-        <View style={styles.reactionBarContainer}>
-          <ReactionBar
-            userReaction={post.user_reaction}
-            onReactionPress={handleReactionPress}
-            showPicker={showReactionPicker}
-            onClosePicker={() => setShowReactionPicker(false)}
-            onMainPress={handleMainPress}
-            onMainLongPress={handleMainLongPress}
-          />
         </View>
 
-        {/* Comments Header */}
-        <View style={styles.commentsHeader}>
-          <Text style={styles.commentsTitle}>
-            Comentarios ({post.comments_count})
-          </Text>
-        </View>
-      </View>
+        <Text style={styles.commentsTitle}>
+          {post.comments_count > 0 ? `Comentarios (${post.comments_count})` : 'Comentarios'}
+        </Text>
+      </Animated.View>
     );
   };
 
   const renderComment = ({ item }: { item: Comment }) => (
-    <View style={styles.commentItemContainer}>
-      <CommentItem
-        comment={item}
-        onDelete={item.is_mine ? () => handleDeleteComment(item.id) : undefined}
-      />
-    </View>
+    <CommentItem
+      comment={item}
+      onDelete={item.is_mine ? () => handleDeleteComment(item.id) : undefined}
+    />
   );
 
   const renderEmptyComments = () => (
     <View style={styles.emptyComments}>
-      <Feather name="message-circle" size={48} color={colors.gray400} />
-      <Text style={styles.emptyCommentsText}>Sin comentarios aún</Text>
-      <Text style={styles.emptyCommentsSubtext}>Sé el primero en comentar</Text>
+      <Feather name="message-circle" size={22} color={colors.gray400} />
+      <Text style={styles.emptyCommentsTitle}>Sin comentarios aún</Text>
+      <Text style={styles.emptyCommentsText}>Sé el primero en comentar.</Text>
     </View>
   );
 
   if (isLoading) {
     return (
-      <View style={styles.container}>
-        <SafeAreaView style={styles.safeArea}>
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={colors.primary} />
-          </View>
-        </SafeAreaView>
-      </View>
+      <Screen wash>
+        <AppHeader title="Publicación" />
+        <View style={styles.centered}>
+          <ActivityIndicator size="large" color={colors.ink} />
+        </View>
+      </Screen>
     );
   }
 
   if (!post) {
     return (
-      <View style={styles.container}>
-        <SafeAreaView style={styles.safeArea}>
-          <View style={styles.header}>
-            <TouchableOpacity onPress={handleBack} style={styles.backButton}>
-              <Feather name="arrow-left" size={24} color={colors.white} />
-            </TouchableOpacity>
-            <Text style={styles.headerTitle}>Publicación</Text>
-            <View style={styles.headerSpacer} />
-          </View>
-          <View style={styles.errorContainer}>
-            <Text style={styles.errorText}>No se encontró la publicación</Text>
-          </View>
-        </SafeAreaView>
-      </View>
+      <Screen wash>
+        <AppHeader title="Publicación" />
+        <View style={styles.centered}>
+          <Feather name="alert-circle" size={24} color={colors.gray400} />
+          <Text style={styles.errorTitle}>No se encontró la publicación</Text>
+          <Text style={styles.errorText}>
+            Es posible que su autor la haya eliminado.
+          </Text>
+        </View>
+      </Screen>
     );
   }
 
   return (
-    <View style={styles.container}>
-      {/* Background Gradients */}
-      <View style={styles.backgroundContainer}>
-        <LinearGradient
-          colors={['rgba(69, 255, 183, 0.15)', 'transparent']}
-          style={styles.gradientTop}
+    <Screen wash>
+      <AppHeader
+        title="Publicación"
+        action={
+          isMine
+            ? { icon: 'trash-2', label: 'Eliminar publicación', onPress: handleDeletePost }
+            : undefined
+        }
+      />
+
+      <FlatList
+        data={comments}
+        keyExtractor={(item) => item.id.toString()}
+        renderItem={renderComment}
+        ListHeaderComponent={renderPostHeader}
+        ListEmptyComponent={isLoadingComments ? null : renderEmptyComments}
+        contentContainerStyle={styles.listContent}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      />
+
+      <SafeAreaView edges={['bottom']} style={styles.inputBar}>
+        <CommentInput
+          onSubmit={handleAddComment}
+          error={commentError ?? undefined}
+          onChangeContent={() => commentError && setCommentError(null)}
         />
-      </View>
-
-      <SafeAreaView style={styles.safeArea} edges={['top']}>
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity onPress={handleBack} style={styles.backButton}>
-            <Feather name="arrow-left" size={24} color={colors.white} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Publicación</Text>
-          <View style={styles.headerSpacer} />
-        </View>
-
-        {/* Comments List with Post as Header */}
-        <FlatList
-          data={comments}
-          keyExtractor={(item) => item.id.toString()}
-          renderItem={renderComment}
-          ListHeaderComponent={renderPostHeader}
-          ListEmptyComponent={isLoadingComments ? null : renderEmptyComments}
-          contentContainerStyle={styles.listContent}
-          showsVerticalScrollIndicator={false}
-        />
-
-        {/* Comment Input */}
-        <SafeAreaView edges={['bottom']} style={styles.commentInputSafeArea}>
-          <CommentInput onSubmit={handleAddComment} />
-        </SafeAreaView>
       </SafeAreaView>
 
-      {/* Full Screen Image Modal */}
       {post.image_url && (
         <FullScreenImage
           visible={showFullScreenImage}
@@ -317,183 +349,142 @@ export default function PostDetailScreen() {
           onClose={() => setShowFullScreenImage(false)}
         />
       )}
-    </View>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  centered: {
     flex: 1,
-    backgroundColor: colors.bgDark,
-  },
-  safeArea: {
-    flex: 1,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
     alignItems: 'center',
-  },
-  errorContainer: {
-    flex: 1,
     justifyContent: 'center',
-    alignItems: 'center',
+    paddingHorizontal: 32,
+    gap: 8,
+  },
+  errorTitle: {
+    fontFamily: typography.fontFamily,
+    fontSize: 20,
+    fontWeight: typography.fontWeight.semiBold,
+    letterSpacing: -0.4,
+    color: colors.ink,
+    textAlign: 'center',
   },
   errorText: {
-    fontSize: typography.fontSize.lg,
     fontFamily: typography.fontFamily,
+    fontSize: 14,
     color: colors.gray400,
-  },
-  backgroundContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-  },
-  gradientTop: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 300,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.gray600,
-  },
-  backButton: {
-    padding: spacing.xs,
-  },
-  headerTitle: {
-    fontSize: typography.fontSize.lg,
-    fontFamily: typography.fontFamily,
-    fontWeight: typography.fontWeight.semiBold,
-    color: colors.white,
-  },
-  headerSpacer: {
-    width: 40,
+    textAlign: 'center',
   },
   listContent: {
-    paddingBottom: spacing.xl,
+    paddingHorizontal: 16,
+    paddingBottom: 24,
   },
-  postContainer: {
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.lg,
+  postCard: {
+    backgroundColor: colors.white,
+    borderRadius: 20,
+    padding: 16,
+    gap: 14,
+  },
+  pressed: {
+    opacity: 0.7,
   },
   authorRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: spacing.md,
+    gap: 12,
   },
   avatar: {
     width: 48,
     height: 48,
     borderRadius: 24,
   },
-  avatarPlaceholder: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: colors.primary,
+  avatarFallback: {
+    backgroundColor: colors.ink,
     alignItems: 'center',
     justifyContent: 'center',
   },
   avatarText: {
-    fontSize: typography.fontSize.md,
     fontFamily: typography.fontFamily,
+    fontSize: 16,
     fontWeight: typography.fontWeight.bold,
-    color: colors.textDark,
+    color: colors.white,
   },
-  authorInfo: {
-    marginLeft: spacing.md,
+  authorText: {
+    flex: 1,
+    gap: 2,
   },
   authorName: {
-    fontSize: typography.fontSize.md,
     fontFamily: typography.fontFamily,
+    fontSize: 16,
     fontWeight: typography.fontWeight.semiBold,
-    color: colors.white,
+    color: colors.ink,
   },
   timeAgo: {
-    fontSize: typography.fontSize.sm,
     fontFamily: typography.fontFamily,
+    fontSize: 12,
     color: colors.gray400,
-    marginTop: 2,
   },
   content: {
-    fontSize: typography.fontSize.md,
     fontFamily: typography.fontFamily,
-    fontWeight: typography.fontWeight.regular,
-    color: colors.white,
-    lineHeight: 22,
-    marginBottom: spacing.md,
+    fontSize: 16,
+    lineHeight: 24,
+    color: colors.ink,
   },
-  postImage: {
+  imageWrap: {
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  image: {
     width: '100%',
-    height: 250,
-    borderRadius: borderRadius.lg,
-    marginBottom: spacing.md,
+    height: 260,
   },
-  reactionsSummary: {
-    flexDirection: 'row',
-    marginBottom: spacing.md,
-    gap: spacing.md,
-  },
-  reactionSummaryItem: {
+  summary: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.xs,
+    gap: 14,
   },
-  reactionCount: {
-    fontSize: typography.fontSize.sm,
+  summaryItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  summaryCount: {
     fontFamily: typography.fontFamily,
+    fontSize: 12,
+    fontWeight: typography.fontWeight.medium,
     color: colors.gray400,
   },
-  reactionBarContainer: {
+  reactionRow: {
+    paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: colors.gray600,
-    paddingTop: spacing.md,
-  },
-  commentsHeader: {
-    marginTop: spacing.xl,
-    paddingBottom: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.gray600,
+    borderTopColor: colors.surface,
   },
   commentsTitle: {
-    fontSize: typography.fontSize.lg,
+    marginTop: 24,
+    marginBottom: 12,
     fontFamily: typography.fontFamily,
-    fontWeight: typography.fontWeight.semiBold,
-    color: colors.white,
-  },
-  commentItemContainer: {
-    paddingHorizontal: spacing.lg,
-    backgroundColor: colors.cardDark,
+    fontSize: 20,
+    fontWeight: typography.fontWeight.bold,
+    letterSpacing: -0.5,
+    color: colors.ink,
   },
   emptyComments: {
     alignItems: 'center',
-    paddingVertical: spacing.xxl,
-    paddingHorizontal: spacing.lg,
+    gap: 6,
+    paddingVertical: 32,
+  },
+  emptyCommentsTitle: {
+    fontFamily: typography.fontFamily,
+    fontSize: 16,
+    fontWeight: typography.fontWeight.semiBold,
+    color: colors.ink,
   },
   emptyCommentsText: {
-    fontSize: typography.fontSize.lg,
     fontFamily: typography.fontFamily,
-    fontWeight: typography.fontWeight.semiBold,
-    color: colors.white,
-    marginTop: spacing.md,
-  },
-  emptyCommentsSubtext: {
-    fontSize: typography.fontSize.md,
-    fontFamily: typography.fontFamily,
+    fontSize: 14,
     color: colors.gray400,
-    marginTop: spacing.xs,
   },
-  commentInputSafeArea: {
-    backgroundColor: colors.cardDark,
+  inputBar: {
+    backgroundColor: colors.white,
   },
 });

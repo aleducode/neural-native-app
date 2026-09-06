@@ -1,13 +1,8 @@
 import React from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  Pressable,
-  Modal,
-} from 'react-native';
+import { View, Text, StyleSheet, Pressable, Modal } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { Feather } from '@expo/vector-icons';
-import { colors, typography, spacing, borderRadius } from '../../theme/colors';
+import { colors, typography } from '../../theme/colors';
 import { ReactionType, REACTION_ICONS, REACTION_LABELS } from '../../types/community';
 
 interface ReactionBarProps {
@@ -21,31 +16,6 @@ interface ReactionBarProps {
 
 const REACTION_TYPES: ReactionType[] = ['fire', 'muscle', 'clap', 'heart'];
 
-interface ReactionButtonProps {
-  type: ReactionType;
-  isActive: boolean;
-  onPress: () => void;
-}
-
-function ReactionButton({ type, isActive, onPress }: ReactionButtonProps) {
-  return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.reactionButton,
-        isActive && styles.reactionButtonActive,
-        pressed && styles.reactionButtonPressed,
-      ]}
-    >
-      <Feather
-        name={REACTION_ICONS[type].icon as any}
-        size={18}
-        color={isActive ? colors.primary : colors.gray400}
-      />
-    </Pressable>
-  );
-}
-
 interface PickerReactionButtonProps {
   type: ReactionType;
   isActive: boolean;
@@ -57,55 +27,94 @@ function PickerReactionButton({ type, isActive, label, onPress }: PickerReaction
   return (
     <Pressable
       onPress={onPress}
-      style={({ pressed }) => [
-        styles.pickerButton,
-        isActive && styles.pickerButtonActive,
-        pressed && styles.pickerButtonPressed,
-      ]}
+      style={({ pressed }) => [styles.pickerButton, pressed && styles.pressed]}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ selected: isActive }}
     >
-      <View style={[styles.pickerIconContainer, isActive && styles.pickerIconContainerActive]}>
+      <View style={[styles.pickerIcon, isActive && styles.pickerIconActive]}>
         <Feather
           name={REACTION_ICONS[type].icon as any}
-          size={28}
-          color={isActive ? colors.primary : colors.white}
+          size={24}
+          color={isActive ? colors.accentDeep : colors.ink}
         />
       </View>
-      <Text style={styles.pickerLabel}>{label}</Text>
+      <Text style={[styles.pickerLabel, isActive && styles.pickerLabelActive]}>{label}</Text>
     </Pressable>
   );
 }
 
+/**
+ * One reaction control plus the picker behind it.
+ *
+ * The bar used to show four always-on icon buttons and declare `onMainPress` /
+ * `onMainLongPress` without ever reading them, so every long-press path its
+ * callers had written was dead. Now the pill is the main control — tap to
+ * react, hold to choose — and the chevron opens the same picker with a plain
+ * tap, so the choice is reachable without knowing the gesture.
+ */
 export default function ReactionBar({
   userReaction,
   onReactionPress,
   showPicker,
   onClosePicker,
+  onMainPress,
+  onMainLongPress,
 }: ReactionBarProps) {
+  const handleMainPress = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    onMainPress();
+  };
+
+  const handleOpenPicker = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    onMainLongPress();
+  };
+
+  // A neutral face for "no reaction yet": the fire icon already means fuego,
+  // so reusing it here would read as an active reaction.
+  const icon = userReaction ? REACTION_ICONS[userReaction].icon : 'smile';
+  const label = userReaction ? REACTION_LABELS[userReaction] : 'Reaccionar';
+
   return (
     <View style={styles.container}>
-      {/* Reaction Buttons */}
-      <View style={styles.reactionButtons}>
-        {REACTION_TYPES.map((type) => (
-          <ReactionButton
-            key={type}
-            type={type}
-            isActive={userReaction === type}
-            onPress={() => onReactionPress(type)}
-          />
-        ))}
-      </View>
-
-      {/* Reaction Picker Modal */}
-      <Modal
-        visible={showPicker}
-        transparent
-        animationType="fade"
-        onRequestClose={onClosePicker}
+      <Pressable
+        onPress={handleMainPress}
+        onLongPress={handleOpenPicker}
+        delayLongPress={240}
+        style={({ pressed }) => [
+          styles.main,
+          !!userReaction && styles.mainActive,
+          pressed && styles.pressed,
+        ]}
+        accessibilityRole="button"
+        accessibilityLabel={label}
+        accessibilityHint="Mantén presionado para elegir otra reacción"
+        accessibilityState={{ selected: !!userReaction }}
       >
+        <Feather
+          name={icon as any}
+          size={16}
+          color={userReaction ? colors.accentDeep : colors.ink}
+        />
+        <Text style={[styles.mainLabel, !!userReaction && styles.mainLabelActive]}>{label}</Text>
+      </Pressable>
+
+      <Pressable
+        onPress={handleOpenPicker}
+        style={({ pressed }) => [styles.more, pressed && styles.pressed]}
+        hitSlop={8}
+        accessibilityRole="button"
+        accessibilityLabel="Elegir reacción"
+      >
+        <Feather name="chevron-up" size={16} color={colors.gray400} />
+      </Pressable>
+
+      <Modal visible={showPicker} transparent animationType="fade" onRequestClose={onClosePicker}>
         <Pressable style={styles.pickerOverlay} onPress={onClosePicker}>
-          <View style={styles.pickerContainer}>
+          <View style={styles.pickerCard}>
             <Text style={styles.pickerTitle}>Reaccionar</Text>
-            <View style={styles.pickerButtons}>
+            <View style={styles.pickerRow}>
               {REACTION_TYPES.map((type) => (
                 <PickerReactionButton
                   key={type}
@@ -113,6 +122,7 @@ export default function ReactionBar({
                   isActive={userReaction === type}
                   label={REACTION_LABELS[type]}
                   onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                     onReactionPress(type);
                     onClosePicker();
                   }}
@@ -130,86 +140,89 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 6,
   },
-  reactionButtons: {
+  main: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
+    gap: 8,
+    height: 36,
+    paddingHorizontal: 14,
+    borderRadius: 18,
+    backgroundColor: colors.surface,
   },
-  reactionButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+  mainActive: {
+    backgroundColor: colors.accentSoft,
+  },
+  mainLabel: {
+    fontFamily: typography.fontFamily,
+    fontSize: 13,
+    fontWeight: typography.fontWeight.semiBold,
+    color: colors.ink,
+  },
+  mainLabelActive: {
+    color: colors.accentDeep,
+  },
+  more: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    backgroundColor: colors.surface,
   },
-  reactionButtonActive: {
-    backgroundColor: 'rgba(90, 107, 255, 0.15)',
-    borderColor: 'rgba(90, 107, 255, 0.3)',
-  },
-  reactionButtonPressed: {
+  pressed: {
     opacity: 0.7,
   },
   pickerOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(17, 17, 17, 0.35)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: spacing.xxl,
+    padding: 24,
   },
-  pickerContainer: {
-    backgroundColor: colors.cardDark,
-    borderRadius: borderRadius.xl,
-    padding: spacing.xxl,
+  pickerCard: {
     width: '100%',
-    maxWidth: 320,
+    maxWidth: 340,
+    backgroundColor: colors.white,
+    borderRadius: 24,
+    padding: 20,
+    gap: 20,
   },
   pickerTitle: {
-    fontSize: typography.fontSize.lg,
     fontFamily: typography.fontFamily,
+    fontSize: 20,
     fontWeight: typography.fontWeight.bold,
-    color: colors.white,
-    textAlign: 'center',
-    marginBottom: spacing.xl,
+    letterSpacing: -0.4,
+    color: colors.ink,
   },
-  pickerButtons: {
+  pickerRow: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
+    justifyContent: 'space-between',
   },
   pickerButton: {
     alignItems: 'center',
-    padding: spacing.md,
-    borderRadius: borderRadius.md,
-    minWidth: 70,
+    gap: 8,
+    flex: 1,
   },
-  pickerButtonActive: {
-    backgroundColor: 'rgba(90, 107, 255, 0.15)',
-  },
-  pickerButtonPressed: {
-    opacity: 0.7,
-  },
-  pickerIconContainer: {
+  pickerIcon: {
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: spacing.sm,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    backgroundColor: colors.surface,
   },
-  pickerIconContainerActive: {
-    backgroundColor: 'rgba(90, 107, 255, 0.15)',
-    borderColor: 'rgba(90, 107, 255, 0.3)',
+  pickerIconActive: {
+    backgroundColor: colors.accentSoft,
   },
   pickerLabel: {
-    fontSize: typography.fontSize.xs,
     fontFamily: typography.fontFamily,
-    fontWeight: typography.fontWeight.medium,
+    fontSize: 12,
     color: colors.gray400,
+  },
+  pickerLabelActive: {
+    color: colors.ink,
+    fontWeight: typography.fontWeight.semiBold,
   },
 });

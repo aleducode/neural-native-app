@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,19 +6,31 @@ import {
   FlatList,
   RefreshControl,
   ActivityIndicator,
-  TouchableOpacity,
+  Pressable,
   Alert,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import * as Haptics from 'expo-haptics';
 import { Feather } from '@expo/vector-icons';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  withDelay,
+  Easing,
+} from 'react-native-reanimated';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
-import { colors, typography, spacing, borderRadius } from '../theme/colors';
+import { useAuth } from '../context/AuthContext';
+import { colors, typography } from '../theme/colors';
 import { Post, ReactionType } from '../types/community';
 import { communityApi } from '../api/community';
 import { PostCard } from '../components/community';
+import Screen from '../components/ui/Screen';
+import PrimaryButton from '../components/ui/PrimaryButton';
+import { captureException } from '../utils/sentry';
 
 export default function CommunityScreen() {
   const navigation = useNavigation<any>();
+  const { user } = useAuth();
 
   const [posts, setPosts] = useState<Post[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -26,6 +38,22 @@ export default function CommunityScreen() {
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
+  // Feed and delete failures are shown in the screen, not in an alert the user
+  // has to dismiss before they can see the feed again.
+  const [feedError, setFeedError] = useState<string | null>(null);
+
+  const intro = useSharedValue(0);
+  useEffect(() => {
+    intro.value = withTiming(1, { duration: 460, easing: Easing.out(Easing.cubic) });
+  }, []);
+
+  const headerStyle = useAnimatedStyle(() => ({
+    opacity: intro.value,
+    transform: [{ translateY: (1 - intro.value) * 14 }],
+  }));
+  const listStyle = useAnimatedStyle(() => ({
+    opacity: withDelay(90, withTiming(intro.value, { duration: 400 })),
+  }));
 
   const fetchPosts = useCallback(async (page: number = 1, refresh: boolean = false) => {
     if (refresh) {
@@ -46,8 +74,10 @@ export default function CommunityScreen() {
       }
       setCurrentPage(page);
       setHasMore(data.has_more);
+      setFeedError(null);
     } else if (error) {
       console.error('Error fetching feed:', error);
+      setFeedError('No pudimos cargar la comunidad. Desliza para reintentar.');
     }
 
     setIsLoading(false);
@@ -115,40 +145,76 @@ export default function CommunityScreen() {
   };
 
   const handleCreatePost = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     navigation.navigate('CreatePost');
   };
 
+  const deletePost = async (postId: number) => {
+    const { error } = await communityApi.deletePost(postId);
+
+    if (error) {
+      captureException(new Error(error), { context: 'communityDeletePost', postId });
+      setFeedError('No pudimos eliminar la publicación. Intenta de nuevo.');
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      return;
+    }
+
+    setPosts((prev) => prev.filter((p) => p.id !== postId));
+    setFeedError(null);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  };
+
+  // Only reachable on your own posts, and deleting one cannot be undone, so
+  // this alert stays.
   const handleOptionsPress = (post: Post) => {
-    // TODO: Show options menu (delete if own post, report, etc.)
-    Alert.alert('Opciones', 'Próximamente');
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    Alert.alert(
+      'Eliminar publicación',
+      '¿Seguro que quieres eliminarla? No se puede deshacer.',
+      [
+        { text: 'Cancelar', style: 'cancel' as const },
+        {
+          text: 'Eliminar',
+          style: 'destructive' as const,
+          onPress: () => deletePost(post.id),
+        },
+      ]
+    );
   };
 
   const handleAuthorPress = (authorId: number) => {
     navigation.navigate('UserProfile', { userId: authorId });
   };
 
-  const renderPost = ({ item }: { item: Post }) => (
-    <PostCard
-      post={item}
-      onPress={() => handlePostPress(item)}
-      onReaction={(type) => handleReaction(item.id, type)}
-      onOptionsPress={() => handleOptionsPress(item)}
-      onAuthorPress={() => handleAuthorPress(item.author.id)}
-    />
-  );
+  const renderPost = ({ item }: { item: Post }) => {
+    const isMine = !!user && item.author.id === user.id;
+
+    return (
+      <PostCard
+        post={item}
+        onPress={() => handlePostPress(item)}
+        onReaction={(type) => handleReaction(item.id, type)}
+        onOptionsPress={isMine ? () => handleOptionsPress(item) : undefined}
+        onAuthorPress={() => handleAuthorPress(item.author.id)}
+      />
+    );
+  };
 
   const renderEmptyState = () => (
-    <View style={styles.emptyContainer}>
-      <View style={styles.emptyIconContainer}>
-        <Feather name="users" size={56} color={colors.gray400} />
+    <View style={styles.empty}>
+      <View style={styles.emptyIcon}>
+        <Feather name="users" size={28} color={colors.ink} />
       </View>
-      <Text style={styles.emptyTitle}>Sin publicaciones</Text>
-      <Text style={styles.emptySubtitle}>
-        Sé el primero en compartir algo con la comunidad Neural
+      <Text style={styles.emptyTitle}>Todavía no hay nada por acá</Text>
+      <Text style={styles.emptyText}>
+        Sé el primero en compartir algo con la comunidad Neural.
       </Text>
-      <TouchableOpacity style={styles.emptyButton} onPress={handleCreatePost}>
-        <Text style={styles.emptyButtonText}>Crear publicación</Text>
-      </TouchableOpacity>
+      <PrimaryButton
+        label="Crear publicación"
+        onPress={handleCreatePost}
+        icon="arrow-right"
+        style={styles.emptyCta}
+      />
     </View>
   );
 
@@ -156,32 +222,30 @@ export default function CommunityScreen() {
     if (!isLoadingMore) return null;
     return (
       <View style={styles.footerLoader}>
-        <ActivityIndicator size="small" color={colors.primary} />
+        <ActivityIndicator size="small" color={colors.ink} />
       </View>
     );
   };
 
   if (isLoading) {
     return (
-      <View style={styles.container}>
-        <SafeAreaView style={styles.safeArea}>
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={colors.primary} />
-          </View>
-        </SafeAreaView>
-      </View>
+      <Screen wash>
+        <View style={styles.loading}>
+          <ActivityIndicator size="large" color={colors.ink} />
+        </View>
+      </Screen>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <SafeAreaView style={styles.safeArea} edges={['top']}>
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Comunidad</Text>
-        </View>
+    <Screen wash>
+      <Animated.View style={[styles.header, headerStyle]}>
+        <Text style={styles.title}>Comunidad</Text>
+        <Text style={styles.subtitle}>Lo que está entrenando la gente de Neural.</Text>
+        {!!feedError && <Text style={styles.error}>{feedError}</Text>}
+      </Animated.View>
 
-        {/* Feed */}
+      <Animated.View style={[styles.flex, listStyle]}>
         <FlatList
           data={posts}
           keyExtractor={(item) => item.id.toString()}
@@ -197,126 +261,132 @@ export default function CommunityScreen() {
             <RefreshControl
               refreshing={isRefreshing}
               onRefresh={handleRefresh}
-              tintColor={colors.primary}
+              tintColor={colors.ink}
             />
           }
           onEndReached={handleLoadMore}
           onEndReachedThreshold={0.5}
         />
+      </Animated.View>
 
-        {/* FAB - Create Post */}
-        <TouchableOpacity
-          style={styles.fab}
-          onPress={handleCreatePost}
-          activeOpacity={0.85}
-        >
-          <Feather name="plus" size={24} color={colors.white} />
-        </TouchableOpacity>
-      </SafeAreaView>
-    </View>
+      <Pressable
+        style={({ pressed }) => [styles.fab, pressed && styles.fabPressed]}
+        onPress={handleCreatePost}
+        accessibilityRole="button"
+        accessibilityLabel="Crear publicación"
+      >
+        <Feather name="plus" size={18} color={colors.white} />
+        <Text style={styles.fabLabel}>Publicar</Text>
+      </Pressable>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.bgDark,
-  },
-  safeArea: {
+  flex: {
     flex: 1,
   },
-  loadingContainer: {
+  loading: {
     flex: 1,
-    justifyContent: 'center',
     alignItems: 'center',
+    justifyContent: 'center',
   },
   header: {
-    paddingHorizontal: spacing.xxl,
-    paddingTop: spacing.xl,
-    paddingBottom: spacing.lg,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 20,
+    gap: 6,
   },
-  headerTitle: {
-    fontSize: typography.fontSize.xxxl,
+  title: {
     fontFamily: typography.fontFamily,
+    fontSize: 34,
     fontWeight: typography.fontWeight.bold,
-    color: colors.white,
-    letterSpacing: -0.5,
+    letterSpacing: -1,
+    color: colors.ink,
+  },
+  subtitle: {
+    fontFamily: typography.fontFamily,
+    fontSize: 15,
+    lineHeight: 21,
+    color: colors.gray400,
+  },
+  error: {
+    marginTop: 4,
+    fontFamily: typography.fontFamily,
+    fontSize: 13,
+    color: colors.error,
   },
   listContent: {
-    paddingHorizontal: spacing.xxl,
-    paddingBottom: 140,
+    paddingHorizontal: 16,
+    paddingBottom: 160,
   },
   listContentEmpty: {
-    flex: 1,
+    flexGrow: 1,
+    justifyContent: 'center',
   },
-  emptyContainer: {
-    flex: 1,
+  empty: {
+    alignItems: 'flex-start',
+    backgroundColor: colors.white,
+    borderRadius: 20,
+    padding: 20,
+    gap: 10,
+  },
+  emptyIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: colors.accentSoft,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: spacing.xxl,
-  },
-  emptyIconContainer: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    backgroundColor: 'rgba(255, 255, 255, 0.03)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.xxl,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.06)',
+    marginBottom: 6,
   },
   emptyTitle: {
-    fontSize: typography.fontSize.xxl,
     fontFamily: typography.fontFamily,
+    fontSize: 22,
     fontWeight: typography.fontWeight.bold,
-    color: colors.white,
-    marginBottom: spacing.md,
-    letterSpacing: -0.3,
+    letterSpacing: -0.6,
+    color: colors.ink,
   },
-  emptySubtitle: {
-    fontSize: typography.fontSize.md,
+  emptyText: {
     fontFamily: typography.fontFamily,
-    fontWeight: typography.fontWeight.regular,
+    fontSize: 14,
+    lineHeight: 20,
     color: colors.gray400,
-    textAlign: 'center',
-    lineHeight: 24,
-    marginBottom: spacing.xxl,
-    letterSpacing: -0.1,
   },
-  emptyButton: {
-    backgroundColor: colors.primary,
-    paddingHorizontal: spacing.xxl,
-    paddingVertical: spacing.lg,
-    borderRadius: borderRadius.full,
-    minWidth: 180,
-    alignItems: 'center',
-  },
-  emptyButtonText: {
-    fontSize: typography.fontSize.md,
-    fontFamily: typography.fontFamily,
-    fontWeight: typography.fontWeight.semiBold,
-    color: colors.white,
-    letterSpacing: -0.1,
+  emptyCta: {
+    alignSelf: 'stretch',
+    marginTop: 10,
   },
   footerLoader: {
-    paddingVertical: spacing.xxl,
+    paddingVertical: 24,
     alignItems: 'center',
   },
   fab: {
     position: 'absolute',
+    // Clears the tab bar.
     bottom: 100,
-    right: spacing.xxl,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: colors.primary,
+    right: 16,
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    elevation: 8,
+    gap: 8,
+    height: 52,
+    paddingHorizontal: 20,
+    borderRadius: 26,
+    backgroundColor: colors.ink,
+    shadowColor: colors.ink,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.2,
+    shadowRadius: 18,
+    elevation: 6,
+  },
+  fabPressed: {
+    transform: [{ scale: 0.98 }],
+    opacity: 0.92,
+  },
+  fabLabel: {
+    fontFamily: typography.fontFamily,
+    fontSize: 15,
+    fontWeight: typography.fontWeight.semiBold,
+    color: colors.white,
   },
 });

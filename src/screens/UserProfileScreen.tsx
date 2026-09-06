@@ -1,22 +1,30 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   ActivityIndicator,
-  TouchableOpacity,
+  Pressable,
   Image,
   Linking,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
+import * as Haptics from 'expo-haptics';
 import { Feather } from '@expo/vector-icons';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  withDelay,
+  Easing,
+} from 'react-native-reanimated';
 import { useNavigation, useRoute, useFocusEffect, RouteProp } from '@react-navigation/native';
-import { colors, typography, spacing, borderRadius } from '../theme/colors';
+import { colors, typography } from '../theme/colors';
 import { communityApi, UserPublicProfile } from '../api/community';
 import { PostCard } from '../components/community';
 import { ReactionType } from '../types/community';
+import Screen from '../components/ui/Screen';
+import AppHeader from '../components/ui/AppHeader';
 import { RootStackParamList } from '../navigation/RootNavigator';
 
 type UserProfileRouteProp = RouteProp<RootStackParamList, 'UserProfile'>;
@@ -28,6 +36,19 @@ export default function UserProfileScreen() {
 
   const [profile, setProfile] = useState<UserPublicProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  const intro = useSharedValue(0);
+  useEffect(() => {
+    intro.value = withTiming(1, { duration: 460, easing: Easing.out(Easing.cubic) });
+  }, []);
+  const headerStyle = useAnimatedStyle(() => ({
+    opacity: intro.value,
+    transform: [{ translateY: (1 - intro.value) * 14 }],
+  }));
+  const bodyStyle = useAnimatedStyle(() => ({
+    opacity: withDelay(90, withTiming(intro.value, { duration: 400 })),
+    transform: [{ translateY: withDelay(90, withTiming((1 - intro.value) * 14, { duration: 400 })) }],
+  }));
 
   const fetchProfile = useCallback(async () => {
     setIsLoading(true);
@@ -44,12 +65,9 @@ export default function UserProfileScreen() {
     }, [fetchProfile])
   );
 
-  const handleBack = () => {
-    navigation.goBack();
-  };
-
   const handleInstagramPress = () => {
     if (profile?.instagram) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       const username = profile.instagram.replace('@', '');
       Linking.openURL(`https://instagram.com/${username}`);
     }
@@ -102,109 +120,86 @@ export default function UserProfileScreen() {
 
   if (isLoading) {
     return (
-      <View style={styles.container}>
-        <SafeAreaView style={styles.safeArea}>
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={colors.primary} />
-          </View>
-        </SafeAreaView>
-      </View>
+      <Screen wash>
+        <AppHeader title="Perfil" />
+        <View style={styles.centered}>
+          <ActivityIndicator size="large" color={colors.ink} />
+        </View>
+      </Screen>
     );
   }
 
   if (!profile) {
     return (
-      <View style={styles.container}>
-        <SafeAreaView style={styles.safeArea}>
-          <View style={styles.header}>
-            <TouchableOpacity onPress={handleBack} style={styles.backButton}>
-              <Feather name="arrow-left" size={24} color={colors.white} />
-            </TouchableOpacity>
-            <Text style={styles.headerTitle}>Perfil</Text>
-            <View style={styles.headerSpacer} />
-          </View>
-          <View style={styles.errorContainer}>
-            <Text style={styles.errorText}>No se encontró el perfil</Text>
-          </View>
-        </SafeAreaView>
-      </View>
+      <Screen wash>
+        <AppHeader title="Perfil" />
+        <View style={styles.centered}>
+          <Feather name="alert-circle" size={24} color={colors.gray400} />
+          <Text style={styles.errorTitle}>No se encontró el perfil</Text>
+        </View>
+      </Screen>
     );
   }
 
+  const stats = [
+    { value: profile.stats.total_trainings, label: 'Entrenos' },
+    { value: profile.stats.current_strike, label: 'Semanas' },
+    { value: profile.stats.posts_count, label: 'Publicaciones' },
+  ];
+
   return (
-    <View style={styles.container}>
-      <View style={styles.backgroundContainer}>
-        <LinearGradient
-          colors={['rgba(90, 107, 255, 0.15)', 'transparent']}
-          style={styles.gradientTop}
-        />
-      </View>
+    <Screen wash>
+      <AppHeader title="Perfil" />
 
-      <SafeAreaView style={styles.safeArea} edges={['top']}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={handleBack} style={styles.backButton}>
-            <Feather name="arrow-left" size={24} color={colors.white} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Perfil</Text>
-          <View style={styles.headerSpacer} />
-        </View>
+      <ScrollView
+        style={styles.flex}
+        contentContainerStyle={styles.scroll}
+        showsVerticalScrollIndicator={false}
+      >
+        <Animated.View style={[styles.identity, headerStyle]}>
+          {profile.photo_url ? (
+            <Image source={{ uri: profile.photo_url }} style={styles.avatar} />
+          ) : (
+            <View style={[styles.avatar, styles.avatarFallback]}>
+              <Text style={styles.avatarText}>
+                {profile.first_name?.[0] || ''}
+                {profile.last_name?.[0] || ''}
+              </Text>
+            </View>
+          )}
 
-        <ScrollView
-          style={styles.scrollView}
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-        >
-          {/* Profile Header */}
-          <View style={styles.profileHeader}>
-            {profile.photo_url ? (
-              <Image source={{ uri: profile.photo_url }} style={styles.avatar} />
-            ) : (
-              <View style={styles.avatarPlaceholder}>
-                <Text style={styles.avatarText}>
-                  {profile.first_name?.[0] || ''}{profile.last_name?.[0] || ''}
-                </Text>
+          <Text style={styles.name}>{profile.name}</Text>
+
+          {!!profile.profession && <Text style={styles.meta}>{profile.profession}</Text>}
+          {!!profile.member_since && (
+            <Text style={styles.meta}>Miembro desde {profile.member_since}</Text>
+          )}
+
+          {!!profile.instagram && (
+            <Pressable
+              style={({ pressed }) => [styles.instagram, pressed && styles.pressed]}
+              onPress={handleInstagramPress}
+              accessibilityRole="link"
+              accessibilityLabel={`Abrir ${profile.instagram} en Instagram`}
+            >
+              <Feather name="instagram" size={16} color={colors.ink} />
+              <Text style={styles.instagramText}>{profile.instagram}</Text>
+            </Pressable>
+          )}
+        </Animated.View>
+
+        <Animated.View style={bodyStyle}>
+          <View style={styles.statsCard}>
+            {stats.map((stat) => (
+              <View key={stat.label} style={styles.stat}>
+                <Text style={styles.statValue}>{stat.value}</Text>
+                <Text style={styles.statLabel}>{stat.label}</Text>
               </View>
-            )}
-
-            <Text style={styles.profileName}>{profile.name}</Text>
-
-            {profile.profession && (
-              <Text style={styles.profession}>{profile.profession}</Text>
-            )}
-
-            {profile.member_since && (
-              <Text style={styles.memberSince}>Miembro desde {profile.member_since}</Text>
-            )}
-
-            {profile.instagram && (
-              <TouchableOpacity style={styles.instagramButton} onPress={handleInstagramPress}>
-                <Feather name="instagram" size={18} color={colors.primary} />
-                <Text style={styles.instagramText}>{profile.instagram}</Text>
-              </TouchableOpacity>
-            )}
+            ))}
           </View>
 
-          {/* Stats */}
-          <View style={styles.statsContainer}>
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>{profile.stats.total_trainings}</Text>
-              <Text style={styles.statLabel}>Entrenamientos</Text>
-            </View>
-            <View style={styles.statDivider} />
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>{profile.stats.current_strike}</Text>
-              <Text style={styles.statLabel}>Semanas racha</Text>
-            </View>
-            <View style={styles.statDivider} />
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>{profile.stats.posts_count}</Text>
-              <Text style={styles.statLabel}>Publicaciones</Text>
-            </View>
-          </View>
-
-          {/* Recent Posts */}
-          {profile.recent_posts.length > 0 && (
-            <View style={styles.postsSection}>
+          {profile.recent_posts.length > 0 ? (
+            <View style={styles.posts}>
               <Text style={styles.sectionTitle}>Publicaciones recientes</Text>
               {profile.recent_posts.map((post) => (
                 <PostCard
@@ -215,193 +210,144 @@ export default function UserProfileScreen() {
                 />
               ))}
             </View>
-          )}
-
-          {profile.recent_posts.length === 0 && (
+          ) : (
             <View style={styles.emptyPosts}>
-              <Feather name="file-text" size={48} color={colors.gray400} />
-              <Text style={styles.emptyPostsText}>Sin publicaciones</Text>
+              <Feather name="file-text" size={22} color={colors.gray400} />
+              <Text style={styles.emptyPostsTitle}>Sin publicaciones</Text>
+              <Text style={styles.emptyPostsText}>
+                Todavía no compartió nada con la comunidad.
+              </Text>
             </View>
           )}
-        </ScrollView>
-      </SafeAreaView>
-    </View>
+        </Animated.View>
+      </ScrollView>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.bgDark,
-  },
-  safeArea: {
+  flex: {
     flex: 1,
   },
-  loadingContainer: {
+  centered: {
     flex: 1,
+    alignItems: 'center',
     justifyContent: 'center',
-    alignItems: 'center',
+    gap: 8,
   },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  errorText: {
-    fontSize: typography.fontSize.lg,
+  errorTitle: {
     fontFamily: typography.fontFamily,
-    color: colors.gray400,
-  },
-  backgroundContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-  },
-  gradientTop: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 300,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-  },
-  backButton: {
-    padding: spacing.xs,
-  },
-  headerTitle: {
-    fontSize: typography.fontSize.lg,
-    fontFamily: typography.fontFamily,
+    fontSize: 20,
     fontWeight: typography.fontWeight.semiBold,
-    color: colors.white,
+    letterSpacing: -0.4,
+    color: colors.ink,
   },
-  headerSpacer: {
-    width: 40,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
+  scroll: {
+    paddingHorizontal: 16,
     paddingBottom: 100,
   },
-  profileHeader: {
+  identity: {
     alignItems: 'center',
-    paddingHorizontal: spacing.xxl,
-    paddingTop: spacing.xl,
-    paddingBottom: spacing.xxl,
+    paddingTop: 8,
+    paddingBottom: 24,
+    gap: 4,
   },
   avatar: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    borderWidth: 3,
-    borderColor: colors.primary,
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    marginBottom: 12,
   },
-  avatarPlaceholder: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: colors.primary,
+  avatarFallback: {
+    backgroundColor: colors.ink,
     alignItems: 'center',
     justifyContent: 'center',
   },
   avatarText: {
-    fontSize: 32,
     fontFamily: typography.fontFamily,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.textDark,
-  },
-  profileName: {
-    fontSize: typography.fontSize.xxl,
-    fontFamily: typography.fontFamily,
+    fontSize: 30,
     fontWeight: typography.fontWeight.bold,
     color: colors.white,
-    marginTop: spacing.lg,
   },
-  profession: {
-    fontSize: typography.fontSize.md,
+  name: {
     fontFamily: typography.fontFamily,
-    color: colors.gray400,
-    marginTop: spacing.xs,
+    fontSize: 30,
+    fontWeight: typography.fontWeight.bold,
+    letterSpacing: -1,
+    color: colors.ink,
+    textAlign: 'center',
   },
-  memberSince: {
-    fontSize: typography.fontSize.sm,
+  meta: {
     fontFamily: typography.fontFamily,
+    fontSize: 14,
     color: colors.gray400,
-    marginTop: spacing.sm,
   },
-  instagramButton: {
+  instagram: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
-    marginTop: spacing.lg,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
-    backgroundColor: 'rgba(90, 107, 255, 0.1)',
-    borderRadius: borderRadius.full,
+    gap: 8,
+    marginTop: 12,
+    height: 40,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    backgroundColor: colors.white,
   },
   instagramText: {
-    fontSize: typography.fontSize.md,
     fontFamily: typography.fontFamily,
-    fontWeight: typography.fontWeight.medium,
-    color: colors.primary,
+    fontSize: 14,
+    fontWeight: typography.fontWeight.semiBold,
+    color: colors.ink,
   },
-  statsContainer: {
+  pressed: {
+    opacity: 0.7,
+  },
+  statsCard: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'center',
-    marginHorizontal: spacing.xxl,
-    paddingVertical: spacing.xl,
-    backgroundColor: colors.cardDark,
-    borderRadius: borderRadius.lg,
+    backgroundColor: colors.white,
+    borderRadius: 20,
+    padding: 16,
+    marginBottom: 24,
   },
-  statItem: {
-    alignItems: 'center',
+  stat: {
     flex: 1,
+    gap: 4,
   },
   statValue: {
-    fontSize: typography.fontSize.xxl,
     fontFamily: typography.fontFamily,
+    fontSize: 24,
     fontWeight: typography.fontWeight.bold,
-    color: colors.white,
+    color: colors.ink,
   },
   statLabel: {
-    fontSize: typography.fontSize.sm,
     fontFamily: typography.fontFamily,
+    fontSize: 12,
     color: colors.gray400,
-    marginTop: spacing.xs,
   },
-  statDivider: {
-    width: 1,
-    height: 40,
-    backgroundColor: colors.gray600,
-  },
-  postsSection: {
-    paddingHorizontal: spacing.xxl,
-    paddingTop: spacing.xxl,
+  posts: {
+    gap: 0,
   },
   sectionTitle: {
-    fontSize: typography.fontSize.lg,
+    marginBottom: 12,
     fontFamily: typography.fontFamily,
-    fontWeight: typography.fontWeight.semiBold,
-    color: colors.white,
-    marginBottom: spacing.lg,
+    fontSize: 20,
+    fontWeight: typography.fontWeight.bold,
+    letterSpacing: -0.5,
+    color: colors.ink,
   },
   emptyPosts: {
     alignItems: 'center',
-    paddingVertical: spacing.xxl,
+    gap: 6,
+    paddingVertical: 32,
+  },
+  emptyPostsTitle: {
+    fontFamily: typography.fontFamily,
+    fontSize: 16,
+    fontWeight: typography.fontWeight.semiBold,
+    color: colors.ink,
   },
   emptyPostsText: {
-    fontSize: typography.fontSize.md,
     fontFamily: typography.fontFamily,
+    fontSize: 14,
     color: colors.gray400,
-    marginTop: spacing.md,
   },
 });

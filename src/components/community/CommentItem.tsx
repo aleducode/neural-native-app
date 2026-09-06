@@ -1,7 +1,7 @@
 import React from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, Image, Pressable } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { colors, typography, spacing, borderRadius } from '../../theme/colors';
+import { colors, typography } from '../../theme/colors';
 import { Comment } from '../../types/community';
 
 interface CommentItemProps {
@@ -12,36 +12,34 @@ interface CommentItemProps {
 export default function CommentItem({ comment, onDelete }: CommentItemProps) {
   return (
     <View style={styles.container}>
-      {/* Avatar */}
       {comment.author.photo_url ? (
-        <Image
-          source={{ uri: comment.author.photo_url }}
-          style={styles.avatar}
-        />
+        <Image source={{ uri: comment.author.photo_url }} style={styles.avatar} />
       ) : (
-        <View style={styles.avatarPlaceholder}>
+        <View style={[styles.avatar, styles.avatarFallback]}>
           <Text style={styles.avatarText}>{comment.author.initials}</Text>
         </View>
       )}
 
-      {/* Content */}
       <View style={styles.content}>
-        <View style={styles.header}>
-          <Text style={styles.authorName}>{comment.author.name}</Text>
+        <View style={styles.head}>
+          <Text style={styles.authorName} numberOfLines={1}>
+            {comment.author.name}
+          </Text>
           <Text style={styles.timeAgo}>{comment.time_ago}</Text>
         </View>
-        <Text style={styles.commentText}>{comment.content}</Text>
+        <Text style={styles.text}>{comment.content}</Text>
       </View>
 
-      {/* Delete button (only for own comments) */}
       {comment.is_mine && onDelete && (
-        <TouchableOpacity
-          style={styles.deleteButton}
+        <Pressable
+          style={({ pressed }) => [styles.delete, pressed && styles.pressed]}
           onPress={onDelete}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          hitSlop={10}
+          accessibilityRole="button"
+          accessibilityLabel="Eliminar comentario"
         >
           <Feather name="trash-2" size={16} color={colors.error} />
-        </TouchableOpacity>
+        </Pressable>
       )}
     </View>
   );
@@ -50,60 +48,64 @@ export default function CommentItem({ comment, onDelete }: CommentItemProps) {
 const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
-    paddingVertical: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.gray600,
+    alignItems: 'flex-start',
+    gap: 12,
+    backgroundColor: colors.white,
+    borderRadius: 20,
+    padding: 14,
+    marginBottom: 8,
   },
   avatar: {
     width: 36,
     height: 36,
     borderRadius: 18,
   },
-  avatarPlaceholder: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: colors.primary,
+  avatarFallback: {
+    backgroundColor: colors.ink,
     alignItems: 'center',
     justifyContent: 'center',
   },
   avatarText: {
-    fontSize: typography.fontSize.sm,
     fontFamily: typography.fontFamily,
+    fontSize: 13,
     fontWeight: typography.fontWeight.bold,
-    color: colors.bgDark,
+    color: colors.white,
   },
   content: {
     flex: 1,
-    marginLeft: spacing.md,
+    gap: 4,
   },
-  header: {
+  head: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: spacing.xs,
+    gap: 8,
   },
   authorName: {
-    fontSize: typography.fontSize.sm,
+    flexShrink: 1,
     fontFamily: typography.fontFamily,
+    fontSize: 14,
     fontWeight: typography.fontWeight.semiBold,
-    color: colors.white,
-    marginRight: spacing.sm,
+    color: colors.ink,
   },
   timeAgo: {
-    fontSize: typography.fontSize.xs,
     fontFamily: typography.fontFamily,
-    fontWeight: typography.fontWeight.regular,
+    fontSize: 12,
     color: colors.gray400,
   },
-  commentText: {
-    fontSize: typography.fontSize.md,
+  text: {
     fontFamily: typography.fontFamily,
-    fontWeight: typography.fontWeight.regular,
-    color: colors.white,
+    fontSize: 14,
     lineHeight: 20,
+    color: colors.ink,
   },
-  deleteButton: {
-    padding: spacing.xs,
-    marginLeft: spacing.sm,
+  delete: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pressed: {
+    opacity: 0.7,
   },
 });

@@ -1,13 +1,14 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { colors, typography, spacing, borderRadius } from '../../theme/colors';
+import { colors, typography } from '../../theme/colors';
 import { PostTraining } from '../../types/community';
 
 interface TrainingBadgeProps {
   training: PostTraining;
 }
 
+/** An attached training reads as an achievement, so it carries the accent. */
 export default function TrainingBadge({ training }: TrainingBadgeProps) {
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr + 'T00:00:00');
@@ -27,25 +28,25 @@ export default function TrainingBadge({ training }: TrainingBadgeProps) {
 
   return (
     <View style={styles.container}>
-      <View style={styles.iconContainer}>
-        <Feather name="activity" size={22} color={colors.primary} />
+      <View style={styles.icon}>
+        <Feather name="activity" size={20} color={colors.accentDeep} />
       </View>
 
       <View style={styles.content}>
-        <Text style={styles.trainingType}>{training.type}</Text>
+        <Text style={styles.type}>{training.type}</Text>
         <View style={styles.details}>
-          <View style={styles.detailItem}>
-            <Feather name="calendar" size={14} color={colors.gray400} />
+          <View style={styles.detail}>
+            <Feather name="calendar" size={13} color={colors.gray400} />
             <Text style={styles.detailText}>{formatDate(training.date)}</Text>
           </View>
-          <View style={styles.detailItem}>
-            <Feather name="clock" size={14} color={colors.gray400} />
+          <View style={styles.detail}>
+            <Feather name="clock" size={13} color={colors.gray400} />
             <Text style={styles.detailText}>{formatDuration(training.duration_minutes)}</Text>
           </View>
         </View>
       </View>
 
-      <Feather name="check-circle" size={24} color={colors.primary} />
+      <Feather name="check-circle" size={20} color={colors.accentDeep} />
     </View>
   );
 }
@@ -54,49 +55,42 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(90, 107, 255, 0.08)',
-    borderRadius: borderRadius.lg,
-    padding: spacing.lg,
-    marginBottom: spacing.lg,
-    borderWidth: 1,
-    borderColor: 'rgba(90, 107, 255, 0.15)',
+    gap: 12,
+    backgroundColor: colors.accentSoft,
+    borderRadius: 16,
+    padding: 12,
   },
-  iconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: 'rgba(90, 107, 255, 0.15)',
+  icon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.white,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: spacing.lg,
-    borderWidth: 1,
-    borderColor: 'rgba(90, 107, 255, 0.25)',
   },
   content: {
     flex: 1,
+    gap: 4,
   },
-  trainingType: {
-    fontSize: typography.fontSize.md,
+  type: {
     fontFamily: typography.fontFamily,
+    fontSize: 15,
     fontWeight: typography.fontWeight.semiBold,
-    color: colors.white,
-    marginBottom: spacing.xs,
-    letterSpacing: -0.1,
+    color: colors.ink,
   },
   details: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.lg,
+    gap: 14,
   },
-  detailItem: {
+  detail: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.xs,
+    gap: 4,
   },
   detailText: {
-    fontSize: typography.fontSize.sm,
     fontFamily: typography.fontFamily,
-    fontWeight: typography.fontWeight.regular,
+    fontSize: 12,
     color: colors.gray400,
   },
 });
