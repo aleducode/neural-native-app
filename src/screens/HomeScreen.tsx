@@ -21,12 +21,18 @@ import Animated, {
   withDelay,
   Easing,
 } from 'react-native-reanimated';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
 import { colors, typography } from '../theme/colors';
 import { dashboardApi, DashboardResponse } from '../api/dashboard';
 import { notificationsApi } from '../api/notifications';
+import { profileApi } from '../api/profile';
+import ProfileNudge, { MissingField } from '../components/ProfileNudge';
 import pushNotificationService from '../services/pushNotifications';
+
+const NUDGE_SNOOZE_KEY = 'neural_profile_nudge_until';
+const NUDGE_SNOOZE_MS = 7 * 24 * 60 * 60 * 1000;
 
 const { width: SCREEN_W } = Dimensions.get('window');
 
@@ -94,6 +100,43 @@ export default function HomeScreen() {
     transform: [{ translateY: withDelay(90, withTiming((1 - intro.value) * 14, { duration: 400 })) }],
   }));
 
+  // The gym asks for weight, height and birthdate on sign-up, but nothing
+  // enforces them, so members reach the app without any of the three.
+  const [missingProfile, setMissingProfile] = useState<MissingField[]>([]);
+  const [nudgeSnoozed, setNudgeSnoozed] = useState(true);
+
+  const fetchProfileGaps = useCallback(async () => {
+    const { data } = await profileApi.getProfile();
+    if (!data) return;
+
+    const gaps: MissingField[] = [];
+    if (data.latest_weight?.weight == null) gaps.push('weight');
+    if (data.profile?.height == null) gaps.push('height');
+    if (data.profile?.birthdate == null) gaps.push('birthdate');
+    setMissingProfile(gaps);
+  }, []);
+
+  // "Ahora no" holds for a week. Asking again on the next launch would make the
+  // dismissal meaningless; never asking again would lose the data for good.
+  const readSnooze = useCallback(async () => {
+    try {
+      const until = await AsyncStorage.getItem(NUDGE_SNOOZE_KEY);
+      setNudgeSnoozed(!!until && Date.now() < Number(until));
+    } catch {
+      setNudgeSnoozed(false);
+    }
+  }, []);
+
+  const snoozeNudge = useCallback(async () => {
+    setNudgeSnoozed(true);
+    try {
+      await AsyncStorage.setItem(NUDGE_SNOOZE_KEY, String(Date.now() + NUDGE_SNOOZE_MS));
+    } catch {
+      // A snooze that fails to persist comes back next launch; that is the
+      // safe direction to fail in, and not worth an error in front of anyone.
+    }
+  }, []);
+
   const fetchDashboard = useCallback(async () => {
     const { data } = await dashboardApi.getDashboard();
     if (data) {
@@ -118,12 +161,14 @@ export default function HomeScreen() {
     useCallback(() => {
       fetchDashboard();
       fetchNotificationCount();
-    }, [fetchDashboard, fetchNotificationCount])
+      fetchProfileGaps();
+      readSnooze();
+    }, [fetchDashboard, fetchNotificationCount, fetchProfileGaps, readSnooze])
   );
 
   const onRefresh = async () => {
     setIsRefreshing(true);
-    await Promise.all([fetchDashboard(), fetchNotificationCount()]);
+    await Promise.all([fetchDashboard(), fetchNotificationCount(), fetchProfileGaps()]);
     setIsRefreshing(false);
   };
 
@@ -266,6 +311,12 @@ export default function HomeScreen() {
                 );
               })}
             </View>
+
+            {/* Above the week's numbers, because those numbers are the ones the
+                missing data would sharpen. */}
+            {!nudgeSnoozed && (
+              <ProfileNudge missing={missingProfile} onDismiss={snoozeNudge} />
+            )}
 
             <View style={styles.card}>
               <View style={styles.cardHead}>
