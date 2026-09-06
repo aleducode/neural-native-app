@@ -1,5 +1,14 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
+import {
+  View,
+  Text,
+  Image,
+  StyleSheet,
+  ScrollView,
+  ActivityIndicator,
+  Pressable,
+} from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { Feather } from '@expo/vector-icons';
 import Animated, {
@@ -14,8 +23,6 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { colors, typography } from '../theme/colors';
 import Screen from '../components/ui/Screen';
 import AppHeader from '../components/ui/AppHeader';
-import Card from '../components/ui/Card';
-import PrimaryButton from '../components/ui/PrimaryButton';
 import { slotsApi } from '../api/slots';
 import { Slot } from '../types';
 import { RootStackParamList } from '../navigation/RootNavigator';
@@ -40,6 +47,57 @@ function initialsOf(name: string): string {
   return `${parts[0][0] ?? ''}${parts[1]?.[0] ?? ''}`.toUpperCase();
 }
 
+/** "HH:MM AM/PM" -> minutes since midnight. */
+function parseTimeToMinutes(time: string): number {
+  const match = time.match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
+  if (!match) return 0;
+
+  let hours = parseInt(match[1], 10);
+  const minutes = parseInt(match[2], 10);
+  const period = match[3]?.toUpperCase();
+
+  if (period === 'PM' && hours !== 12) hours += 12;
+  if (period === 'AM' && hours === 12) hours = 0;
+
+  return hours * 60 + minutes;
+}
+
+/** "06:00 AM" -> ["06:00", "AM"], so the meridiem can sit smaller and muted. */
+function splitHour(hour: string): [string, string] {
+  const match = hour.match(/^\s*(\d{1,2}:\d{2})\s*(AM|PM)?/i);
+  if (!match) return [hour, ''];
+  return [match[1], (match[2] ?? '').toUpperCase()];
+}
+
+/** The meter's 34 hairlines, exactly as the design draws them. */
+const TICKS = Array.from({ length: 34 }, (_, i) => i);
+
+/** One column of the stats row: icon, value with a small unit, and a label. */
+function Stat({
+  icon,
+  value,
+  unit,
+  label,
+}: {
+  icon: keyof typeof Feather.glyphMap;
+  value: string;
+  unit: string;
+  label: string;
+}) {
+  return (
+    <View style={styles.stat}>
+      <Feather name={icon} size={24} color={colors.ink} />
+      <View style={styles.statCol}>
+        <View style={styles.statValueRow}>
+          <Text style={styles.statValue}>{value}</Text>
+          {!!unit && <Text style={styles.statUnit}>{unit}</Text>}
+        </View>
+        <Text style={styles.statLabel}>{label}</Text>
+      </View>
+    </View>
+  );
+}
+
 export default function SlotDetailScreen() {
   const navigation = useNavigation<SlotDetailNavigationProp>();
   const route = useRoute<RouteProp<SlotDetailRouteParams, 'SlotDetail'>>();
@@ -55,6 +113,8 @@ export default function SlotDetailScreen() {
   // Booking failures and blocked attempts land here, right above the button
   // that was pressed, instead of in a modal.
   const [bookError, setBookError] = useState<string | null>(null);
+  // The design shows the roster open; the pill collapses it, not the reverse.
+  const [showRoster, setShowRoster] = useState(true);
 
   const intro = useSharedValue(0);
   useEffect(() => {
@@ -143,10 +203,11 @@ export default function SlotDetailScreen() {
     return `${dayNames[date.getDay()]} ${date.getDate()} ${monthNames[date.getMonth()]}`;
   };
 
+
   if (isLoading) {
     return (
       <Screen wash>
-        <AppHeader title="Entrenamiento" />
+        <AppHeader title="Detalle del turno" />
         <View style={styles.centered}>
           <ActivityIndicator size="large" color={colors.ink} />
         </View>
@@ -157,7 +218,7 @@ export default function SlotDetailScreen() {
   if (error || !slot) {
     return (
       <Screen wash>
-        <AppHeader title="Entrenamiento" />
+        <AppHeader title="Detalle del turno" />
         <View style={styles.centered}>
           <Feather name="alert-circle" size={28} color={colors.gray400} />
           <Text style={styles.emptyTitle}>No pudimos abrir este horario</Text>
@@ -167,53 +228,133 @@ export default function SlotDetailScreen() {
     );
   }
 
-  const canBook = !userHasBooked && !alreadyScheduledToday && slot.available_places > 0;
-
-  const freeRatio =
-    slot.max_places > 0
-      ? Math.max(Math.min(slot.available_places / slot.max_places, 1), 0)
-      : 0;
+  const taken = Math.max(slot.max_places - slot.available_places, 0);
+  const takenRatio = slot.max_places > 0 ? Math.min(taken / slot.max_places, 1) : 0;
+  const isFull = slot.available_places <= 0;
+  const duration = parseTimeToMinutes(slot.hour_end) - parseTimeToMinutes(slot.hour_init);
+  const [hourValue, hourUnit] = splitHour(slot.hour_init);
 
   return (
     <Screen wash edges={['top', 'bottom']}>
-      <AppHeader title={slot.training_type.name} />
+      <AppHeader title="Detalle del turno" />
 
-      <Animated.View style={[styles.head, headStyle]}>
-        <Text style={styles.editorial}>{formatDate(slot.date)}</Text>
-        <Text style={styles.editorialMeta}>
-          {slot.hour_init} — {slot.hour_end}
-        </Text>
-      </Animated.View>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scroll}
+      >
+        <Animated.View style={[styles.hero, headStyle]}>
+          <Image
+            source={require('../../assets/trainings/hero-gym.jpg')}
+            style={styles.heroImage}
+            accessible={false}
+          />
+          {/* The design lays a 3% ink wash under the caption. At that opacity
+              white text on a bright gym photo is unreadable, so the wash is a
+              gradient that actually darkens the strip it sits on. */}
+          <LinearGradient
+            colors={['rgba(17,17,17,0)', 'rgba(17,17,17,0.72)']}
+            style={styles.heroScrim}
+            pointerEvents="none"
+          />
+          <View style={styles.heroCaption}>
+            <Text style={styles.heroTitle} numberOfLines={1}>
+              {slot.training_type.name}
+            </Text>
+            {/* The mock puts a red three-bar difficulty meter here. The API has
+                no difficulty for a slot, so the caption carries the date. */}
+            <Text style={styles.heroDate} numberOfLines={1}>
+              {formatDate(slot.date)}
+            </Text>
+          </View>
+        </Animated.View>
 
-      <Animated.View style={[styles.bodyWrap, bodyStyle]}>
-        <ScrollView
-          style={styles.scroll}
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-        >
-          {/* Places. The meter measures what is left, not what is taken: it
-              drains as the class fills, so a fuller class never reads as a
-              better one. */}
-          <Card style={styles.card}>
-            <View style={styles.spotsRow}>
-              <View style={styles.spotsValue}>
-                <Text style={styles.spotsNumber}>{slot.available_places}</Text>
-                <Text style={styles.spotsUnit}>de {slot.max_places}</Text>
+        <Animated.View style={bodyStyle}>
+          <View style={styles.stats}>
+            <Stat icon="calendar" value={hourValue} unit={hourUnit} label="Horario" />
+            <Stat icon="clock" value={String(duration)} unit="min" label="Duración" />
+            <Stat
+              icon="users"
+              value={String(slot.available_places)}
+              unit={`/${slot.max_places}`}
+              label="Cupos"
+            />
+          </View>
+
+          <View style={styles.occupancy}>
+            <View style={styles.occupancyTop}>
+              <View style={styles.occupancyCol}>
+                <Text style={styles.occupancyLabel}>Cupos ocupados</Text>
+                <View style={styles.occupancyValueRow}>
+                  <Text style={styles.occupancyValue}>{taken}</Text>
+                  <Text style={styles.occupancyUnit}>/{slot.max_places}</Text>
+                </View>
               </View>
-              <Text style={styles.spotsLabel}>
-                {slot.available_places === 1 ? 'cupo disponible' : 'cupos disponibles'}
-              </Text>
+
+              {confirmedUsers.length > 0 && (
+                <Pressable
+                  onPress={() => setShowRoster((v) => !v)}
+                  style={({ pressed }) => [styles.rosterPill, pressed && styles.pressed]}
+                  accessibilityRole="button"
+                  accessibilityState={{ expanded: showRoster }}
+                >
+                  <Text style={styles.rosterPillLabel}>
+                    {showRoster ? 'Ocultar' : 'Ver lista'}
+                  </Text>
+                </Pressable>
+              )}
             </View>
 
             <View
-              style={styles.track}
+              style={styles.meter}
               accessibilityRole="progressbar"
-              accessibilityLabel="Cupos disponibles"
-              accessibilityValue={{ min: 0, max: slot.max_places, now: slot.available_places }}
+              accessibilityLabel="Cupos ocupados"
+              accessibilityValue={{ min: 0, max: slot.max_places, now: taken }}
             >
-              <View style={[styles.trackFill, { width: `${freeRatio * 100}%` }]} />
+              {/* Green while there is room, red as the last places go: the
+                  design's own palette, ordered so the colour tracks urgency.
+
+                  The gradient spans the whole track and the empty part is
+                  covered from the right, so a nearly empty class shows the
+                  green end of the ramp instead of the whole ramp squeezed into
+                  a sliver. */}
+              <LinearGradient
+                colors={[colors.accentDeep, colors.accent, '#FF4040']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={StyleSheet.absoluteFill}
+              />
+              <View
+                style={[styles.meterEmpty, { left: `${Math.max(takenRatio, 0.03) * 100}%` }]}
+                pointerEvents="none"
+              />
+              <View style={styles.meterTicks} pointerEvents="none">
+                {TICKS.map((i) => (
+                  <View key={i} style={styles.tick} />
+                ))}
+              </View>
             </View>
-          </Card>
+          </View>
+
+          {showRoster && (
+            <View style={styles.roster}>
+              {confirmedUsers.map((user) => (
+                <View key={user.id} style={styles.rosterRow}>
+                  <View style={styles.avatar}>
+                    <Text style={styles.avatarText}>{initialsOf(user.name)}</Text>
+                  </View>
+                  <View style={styles.rosterTexts}>
+                    <Text style={styles.rosterName} numberOfLines={1}>
+                      {user.name}
+                    </Text>
+                    <Text style={styles.rosterState}>Confirmada</Text>
+                  </View>
+                  {/* The mock puts a switch on each row. A toggle beside another
+                      member's name would do nothing; the check states the fact. */}
+                  <Feather name="check" size={22} color={colors.accentDeep} />
+                </View>
+              ))}
+            </View>
+          )}
 
           {userHasBooked && (
             <View style={styles.banner}>
@@ -222,169 +363,264 @@ export default function SlotDetailScreen() {
             </View>
           )}
 
-          {alreadyScheduledToday && !userHasBooked && (
+          {!userHasBooked && alreadyScheduledToday && (
             <View style={styles.warning}>
               <Feather name="alert-circle" size={18} color={colors.ink} />
               <Text style={styles.bannerText}>
-                Ya tienes otro entrenamiento agendado para este día. Cancela tu reserva actual
-                para agendar este horario.
+                Ya tienes un entrenamiento agendado para este día
               </Text>
             </View>
           )}
 
-          {!userHasBooked && !alreadyScheduledToday && slot.available_places <= 0 && (
+          {!userHasBooked && isFull && (
             <View style={styles.warning}>
               <Feather name="slash" size={18} color={colors.ink} />
-              <Text style={styles.bannerText}>
-                Este horario ya no tiene cupos disponibles.
-              </Text>
+              <Text style={styles.bannerText}>Este horario ya no tiene cupos</Text>
+            </View>
+          )}
+        </Animated.View>
+      </ScrollView>
+
+      {!userHasBooked && (
+        <View style={styles.footer}>
+          {!!bookError && (
+            <View style={styles.inlineError}>
+              <Feather name="alert-circle" size={16} color={colors.ink} />
+              <Text style={styles.inlineErrorText}>{bookError}</Text>
             </View>
           )}
 
-          {confirmedUsers.length > 0 && (
-            <Card
-              title="Confirmados"
-              subtitle={`${confirmedUsers.length} ${
-                confirmedUsers.length === 1 ? 'persona' : 'personas'
-              } en este horario`}
-              style={styles.card}
-            >
-              <View style={styles.usersList}>
-                {confirmedUsers.map((user, index) => (
-                  <View
-                    key={user.id}
-                    style={[styles.userItem, index > 0 && styles.userItemDivided]}
-                  >
-                    <View style={styles.avatar}>
-                      <Text style={styles.avatarText}>{initialsOf(user.name)}</Text>
-                    </View>
-                    <Text style={styles.userName} numberOfLines={1}>
-                      {user.name}
-                    </Text>
-                  </View>
-                ))}
-              </View>
-            </Card>
-          )}
-
-          <View style={{ height: 16 }} />
-        </ScrollView>
-
-        {/* Book button */}
-        {!userHasBooked && (
-          <View style={styles.footer}>
-            {!!bookError && (
-              <View style={styles.inlineError}>
-                <Feather name="alert-circle" size={16} color={colors.ink} />
-                <Text style={styles.inlineErrorText}>{bookError}</Text>
-              </View>
+          <Pressable
+            onPress={handleBook}
+            disabled={isBooking || isFull}
+            style={({ pressed }) => [
+              styles.cta,
+              (isBooking || isFull) && styles.ctaDisabled,
+              pressed && styles.ctaPressed,
+            ]}
+            accessibilityRole="button"
+            accessibilityState={{ disabled: isBooking || isFull, busy: isBooking }}
+          >
+            {isBooking ? (
+              <ActivityIndicator color={colors.white} />
+            ) : (
+              <>
+                <Text style={styles.ctaLabel}>Confirmar reserva</Text>
+                {/* Three chevrons overlapping at -5, straight from the design. */}
+                <View style={styles.ctaArrows}>
+                  <Feather name="chevron-right" size={24} color={colors.white} />
+                  <Feather name="chevron-right" size={24} color={colors.white} style={styles.ctaArrowLap} />
+                  <Feather name="chevron-right" size={24} color={colors.white} style={styles.ctaArrowLap} />
+                </View>
+              </>
             )}
-            <PrimaryButton
-              label={isBooking ? 'Reservando...' : 'Confirmar reserva'}
-              onPress={handleBook}
-              disabled={!canBook || isBooking}
-              loading={isBooking}
-            />
-          </View>
-        )}
-      </Animated.View>
+          </Pressable>
+        </View>
+      )}
     </Screen>
   );
 }
 
+// Values from the design's "Detalle del turno" node: a 268-tall hero at radius
+// 20, content stacked at 24, an occupancy card 159 tall with a 50-tall meter at
+// radius 16, and a 54-tall CTA at radius 32.
 const styles = StyleSheet.create({
-  centered: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingHorizontal: 32,
-  },
-  emptyTitle: {
-    fontFamily: typography.fontFamily,
-    fontSize: 17,
-    fontWeight: typography.fontWeight.semiBold,
-    color: colors.ink,
-    textAlign: 'center',
-  },
-  emptyText: {
-    fontFamily: typography.fontFamily,
-    fontSize: 14,
-    color: colors.gray400,
-    textAlign: 'center',
-  },
-  head: {
+  scroll: {
     paddingHorizontal: 16,
     paddingTop: 4,
-    paddingBottom: 20,
+    paddingBottom: 24,
+    gap: 24,
   },
-  editorial: {
+  hero: {
+    height: 268,
+    borderRadius: 20,
+    overflow: 'hidden',
+    backgroundColor: colors.ink,
+  },
+  heroImage: {
+    ...StyleSheet.absoluteFillObject,
+    width: '100%',
+    height: '100%',
+  },
+  heroScrim: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: 120,
+  },
+  heroCaption: {
+    position: 'absolute',
+    left: 16,
+    right: 16,
+    bottom: 16,
+    gap: 4,
+  },
+  heroTitle: {
     fontFamily: typography.fontFamily,
-    fontSize: 34,
-    fontWeight: typography.fontWeight.bold,
-    letterSpacing: -1,
-    color: colors.ink,
+    fontSize: 20,
+    fontWeight: typography.fontWeight.semiBold,
+    color: colors.white,
   },
-  editorialMeta: {
-    marginTop: 4,
+  heroDate: {
     fontFamily: typography.fontFamily,
-    fontSize: 15,
-    // gray400 keeps the muted role at 5.3:1; #9D9D9D would be 2.7:1.
-    color: colors.gray400,
+    fontSize: 12,
+    color: colors.white,
   },
-  bodyWrap: {
-    flex: 1,
+  stats: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
   },
-  scroll: {
-    flex: 1,
+  stat: {
+    flexDirection: 'row',
+    gap: 8,
   },
-  scrollContent: {
-    paddingHorizontal: 16,
-    gap: 12,
+  statCol: {
+    gap: 4,
   },
-  card: {
-    gap: 14,
-  },
-  spotsRow: {
+  statValueRow: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    justifyContent: 'space-between',
-    gap: 12,
+    gap: 2,
   },
-  spotsValue: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: 6,
-  },
-  spotsNumber: {
+  statValue: {
     fontFamily: typography.fontFamily,
-    fontSize: 44,
-    fontWeight: typography.fontWeight.bold,
-    letterSpacing: -1.5,
+    fontSize: 16,
+    fontWeight: typography.fontWeight.semiBold,
     color: colors.ink,
   },
-  spotsUnit: {
+  statUnit: {
     fontFamily: typography.fontFamily,
-    fontSize: 15,
+    fontSize: 12,
+    // #A5A5A5 is 2.5:1 on this ground; gray400 keeps the muted role at 5.3:1.
     color: colors.gray400,
   },
-  spotsLabel: {
-    flex: 1,
-    textAlign: 'right',
+  statLabel: {
     fontFamily: typography.fontFamily,
-    fontSize: 13,
+    fontSize: 12,
     color: colors.gray400,
   },
-  track: {
-    height: 8,
-    borderRadius: 4,
+  occupancy: {
+    backgroundColor: colors.white,
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 20,
+  },
+  occupancyTop: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+  },
+  occupancyCol: {
+    gap: 8,
+  },
+  occupancyLabel: {
+    fontFamily: typography.fontFamily,
+    fontSize: 12,
+    color: colors.gray400,
+  },
+  occupancyValueRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 2,
+  },
+  occupancyValue: {
+    fontFamily: typography.fontFamily,
+    fontSize: 36,
+    letterSpacing: -0.36,
+    color: colors.ink,
+  },
+  occupancyUnit: {
+    fontFamily: typography.fontFamily,
+    fontSize: 20,
+    color: colors.gray400,
+    paddingBottom: 4,
+  },
+  rosterPill: {
+    minWidth: 105,
+    height: 32,
+    borderRadius: 32,
+    borderWidth: 1,
+    borderColor: '#DEDEDE',
+    backgroundColor: colors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+  },
+  rosterPillLabel: {
+    fontFamily: typography.fontFamily,
+    fontSize: 12,
+    color: colors.ink,
+  },
+  pressed: {
+    opacity: 0.7,
+  },
+  meter: {
+    height: 50,
+    borderRadius: 16,
     backgroundColor: colors.surface,
     overflow: 'hidden',
+    justifyContent: 'center',
   },
-  trackFill: {
-    height: '100%',
-    borderRadius: 4,
-    backgroundColor: colors.ink,
+  meterTicks: {
+    ...StyleSheet.absoluteFillObject,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 6,
+  },
+  tick: {
+    width: 2,
+    height: 50,
+    backgroundColor: '#DEDEDE',
+  },
+  meterEmpty: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    right: 0,
+    backgroundColor: colors.surface,
+  },
+  roster: {
+    backgroundColor: colors.white,
+    borderRadius: 20,
+    padding: 16,
+    gap: 16,
+  },
+  rosterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  avatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarText: {
+    fontFamily: typography.fontFamily,
+    fontSize: 14,
+    fontWeight: typography.fontWeight.semiBold,
+    color: colors.ink,
+  },
+  rosterTexts: {
+    flex: 1,
+    gap: 4,
+  },
+  rosterName: {
+    fontFamily: typography.fontFamily,
+    fontSize: 16,
+    fontWeight: typography.fontWeight.semiBold,
+    color: colors.ink,
+  },
+  rosterState: {
+    fontFamily: typography.fontFamily,
+    fontSize: 12,
+    color: colors.gray400,
   },
   banner: {
     flexDirection: 'row',
@@ -399,9 +635,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    // The error hue only tints the ground. As text it is 3.3:1 on white and
-    // fails AA, so the copy stays ink.
-    backgroundColor: 'rgba(255, 77, 77, 0.10)',
+    backgroundColor: colors.white,
     borderRadius: 16,
     paddingHorizontal: 14,
     paddingVertical: 12,
@@ -414,54 +648,18 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     color: colors.ink,
   },
-  usersList: {
-    marginTop: -2,
-  },
-  userItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingVertical: 10,
-  },
-  userItemDivided: {
-    borderTopWidth: 1,
-    borderTopColor: colors.surface,
-  },
-  avatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarText: {
-    fontFamily: typography.fontFamily,
-    fontSize: 13,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.ink,
-  },
-  userName: {
-    flex: 1,
-    fontFamily: typography.fontFamily,
-    fontSize: 15,
-    fontWeight: typography.fontWeight.medium,
-    color: colors.ink,
-  },
   footer: {
     paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 12,
-    gap: 12,
+    paddingBottom: 8,
+    gap: 10,
   },
   inlineError: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
     gap: 8,
-    backgroundColor: 'rgba(255, 77, 77, 0.10)',
-    borderRadius: 14,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    backgroundColor: colors.white,
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
   },
   inlineErrorText: {
     flex: 1,
@@ -469,5 +667,57 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
     color: colors.ink,
+  },
+  cta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    height: 54,
+    borderRadius: 32,
+    paddingLeft: 24,
+    paddingRight: 16,
+    // The design fills this pill white, which on the #F4F4F4 ground leaves the
+    // screen's primary action at 1.06:1 against its own background.
+    backgroundColor: colors.ink,
+  },
+  ctaDisabled: {
+    opacity: 0.45,
+  },
+  ctaPressed: {
+    transform: [{ scale: 0.98 }],
+  },
+  ctaLabel: {
+    fontFamily: typography.fontFamily,
+    fontSize: 16,
+    fontWeight: typography.fontWeight.semiBold,
+    color: colors.white,
+  },
+  ctaArrows: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  ctaArrowLap: {
+    // The design overlaps the chevrons with a -5 gap, which RN's layout has no
+    // equivalent for; a negative left margin on the followers does the same.
+    marginLeft: -5,
+  },
+  centered: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingHorizontal: 32,
+  },
+  emptyTitle: {
+    fontFamily: typography.fontFamily,
+    fontSize: 17,
+    fontWeight: typography.fontWeight.semiBold,
+    color: colors.ink,
+  },
+  emptyText: {
+    fontFamily: typography.fontFamily,
+    fontSize: 14,
+    color: colors.gray400,
+    textAlign: 'center',
   },
 });
