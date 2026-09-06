@@ -331,8 +331,9 @@ export default function HomeScreen() {
             </Pressable>
           </Animated.View>
 
-          {/* Clears the tab bar. */}
-          <View style={{ height: 96 }} />
+          {/* Clears the floating pill, which sits over the content rather
+              than pushing it. */}
+          <View style={{ height: 132 }} />
         </ScrollView>
       </SafeAreaView>
     </View>
