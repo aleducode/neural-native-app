@@ -1,23 +1,24 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  ActivityIndicator,
-  Alert,
-} from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
+import * as Haptics from 'expo-haptics';
+import { Feather } from '@expo/vector-icons';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  withDelay,
+  Easing,
+} from 'react-native-reanimated';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
-import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
-import { colors, typography, spacing, borderRadius } from '../theme/colors';
+import { colors, typography } from '../theme/colors';
+import Screen from '../components/ui/Screen';
+import AppHeader from '../components/ui/AppHeader';
+import Card from '../components/ui/Card';
+import PrimaryButton from '../components/ui/PrimaryButton';
 import { slotsApi } from '../api/slots';
 import { Slot } from '../types';
 import { RootStackParamList } from '../navigation/RootNavigator';
-import Button from '../components/Button';
 
 type SlotDetailNavigationProp = StackNavigationProp<RootStackParamList>;
 
@@ -32,11 +33,17 @@ interface ConfirmedUser {
   name: string;
 }
 
+/** Up to two initials, so the roster reads as people rather than row numbers. */
+function initialsOf(name: string): string {
+  const parts = (name || '').trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return '?';
+  return `${parts[0][0] ?? ''}${parts[1]?.[0] ?? ''}`.toUpperCase();
+}
+
 export default function SlotDetailScreen() {
   const navigation = useNavigation<SlotDetailNavigationProp>();
   const route = useRoute<RouteProp<SlotDetailRouteParams, 'SlotDetail'>>();
   const { slotId } = route.params;
-  const insets = useSafeAreaInsets();
 
   const [slot, setSlot] = useState<Slot | null>(null);
   const [confirmedUsers, setConfirmedUsers] = useState<ConfirmedUser[]>([]);
@@ -45,6 +52,25 @@ export default function SlotDetailScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [isBooking, setIsBooking] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Booking failures and blocked attempts land here, right above the button
+  // that was pressed, instead of in a modal.
+  const [bookError, setBookError] = useState<string | null>(null);
+
+  const intro = useSharedValue(0);
+  useEffect(() => {
+    intro.value = withTiming(1, { duration: 460, easing: Easing.out(Easing.cubic) });
+  }, []);
+
+  const headStyle = useAnimatedStyle(() => ({
+    opacity: intro.value,
+    transform: [{ translateY: (1 - intro.value) * 14 }],
+  }));
+  const bodyStyle = useAnimatedStyle(() => ({
+    opacity: withDelay(90, withTiming(intro.value, { duration: 400 })),
+    transform: [
+      { translateY: withDelay(90, withTiming((1 - intro.value) * 14, { duration: 400 })) },
+    ],
+  }));
 
   const fetchSlotDetail = useCallback(async () => {
     setIsLoading(true);
@@ -71,25 +97,25 @@ export default function SlotDetailScreen() {
   const handleBook = async () => {
     if (!slot) return;
 
+    setBookError(null);
+
     if (alreadyScheduledToday && !userHasBooked) {
-      Alert.alert(
-        'Ya tienes reserva',
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      setBookError(
         'Ya tienes un entrenamiento reservado para este día. Cancela tu reserva actual para agendar otro horario.'
       );
       return;
     }
 
     if (slot.available_places <= 0) {
-      Alert.alert(
-        'Sin cupos',
-        'Este horario ya no tiene cupos disponibles.'
-      );
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      setBookError('Este horario ya no tiene cupos disponibles.');
       return;
     }
 
     setIsBooking(true);
 
-    const { success, error: bookError } = await slotsApi.bookSlot(slotId);
+    const { success, error: bookingError } = await slotsApi.bookSlot(slotId);
 
     setIsBooking(false);
 
@@ -102,7 +128,8 @@ export default function SlotDetailScreen() {
         hourEnd: slot.hour_end,
       });
     } else {
-      Alert.alert('Error', bookError || 'No se pudo realizar la reserva');
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      setBookError(bookingError || 'No se pudo realizar la reserva');
     }
   };
 
@@ -118,398 +145,329 @@ export default function SlotDetailScreen() {
 
   if (isLoading) {
     return (
-      <View style={styles.container}>
-        <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={colors.primary} />
-          </View>
-        </SafeAreaView>
-      </View>
+      <Screen wash>
+        <AppHeader title="Entrenamiento" />
+        <View style={styles.centered}>
+          <ActivityIndicator size="large" color={colors.ink} />
+        </View>
+      </Screen>
     );
   }
 
   if (error || !slot) {
     return (
-      <View style={styles.container}>
-        <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
-          <View style={styles.header}>
-            <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-              <Ionicons name="chevron-back" size={24} color={colors.textDark} />
-            </TouchableOpacity>
-            <View style={styles.headerSpacer} />
-          </View>
-          <View style={styles.errorContainer}>
-            <Ionicons name="alert-circle-outline" size={48} color={colors.gray400} style={styles.errorIcon} />
-            <Text style={styles.errorText}>{error || 'Slot no encontrado'}</Text>
-          </View>
-        </SafeAreaView>
-      </View>
+      <Screen wash>
+        <AppHeader title="Entrenamiento" />
+        <View style={styles.centered}>
+          <Feather name="alert-circle" size={28} color={colors.gray400} />
+          <Text style={styles.emptyTitle}>No pudimos abrir este horario</Text>
+          <Text style={styles.emptyText}>{error || 'Slot no encontrado'}</Text>
+        </View>
+      </Screen>
     );
   }
 
   const canBook = !userHasBooked && !alreadyScheduledToday && slot.available_places > 0;
 
+  const freeRatio =
+    slot.max_places > 0
+      ? Math.max(Math.min(slot.available_places / slot.max_places, 1), 0)
+      : 0;
+
   return (
-    <View style={styles.container}>
-      {/* Background Gradients */}
-      <View style={styles.backgroundContainer}>
-        <LinearGradient
-          colors={['rgba(90, 107, 255, 0.15)', 'transparent']}
-          style={styles.gradientTop}
-        />
-        <LinearGradient
-          colors={['rgba(90, 107, 255, 0.15)', 'transparent']}
-          style={styles.gradientBottom}
-        />
-      </View>
+    <Screen wash edges={['top', 'bottom']}>
+      <AppHeader title={slot.training_type.name} />
 
-      <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-            <Ionicons name="chevron-back" size={24} color={colors.textDark} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>{slot.training_type.name}</Text>
-          <View style={styles.headerSpacer} />
-        </View>
+      <Animated.View style={[styles.head, headStyle]}>
+        <Text style={styles.editorial}>{formatDate(slot.date)}</Text>
+        <Text style={styles.editorialMeta}>
+          {slot.hour_init} — {slot.hour_end}
+        </Text>
+      </Animated.View>
 
+      <Animated.View style={[styles.bodyWrap, bodyStyle]}>
         <ScrollView
-          style={styles.scrollView}
+          style={styles.scroll}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
-          {/* Date & Time Card */}
-          <View style={styles.infoCard}>
-            <View style={styles.infoRow}>
-              <View style={styles.iconContainer}>
-                <Ionicons name="calendar-outline" size={20} color={colors.primary} />
+          {/* Places. The meter measures what is left, not what is taken: it
+              drains as the class fills, so a fuller class never reads as a
+              better one. */}
+          <Card style={styles.card}>
+            <View style={styles.spotsRow}>
+              <View style={styles.spotsValue}>
+                <Text style={styles.spotsNumber}>{slot.available_places}</Text>
+                <Text style={styles.spotsUnit}>de {slot.max_places}</Text>
               </View>
-              <View style={styles.infoTextContainer}>
-                <Text style={styles.infoLabel}>Fecha</Text>
-                <Text style={styles.infoText}>{formatDate(slot.date)}</Text>
-              </View>
+              <Text style={styles.spotsLabel}>
+                {slot.available_places === 1 ? 'cupo disponible' : 'cupos disponibles'}
+              </Text>
             </View>
-            <View style={styles.divider} />
-            <View style={styles.infoRow}>
-              <View style={styles.iconContainer}>
-                <Ionicons name="time-outline" size={20} color={colors.primary} />
-              </View>
-              <View style={styles.infoTextContainer}>
-                <Text style={styles.infoLabel}>Horario</Text>
-                <Text style={styles.infoText}>{slot.hour_init} - {slot.hour_end}</Text>
-              </View>
-            </View>
-          </View>
 
-          {/* Available Spots Card */}
-          <View style={styles.spotsCard}>
-            <View style={styles.spotsContent}>
-              <Text style={styles.spotsNumber}>{slot.available_places}</Text>
-              <View style={styles.spotsTextContainer}>
-                <Text style={styles.spotsLabel}>Cupos disponibles</Text>
-                <Text style={styles.spotsTotal}>de {slot.max_places} totales</Text>
-              </View>
+            <View
+              style={styles.track}
+              accessibilityRole="progressbar"
+              accessibilityLabel="Cupos disponibles"
+              accessibilityValue={{ min: 0, max: slot.max_places, now: slot.available_places }}
+            >
+              <View style={[styles.trackFill, { width: `${freeRatio * 100}%` }]} />
             </View>
-          </View>
+          </Card>
 
-          {/* Status Banner */}
           {userHasBooked && (
-            <View style={styles.bookedBanner}>
-              <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
-              <Text style={styles.bookedText}>Ya tienes reserva en este horario</Text>
+            <View style={styles.banner}>
+              <Feather name="check-circle" size={18} color={colors.ink} />
+              <Text style={styles.bannerText}>Ya tienes reserva en este horario</Text>
             </View>
           )}
 
           {alreadyScheduledToday && !userHasBooked && (
-            <View style={styles.warningBanner}>
-              <Ionicons name="alert-circle-outline" size={20} color={colors.error} />
-              <Text style={styles.warningText}>Ya tienes otro entrenamiento agendado para este día. Cancela tu reserva actual para agendar este horario.</Text>
+            <View style={styles.warning}>
+              <Feather name="alert-circle" size={18} color={colors.ink} />
+              <Text style={styles.bannerText}>
+                Ya tienes otro entrenamiento agendado para este día. Cancela tu reserva actual
+                para agendar este horario.
+              </Text>
             </View>
           )}
 
-          {/* Confirmed Users */}
-          {confirmedUsers.length > 0 && (
-            <View style={styles.usersSection}>
-              <Text style={styles.usersSectionTitle}>
-                Usuarios confirmados ({confirmedUsers.length})
+          {!userHasBooked && !alreadyScheduledToday && slot.available_places <= 0 && (
+            <View style={styles.warning}>
+              <Feather name="slash" size={18} color={colors.ink} />
+              <Text style={styles.bannerText}>
+                Este horario ya no tiene cupos disponibles.
               </Text>
+            </View>
+          )}
+
+          {confirmedUsers.length > 0 && (
+            <Card
+              title="Confirmados"
+              subtitle={`${confirmedUsers.length} ${
+                confirmedUsers.length === 1 ? 'persona' : 'personas'
+              } en este horario`}
+              style={styles.card}
+            >
               <View style={styles.usersList}>
                 {confirmedUsers.map((user, index) => (
-                  <View key={user.id} style={styles.userItem}>
-                    <View style={styles.userNumber}>
-                      <Text style={styles.userNumberText}>{index + 1}</Text>
+                  <View
+                    key={user.id}
+                    style={[styles.userItem, index > 0 && styles.userItemDivided]}
+                  >
+                    <View style={styles.avatar}>
+                      <Text style={styles.avatarText}>{initialsOf(user.name)}</Text>
                     </View>
-                    <Text style={styles.userName}>{user.name}</Text>
+                    <Text style={styles.userName} numberOfLines={1}>
+                      {user.name}
+                    </Text>
                   </View>
                 ))}
               </View>
-            </View>
+            </Card>
           )}
 
-          {/* Bottom Spacer for Button */}
-          <View style={{ height: 100 }} />
+          <View style={{ height: 16 }} />
         </ScrollView>
 
-        {/* Book Button */}
+        {/* Book button */}
         {!userHasBooked && (
-          <View style={[styles.buttonContainer, { paddingBottom: Math.max(insets.bottom, spacing.xxl) + spacing.lg }]}>
-            <Button
-              title={isBooking ? 'Reservando...' : 'Confirmar Reserva'}
+          <View style={styles.footer}>
+            {!!bookError && (
+              <View style={styles.inlineError}>
+                <Feather name="alert-circle" size={16} color={colors.ink} />
+                <Text style={styles.inlineErrorText}>{bookError}</Text>
+              </View>
+            )}
+            <PrimaryButton
+              label={isBooking ? 'Reservando...' : 'Confirmar reserva'}
               onPress={handleBook}
               disabled={!canBook || isBooking}
               loading={isBooking}
             />
           </View>
         )}
-      </SafeAreaView>
-    </View>
+      </Animated.View>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  centered: {
     flex: 1,
-    backgroundColor: colors.bgDark,
-  },
-  safeArea: {
-    flex: 1,
-  },
-  backgroundContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-  },
-  gradientTop: {
-    position: 'absolute',
-    top: 50,
-    left: -150,
-    width: 250,
-    height: 250,
-    borderRadius: 125,
-  },
-  gradientBottom: {
-    position: 'absolute',
-    bottom: 200,
-    right: -150,
-    width: 250,
-    height: 250,
-    borderRadius: 125,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
     alignItems: 'center',
-  },
-  errorContainer: {
-    flex: 1,
     justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: spacing.xxl,
+    gap: 8,
+    paddingHorizontal: 32,
   },
-  errorIcon: {
-    marginBottom: spacing.lg,
-  },
-  errorText: {
-    fontSize: typography.fontSize.md,
+  emptyTitle: {
     fontFamily: typography.fontFamily,
-    fontWeight: typography.fontWeight.medium,
+    fontSize: 17,
+    fontWeight: typography.fontWeight.semiBold,
+    color: colors.ink,
+    textAlign: 'center',
+  },
+  emptyText: {
+    fontFamily: typography.fontFamily,
+    fontSize: 14,
     color: colors.gray400,
     textAlign: 'center',
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.xxl,
-    paddingTop: spacing.lg,
-    paddingBottom: spacing.md,
+  head: {
+    paddingHorizontal: 16,
+    paddingTop: 4,
+    paddingBottom: 20,
   },
-  backButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: colors.white,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    fontSize: typography.fontSize.xxl,
+  editorial: {
     fontFamily: typography.fontFamily,
+    fontSize: 34,
     fontWeight: typography.fontWeight.bold,
-    color: colors.white,
+    letterSpacing: -1,
+    color: colors.ink,
   },
-  headerSpacer: {
-    width: 48,
+  editorialMeta: {
+    marginTop: 4,
+    fontFamily: typography.fontFamily,
+    fontSize: 15,
+    // gray400 keeps the muted role at 5.3:1; #9D9D9D would be 2.7:1.
+    color: colors.gray400,
   },
-  scrollView: {
+  bodyWrap: {
+    flex: 1,
+  },
+  scroll: {
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: spacing.xxl,
-    paddingTop: spacing.md,
+    paddingHorizontal: 16,
+    gap: 12,
   },
-  infoCard: {
-    backgroundColor: colors.white,
-    borderRadius: borderRadius.xxl,
-    padding: spacing.xxl,
-    marginBottom: spacing.lg,
+  card: {
+    gap: 14,
   },
-  infoRow: {
+  spotsRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-  },
-  iconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(90, 107, 255, 0.1)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: spacing.lg,
-  },
-  infoTextContainer: {
-    flex: 1,
-  },
-  infoLabel: {
-    fontSize: typography.fontSize.xs,
-    fontFamily: typography.fontFamily,
-    fontWeight: typography.fontWeight.medium,
-    color: colors.gray400,
-    marginBottom: spacing.xs,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  infoText: {
-    fontSize: typography.fontSize.lg,
-    fontFamily: typography.fontFamily,
-    fontWeight: typography.fontWeight.semiBold,
-    color: colors.textDark,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: colors.gray200,
-    marginVertical: spacing.lg,
-    marginLeft: 56, // iconContainer width + marginRight
-  },
-  spotsCard: {
-    backgroundColor: colors.white,
-    borderRadius: borderRadius.xxl,
-    padding: spacing.xxl,
-    marginBottom: spacing.lg,
-  },
-  spotsContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-end',
     justifyContent: 'space-between',
+    gap: 12,
+  },
+  spotsValue: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 6,
   },
   spotsNumber: {
-    fontSize: 56,
     fontFamily: typography.fontFamily,
+    fontSize: 44,
     fontWeight: typography.fontWeight.bold,
-    color: colors.primary,
-    lineHeight: 64,
+    letterSpacing: -1.5,
+    color: colors.ink,
   },
-  spotsTextContainer: {
-    alignItems: 'flex-end',
-  },
-  spotsLabel: {
-    fontSize: typography.fontSize.md,
+  spotsUnit: {
     fontFamily: typography.fontFamily,
-    fontWeight: typography.fontWeight.semiBold,
-    color: colors.textDark,
-    marginBottom: spacing.xs,
-  },
-  spotsTotal: {
-    fontSize: typography.fontSize.sm,
-    fontFamily: typography.fontFamily,
-    fontWeight: typography.fontWeight.medium,
+    fontSize: 15,
     color: colors.gray400,
   },
-  bookedBanner: {
+  spotsLabel: {
+    flex: 1,
+    textAlign: 'right',
+    fontFamily: typography.fontFamily,
+    fontSize: 13,
+    color: colors.gray400,
+  },
+  track: {
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: colors.surface,
+    overflow: 'hidden',
+  },
+  trackFill: {
+    height: '100%',
+    borderRadius: 4,
+    backgroundColor: colors.ink,
+  },
+  banner: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.md,
-    backgroundColor: 'rgba(90, 107, 255, 0.15)',
-    borderRadius: borderRadius.lg,
-    padding: spacing.lg,
-    marginBottom: spacing.lg,
+    gap: 10,
+    backgroundColor: colors.accentSoft,
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
   },
-  bookedText: {
-    fontSize: typography.fontSize.sm,
-    fontFamily: typography.fontFamily,
-    fontWeight: typography.fontWeight.medium,
-    color: colors.primary,
-    flex: 1,
-  },
-  warningBanner: {
+  warning: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.md,
-    backgroundColor: 'rgba(255, 77, 77, 0.15)',
-    borderRadius: borderRadius.lg,
-    padding: spacing.lg,
-    marginBottom: spacing.lg,
+    gap: 10,
+    // The error hue only tints the ground. As text it is 3.3:1 on white and
+    // fails AA, so the copy stays ink.
+    backgroundColor: 'rgba(255, 77, 77, 0.10)',
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
   },
-  warningText: {
-    fontSize: typography.fontSize.sm,
-    fontFamily: typography.fontFamily,
-    fontWeight: typography.fontWeight.medium,
-    color: colors.error,
+  bannerText: {
     flex: 1,
-  },
-  usersSection: {
-    marginTop: spacing.md,
-  },
-  usersSectionTitle: {
-    fontSize: typography.fontSize.lg,
     fontFamily: typography.fontFamily,
-    fontWeight: typography.fontWeight.semiBold,
-    color: colors.white,
-    marginBottom: spacing.md,
+    fontSize: 13,
+    fontWeight: typography.fontWeight.medium,
+    lineHeight: 18,
+    color: colors.ink,
   },
   usersList: {
-    backgroundColor: colors.white,
-    borderRadius: borderRadius.xxl,
-    overflow: 'hidden',
+    marginTop: -2,
   },
   userItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: spacing.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.gray200,
+    gap: 12,
+    paddingVertical: 10,
   },
-  userNumber: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: colors.gray200,
+  userItemDivided: {
+    borderTopWidth: 1,
+    borderTopColor: colors.surface,
+  },
+  avatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: spacing.md,
   },
-  userNumberText: {
-    fontSize: typography.fontSize.sm,
+  avatarText: {
     fontFamily: typography.fontFamily,
-    fontWeight: typography.fontWeight.semiBold,
-    color: colors.textDark,
+    fontSize: 13,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.ink,
   },
   userName: {
-    fontSize: typography.fontSize.md,
-    fontFamily: typography.fontFamily,
-    fontWeight: typography.fontWeight.medium,
-    color: colors.textDark,
     flex: 1,
+    fontFamily: typography.fontFamily,
+    fontSize: 15,
+    fontWeight: typography.fontWeight.medium,
+    color: colors.ink,
   },
-  buttonContainer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    paddingHorizontal: spacing.xxl,
-    paddingTop: spacing.xl,
-    backgroundColor: colors.bgDark,
+  footer: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 12,
+    gap: 12,
+  },
+  inlineError: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    backgroundColor: 'rgba(255, 77, 77, 0.10)',
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  inlineErrorText: {
+    flex: 1,
+    fontFamily: typography.fontFamily,
+    fontSize: 13,
+    lineHeight: 18,
+    color: colors.ink,
   },
 });

@@ -1,15 +1,19 @@
-import React from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  Image,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import React, { useEffect } from 'react';
+import { View, Text, StyleSheet } from 'react-native';
+import * as Haptics from 'expo-haptics';
+import { Feather } from '@expo/vector-icons';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  withDelay,
+  Easing,
+} from 'react-native-reanimated';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
-import { Ionicons } from '@expo/vector-icons';
-import { colors, typography, spacing, borderRadius } from '../theme/colors';
-import Button from '../components/Button';
+import { colors, typography } from '../theme/colors';
+import Screen from '../components/ui/Screen';
+import Card from '../components/ui/Card';
+import PrimaryButton from '../components/ui/PrimaryButton';
 
 type BookingConfirmationRouteParams = {
   BookingConfirmation: {
@@ -42,137 +46,184 @@ export default function BookingConfirmationScreen() {
     navigation.navigate('MainTabs', { screen: 'Home' });
   };
 
+  // The booking already succeeded by the time this screen mounts, so the
+  // confirmation is worth feeling as well as reading.
+  const intro = useSharedValue(0);
+  useEffect(() => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    intro.value = withTiming(1, { duration: 460, easing: Easing.out(Easing.cubic) });
+  }, []);
+
+  const markStyle = useAnimatedStyle(() => ({
+    opacity: intro.value,
+    transform: [{ scale: 0.86 + intro.value * 0.14 }],
+  }));
+  const textStyle = useAnimatedStyle(() => ({
+    opacity: withDelay(90, withTiming(intro.value, { duration: 400 })),
+    transform: [
+      { translateY: withDelay(90, withTiming((1 - intro.value) * 14, { duration: 400 })) },
+    ],
+  }));
+  const cardStyle = useAnimatedStyle(() => ({
+    opacity: withDelay(170, withTiming(intro.value, { duration: 400 })),
+    transform: [
+      { translateY: withDelay(170, withTiming((1 - intro.value) * 14, { duration: 400 })) },
+    ],
+  }));
+  const footerStyle = useAnimatedStyle(() => ({
+    opacity: withDelay(250, withTiming(intro.value, { duration: 400 })),
+  }));
+
   return (
-    <View style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
-        <View style={styles.content}>
-          {/* Success Icon */}
-          <View style={styles.iconContainer}>
-            <View style={styles.iconCircle}>
-              <Ionicons name="checkmark" size={64} color={colors.textDark} />
-            </View>
+    <Screen wash edges={['top', 'bottom']}>
+      <View style={styles.content}>
+        {/* Achievement is where the brand accent belongs. It sits as the mark
+            inside an ink disc — lime on white would be 1.1:1 and vanish. */}
+        <Animated.View style={[styles.halo, markStyle]}>
+          <View style={styles.mark}>
+            <Feather name="check" size={56} color={colors.accent} />
           </View>
+        </Animated.View>
 
-          {/* Title */}
+        <Animated.View style={[styles.titles, textStyle]}>
           <Text style={styles.title}>¡Ya te agendamos!</Text>
-          <Text style={styles.subtitle}>{trainingType}</Text>
+          <Text style={styles.trainingType}>{trainingType}</Text>
+        </Animated.View>
 
-          {/* Details Card */}
-          <View style={styles.detailsCard}>
+        <Animated.View style={[styles.cardWrap, cardStyle]}>
+          <Card>
             <View style={styles.detailRow}>
               <View style={styles.detailIcon}>
-                <Ionicons name="calendar-outline" size={24} color={colors.primary} />
+                <Feather name="calendar" size={18} color={colors.ink} />
               </View>
-              <Text style={styles.detailText}>{formatDate(date)}</Text>
+              <View style={styles.detailTexts}>
+                <Text style={styles.detailLabel}>FECHA</Text>
+                <Text style={styles.detailValue}>{formatDate(date)}</Text>
+              </View>
             </View>
 
             <View style={styles.divider} />
 
             <View style={styles.detailRow}>
               <View style={styles.detailIcon}>
-                <Ionicons name="time-outline" size={24} color={colors.primary} />
+                <Feather name="clock" size={18} color={colors.ink} />
               </View>
-              <Text style={styles.detailText}>{hourInit} - {hourEnd}</Text>
+              <View style={styles.detailTexts}>
+                <Text style={styles.detailLabel}>HORARIO</Text>
+                <Text style={styles.detailValue}>
+                  {hourInit} — {hourEnd}
+                </Text>
+              </View>
             </View>
-          </View>
+          </Card>
 
-          {/* Motivational Text */}
-          <Text style={styles.motivationalText}>
-            ¡Prepárate para dar lo mejor de ti!
-          </Text>
-        </View>
+          <Text style={styles.motivational}>¡Prepárate para dar lo mejor de ti!</Text>
+        </Animated.View>
+      </View>
 
-        {/* Button */}
-        <View style={styles.buttonContainer}>
-          <Button title="Listo" onPress={handleDone} />
-        </View>
-      </SafeAreaView>
-    </View>
+      <Animated.View style={[styles.footer, footerStyle]}>
+        <PrimaryButton label="Listo" onPress={handleDone} />
+      </Animated.View>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.bgDark,
-  },
-  safeArea: {
-    flex: 1,
-  },
   content: {
     flex: 1,
-    paddingHorizontal: spacing.xxl,
+    paddingHorizontal: 24,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  iconContainer: {
-    marginBottom: spacing.xxl,
-  },
-  iconCircle: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: colors.primary,
+  halo: {
+    width: 148,
+    height: 148,
+    borderRadius: 74,
+    backgroundColor: colors.accentSoft,
     alignItems: 'center',
     justifyContent: 'center',
+    marginBottom: 28,
+  },
+  mark: {
+    width: 112,
+    height: 112,
+    borderRadius: 56,
+    backgroundColor: colors.ink,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  titles: {
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 28,
   },
   title: {
-    fontSize: typography.fontSize.title1,
     fontFamily: typography.fontFamily,
+    fontSize: 34,
     fontWeight: typography.fontWeight.bold,
-    color: colors.white,
+    lineHeight: 40,
+    letterSpacing: -1,
+    color: colors.ink,
     textAlign: 'center',
-    marginBottom: spacing.md,
   },
-  subtitle: {
-    fontSize: typography.fontSize.xxl,
-    fontFamily: typography.fontFamily.semibold,
-    color: colors.primary,
-    textAlign: 'center',
+  trainingType: {
+    fontFamily: typography.fontFamily,
+    fontSize: 12,
+    fontWeight: typography.fontWeight.bold,
+    letterSpacing: 1.4,
     textTransform: 'uppercase',
-    marginBottom: spacing.xxl,
+    // gray400 is 5.3:1 here; the design's #A5A5A5 would be 2.5:1.
+    color: colors.gray400,
+    textAlign: 'center',
   },
-  detailsCard: {
-    backgroundColor: colors.white,
-    borderRadius: borderRadius.xl,
-    padding: spacing.xxl,
-    width: '100%',
-    marginBottom: spacing.xxl,
+  cardWrap: {
+    alignSelf: 'stretch',
+    gap: 20,
   },
   detailRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.lg,
+    gap: 14,
   },
   detailIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: 'rgba(90, 107, 255, 0.15)',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  detailText: {
-    fontSize: typography.fontSize.lg,
-    fontFamily: typography.fontFamily,
-    fontWeight: typography.fontWeight.medium,
-    color: colors.textDark,
+  detailTexts: {
     flex: 1,
+    gap: 2,
+  },
+  detailLabel: {
+    fontFamily: typography.fontFamily,
+    fontSize: 10,
+    fontWeight: typography.fontWeight.bold,
+    letterSpacing: 1.2,
+    color: colors.gray400,
+  },
+  detailValue: {
+    fontFamily: typography.fontFamily,
+    fontSize: 17,
+    fontWeight: typography.fontWeight.semiBold,
+    color: colors.ink,
   },
   divider: {
     height: 1,
-    backgroundColor: colors.gray200,
-    marginVertical: spacing.lg,
+    backgroundColor: colors.surface,
+    marginLeft: 54, // detailIcon width + gap
   },
-  motivationalText: {
-    fontSize: typography.fontSize.md,
+  motivational: {
     fontFamily: typography.fontFamily,
-    fontWeight: typography.fontWeight.medium,
+    fontSize: 14,
     color: colors.gray400,
     textAlign: 'center',
   },
-  buttonContainer: {
-    paddingHorizontal: spacing.xxl,
-    paddingBottom: spacing.xxl,
+  footer: {
+    paddingHorizontal: 24,
+    paddingBottom: 12,
+    paddingTop: 8,
   },
 });
