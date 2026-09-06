@@ -1,25 +1,44 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
-  TouchableOpacity,
+  Pressable,
   KeyboardAvoidingView,
   Platform,
+  ScrollView,
+  Image,
+  ActivityIndicator,
   Dimensions,
-  Alert,
+  type TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
+import { StatusBar } from 'expo-status-bar';
+import * as Haptics from 'expo-haptics';
+import Svg, { Path, Defs, LinearGradient as SvgGradient, Stop } from 'react-native-svg';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  withDelay,
+  Easing,
+} from 'react-native-reanimated';
+import { Ionicons, Feather } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
-import { colors, typography, spacing, borderRadius } from '../theme/colors';
-import Input from '../components/Input';
-import Button from '../components/Button';
 import { useAuth } from '../context/AuthContext';
+import { colors, typography } from '../theme/colors';
+import AuthField from '../components/AuthField';
 
-const CONTENT_PADDING = spacing.xxl;
-const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+const { width: SCREEN_W } = Dimensions.get('window');
+
+// Same brand shape as the splash and the login screen, bled off the top
+// corner so the auth pair reads as one continuous surface.
+const BLOB_VIEWBOX = '0 0 343 380.74';
+const BLOB_PATH =
+  'M0 142.78c0 0 0 152.29 0 152.29 0 0 47.64 0 47.64 0 5 0 9.96 0.99 14.58 2.9 4.63 1.91 8.83 4.72 12.37 8.25 3.54 3.54 6.34 7.74 8.26 12.36 1.91 4.62 2.9 9.57 2.9 14.57 0 0 0 47.59 0 47.59 0 0 114.33 0 114.33 0 0 0 142.92-142.78 142.92-142.78 0 0 0-152.29 0-152.29 0 0-47.64 0-47.64 0-5 0-9.96-0.99-14.58-2.9-4.63-1.92-8.83-4.72-12.37-8.26-3.54-3.53-6.34-7.73-8.26-12.35-1.91-4.62-2.9-9.57-2.9-14.57 0 0 0-47.59 0-47.59 0 0-114.33 0-114.33 0 0 0-142.92 142.78-142.92 142.78z m161.97 142.77c0 0-66.69 0-66.69 0 0 0 0-104.7 0-104.7 0 0 85.75-85.67 85.75-85.67 0 0 66.69 0 66.69 0 0 0 0 104.71 0 104.71 0 0-85.75 85.66-85.75 85.66z';
+
+const DECOR_W = SCREEN_W * 0.95;
+const DECOR_H = DECOR_W * (380.74 / 343);
 
 interface FormErrors {
   first_name?: string;
@@ -46,6 +65,33 @@ export default function RegisterScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<FormErrors>({});
 
+  // Six fields is a long walk on a phone keyboard, so every return key hands
+  // off to the next input and the last one submits.
+  const lastNameRef = useRef<TextInput>(null);
+  const emailRef = useRef<TextInput>(null);
+  const phoneRef = useRef<TextInput>(null);
+  const passwordRef = useRef<TextInput>(null);
+  const confirmRef = useRef<TextInput>(null);
+
+  // Short staggered entrance, matching the login screen. Anything longer
+  // makes the form feel heavier than it already is.
+  const intro = useSharedValue(0);
+  useEffect(() => {
+    intro.value = withTiming(1, { duration: 460, easing: Easing.out(Easing.cubic) });
+  }, []);
+
+  const headerStyle = useAnimatedStyle(() => ({
+    opacity: intro.value,
+    transform: [{ translateY: (1 - intro.value) * 18 }],
+  }));
+  const formStyle = useAnimatedStyle(() => ({
+    opacity: withDelay(80, withTiming(intro.value, { duration: 400 })),
+    transform: [{ translateY: withDelay(80, withTiming((1 - intro.value) * 18, { duration: 400 })) }],
+  }));
+  const footerStyle = useAnimatedStyle(() => ({
+    opacity: withDelay(160, withTiming(intro.value, { duration: 400 })),
+  }));
+
   const updateField = (field: keyof typeof formData, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
     if (errors[field]) {
@@ -57,27 +103,27 @@ export default function RegisterScreen() {
     const newErrors: FormErrors = {};
 
     if (!formData.first_name.trim()) {
-      newErrors.first_name = 'El nombre es requerido';
+      newErrors.first_name = 'Ingresa tu nombre';
     }
 
     if (!formData.last_name.trim()) {
-      newErrors.last_name = 'El apellido es requerido';
+      newErrors.last_name = 'Ingresa tu apellido';
     }
 
     if (!formData.email.trim()) {
-      newErrors.email = 'El email es requerido';
+      newErrors.email = 'Ingresa tu correo';
     } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = 'Email inválido';
+      newErrors.email = 'Ese correo no parece válido';
     }
 
     if (!formData.phone_number.trim()) {
-      newErrors.phone_number = 'El teléfono es requerido';
+      newErrors.phone_number = 'Ingresa tu teléfono';
     }
 
     if (!formData.password) {
-      newErrors.password = 'La contraseña es requerida';
+      newErrors.password = 'Ingresa una contraseña';
     } else if (formData.password.length < 8) {
-      newErrors.password = 'Mínimo 8 caracteres';
+      newErrors.password = 'Usa al menos 8 caracteres';
     }
 
     if (formData.password !== formData.password_confirmation) {
@@ -89,10 +135,14 @@ export default function RegisterScreen() {
   };
 
   const handleRegister = async () => {
-    if (!validateForm()) return;
+    if (!validateForm()) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      return;
+    }
 
     setIsLoading(true);
     setErrors({});
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
     const { success, error, errors: apiErrors } = await register({
       first_name: formData.first_name.trim(),
@@ -106,6 +156,7 @@ export default function RegisterScreen() {
     setIsLoading(false);
 
     if (success) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       // Registration successful - navigate to login
       // In web, Alert might not work well, so navigate directly after a brief delay
       setTimeout(() => {
@@ -116,12 +167,12 @@ export default function RegisterScreen() {
 
     // Handle registration errors
     const newErrors: FormErrors = {};
-    
+
     // Map API field errors to form errors first
     if (apiErrors && Object.keys(apiErrors).length > 0) {
       Object.keys(apiErrors).forEach((field) => {
         const fieldErrors = apiErrors[field];
-        
+
         if (fieldErrors && Array.isArray(fieldErrors) && fieldErrors.length > 0) {
           // Map API field names to form field names
           const formFieldMap: Record<string, keyof FormErrors> = {
@@ -132,7 +183,7 @@ export default function RegisterScreen() {
             phone_number: 'phone_number',
             password_confirmation: 'password_confirmation',
           };
-          
+
           const formField = formFieldMap[field];
           if (formField) {
             // Join multiple errors with ". " (period and space)
@@ -141,13 +192,14 @@ export default function RegisterScreen() {
         }
       });
     }
-    
+
     // Set general error only if no field-specific errors exist
     if (error && Object.keys(newErrors).length === 0) {
       newErrors.general = error;
     }
-    
+
     setErrors(newErrors);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
   };
 
   const handleSignIn = () => {
@@ -156,129 +208,159 @@ export default function RegisterScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Subtle Background Gradients */}
-      <View style={styles.backgroundContainer}>
-        <LinearGradient
-          colors={['rgba(90, 107, 255, 0.15)', 'transparent']}
-          style={styles.gradientTop}
-        />
-        <LinearGradient
-          colors={['rgba(90, 107, 255, 0.15)', 'transparent']}
-          style={styles.gradientBottom}
-        />
+      <StatusBar style="dark" />
+
+      <View style={styles.decor} pointerEvents="none">
+        <Svg width={DECOR_W} height={DECOR_H} viewBox={BLOB_VIEWBOX}>
+          <Defs>
+            <SvgGradient id="registerBrand" x1="0" y1="1" x2="1" y2="0">
+              <Stop offset="0" stopColor={colors.accent} stopOpacity={0.55} />
+              <Stop offset="1" stopColor={colors.accentDeep} stopOpacity={0.35} />
+            </SvgGradient>
+          </Defs>
+          <Path d={BLOB_PATH} fill="url(#registerBrand)" fillRule="evenodd" />
+        </Svg>
       </View>
 
       <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
         <KeyboardAvoidingView
-          style={styles.keyboardAvoid}
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+          style={styles.flex}
         >
           <ScrollView
-            contentContainerStyle={styles.scrollContent}
+            contentContainerStyle={styles.scroll}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
           >
-            <View style={styles.centerContainer}>
-              {/* Header Title */}
-              <Text style={styles.headerTitle}>Registro</Text>
+            <Animated.View style={[styles.header, headerStyle]}>
+              <Image
+                source={require('../../assets/neural.png')}
+                style={styles.logo}
+                resizeMode="contain"
+              />
+              <Text style={styles.title}>Crea tu{'\n'}cuenta</Text>
+              <Text style={styles.subtitle}>
+                Unos datos y ya puedes reservar tu primer entrenamiento.
+              </Text>
+            </Animated.View>
 
-              {/* Premium Card */}
-              <View style={styles.card}>
-                {/* General Error */}
-                {errors.general && (
-                  <View style={styles.errorBanner}>
-                    <Text style={styles.errorBannerText}>{errors.general}</Text>
-                  </View>
-                )}
+            <Animated.View style={[styles.form, formStyle]}>
+              {!!errors.general && (
+                <View style={styles.banner}>
+                  <Feather name="alert-circle" size={16} color={colors.error} />
+                  <Text style={styles.bannerText}>{errors.general}</Text>
+                </View>
+              )}
 
-                {/* Input Fields */}
-                <View style={styles.inputsContainer}>
-                  <View style={styles.nameRow}>
-                    <View style={styles.nameInput}>
-                      <Input
-                        placeholder="Nombre"
-                        value={formData.first_name}
-                        onChangeText={(text) => updateField('first_name', text)}
-                        autoCapitalize="words"
-                        error={errors.first_name}
-                        editable={!isLoading}
-                      />
-                    </View>
-                    <View style={styles.nameInput}>
-                      <Input
-                        placeholder="Apellido"
-                        value={formData.last_name}
-                        onChangeText={(text) => updateField('last_name', text)}
-                        autoCapitalize="words"
-                        error={errors.last_name}
-                        editable={!isLoading}
-                      />
-                    </View>
-                  </View>
-
-                  <Input
-                    placeholder="Email"
-                    value={formData.email}
-                    onChangeText={(text) => updateField('email', text)}
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                    error={errors.email}
+              <View style={styles.nameRow}>
+                <View style={styles.nameCell}>
+                  <AuthField
+                    kind="text"
+                    label="Nombre"
+                    value={formData.first_name}
+                    error={errors.first_name}
                     editable={!isLoading}
-                  />
-
-                  <Input
-                    placeholder="Teléfono"
-                    value={formData.phone_number}
-                    onChangeText={(text) => updateField('phone_number', text)}
-                    keyboardType="phone-pad"
-                    error={errors.phone_number}
-                    editable={!isLoading}
-                  />
-
-                  <Input
-                    placeholder="Contraseña"
-                    value={formData.password}
-                    onChangeText={(text) => updateField('password', text)}
-                    secureTextEntry
-                    autoCapitalize="none"
-                    error={errors.password}
-                    editable={!isLoading}
-                  />
-
-                  <Input
-                    placeholder="Confirmar contraseña"
-                    value={formData.password_confirmation}
-                    onChangeText={(text) => updateField('password_confirmation', text)}
-                    secureTextEntry
-                    autoCapitalize="none"
-                    error={errors.password_confirmation}
-                    editable={!isLoading}
+                    returnKeyType="next"
+                    onSubmitEditing={() => lastNameRef.current?.focus()}
+                    onChangeText={(text) => updateField('first_name', text)}
                   />
                 </View>
-
-                {/* Register Button */}
-                <View style={styles.buttonContainer}>
-                  <Button
-                    title="Registrarse"
-                    onPress={handleRegister}
-                    disabled={isLoading}
-                    loading={isLoading}
+                <View style={styles.nameCell}>
+                  <AuthField
+                    ref={lastNameRef}
+                    kind="text"
+                    label="Apellido"
+                    value={formData.last_name}
+                    error={errors.last_name}
+                    editable={!isLoading}
+                    returnKeyType="next"
+                    onSubmitEditing={() => emailRef.current?.focus()}
+                    onChangeText={(text) => updateField('last_name', text)}
                   />
                 </View>
-
-                {/* Sign In Link */}
-                <TouchableOpacity
-                  onPress={handleSignIn}
-                  style={styles.signInContainer}
-                  disabled={isLoading}
-                >
-                  <Text style={styles.signInText}>
-                    ¿Ya tienes cuenta? <Text style={styles.signInLink}>Inicia sesión</Text>
-                  </Text>
-                </TouchableOpacity>
               </View>
-            </View>
+
+              <AuthField
+                ref={emailRef}
+                kind="email"
+                label="Correo electrónico"
+                value={formData.email}
+                error={errors.email}
+                editable={!isLoading}
+                returnKeyType="next"
+                onSubmitEditing={() => phoneRef.current?.focus()}
+                onChangeText={(text) => updateField('email', text)}
+              />
+
+              <AuthField
+                ref={phoneRef}
+                kind="phone"
+                label="Teléfono"
+                value={formData.phone_number}
+                error={errors.phone_number}
+                editable={!isLoading}
+                returnKeyType="next"
+                onSubmitEditing={() => passwordRef.current?.focus()}
+                onChangeText={(text) => updateField('phone_number', text)}
+              />
+
+              <AuthField
+                ref={passwordRef}
+                kind="password"
+                label="Contraseña"
+                value={formData.password}
+                error={errors.password}
+                editable={!isLoading}
+                returnKeyType="next"
+                onSubmitEditing={() => confirmRef.current?.focus()}
+                onChangeText={(text) => updateField('password', text)}
+              />
+
+              <AuthField
+                ref={confirmRef}
+                kind="password"
+                label="Confirmar contraseña"
+                value={formData.password_confirmation}
+                error={errors.password_confirmation}
+                editable={!isLoading}
+                returnKeyType="go"
+                onSubmitEditing={handleRegister}
+                onChangeText={(text) => updateField('password_confirmation', text)}
+              />
+
+              <Pressable
+                onPress={handleRegister}
+                disabled={isLoading}
+                accessibilityRole="button"
+                accessibilityLabel="Crear cuenta"
+                style={({ pressed }) => [
+                  styles.cta,
+                  pressed && styles.ctaPressed,
+                  isLoading && styles.ctaLoading,
+                ]}
+              >
+                {isLoading ? (
+                  <ActivityIndicator size="small" color={colors.white} />
+                ) : (
+                  <>
+                    <Text style={styles.ctaLabel}>Crear cuenta</Text>
+                    <Ionicons name="arrow-forward" size={19} color={colors.white} />
+                  </>
+                )}
+              </Pressable>
+            </Animated.View>
+
+            <Animated.View style={[styles.footer, footerStyle]}>
+              <Text style={styles.footerText}>¿Ya tienes cuenta?</Text>
+              <Pressable onPress={handleSignIn} disabled={isLoading} hitSlop={8}>
+                {({ pressed }) => (
+                  <Text style={[styles.footerLink, pressed && styles.pressedText]}>
+                    Inicia sesión
+                  </Text>
+                )}
+              </Pressable>
+            </Animated.View>
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
@@ -289,103 +371,140 @@ export default function RegisterScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.bgDark,
+    backgroundColor: colors.white,
+  },
+  flex: {
+    flex: 1,
+  },
+  decor: {
+    position: 'absolute',
+    // Pulled far enough out that only the solid corner of the mark reads;
+    // the shape is hollow through its middle and that hole looks like a
+    // rendering fault when it lands inside the frame.
+    top: -DECOR_H * 0.62,
+    right: -DECOR_W * 0.52,
   },
   safeArea: {
     flex: 1,
   },
-  keyboardAvoid: {
-    flex: 1,
-  },
-  scrollContent: {
+  scroll: {
     flexGrow: 1,
-    paddingHorizontal: CONTENT_PADDING,
-    justifyContent: 'center',
-    minHeight: SCREEN_HEIGHT * 0.9,
+    paddingHorizontal: 24,
+    paddingTop: 8,
+    paddingBottom: 24,
   },
-  centerContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    paddingVertical: 20,
+  header: {
+    marginTop: 40,
+    marginBottom: 32,
   },
-  backgroundContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+  logo: {
+    width: 132,
+    height: 34,
+    marginBottom: 28,
   },
-  gradientTop: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 300,
-  },
-  gradientBottom: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 300,
-    transform: [{ rotate: '180deg' }],
-  },
-  headerTitle: {
-    fontSize: typography.fontSize.title1,
+  title: {
     fontFamily: typography.fontFamily,
+    fontSize: 40,
     fontWeight: typography.fontWeight.bold,
-    lineHeight: typography.lineHeight.xxxl,
-    color: colors.white,
-    marginBottom: spacing.xl,
-    textAlign: 'center',
-    letterSpacing: 1,
+    lineHeight: 44,
+    letterSpacing: -1,
+    color: colors.ink,
   },
-  card: {
-    backgroundColor: colors.white,
-    borderRadius: borderRadius.xxl,
-    padding: spacing.xxl,
+  subtitle: {
+    marginTop: 12,
+    fontFamily: typography.fontFamily,
+    fontSize: 15,
+    lineHeight: 21,
+    // gray400 sits at 5.3:1 on white. The design's #9D9D9D is 2.7:1 and fails
+    // AA, so the muted role is kept but that value is not.
+    color: colors.gray400,
   },
-  errorBanner: {
-    backgroundColor: colors.gray200,
-    borderRadius: borderRadius.md,
-    padding: spacing.md,
-    marginBottom: spacing.lg,
+  form: {
+    gap: 18,
+  },
+  // The backend can reject the whole submission without naming a field, and
+  // that message has nowhere else to live.
+  banner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    padding: 14,
+    borderRadius: 14,
+    backgroundColor: colors.surface,
     borderLeftWidth: 3,
     borderLeftColor: colors.error,
   },
-  errorBannerText: {
-    color: colors.error,
-    fontSize: typography.fontSize.sm,
+  bannerText: {
+    flex: 1,
     fontFamily: typography.fontFamily,
-    fontWeight: typography.fontWeight.medium,
-    textAlign: 'left',
-  },
-  inputsContainer: {
-    gap: spacing.lg,
+    fontSize: 14,
+    lineHeight: 19,
+    color: colors.error,
   },
   nameRow: {
     flexDirection: 'row',
-    gap: spacing.md,
+    gap: 12,
+    // Errors under one of the two make it taller than its neighbour; top
+    // alignment keeps both labels on the same line.
+    alignItems: 'flex-start',
   },
-  nameInput: {
+  nameCell: {
     flex: 1,
   },
-  buttonContainer: {
-    marginTop: spacing.xxl,
+  pressedText: {
+    opacity: 0.5,
   },
-  signInContainer: {
-    marginTop: spacing.lg,
+  cta: {
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    height: 58,
+    borderRadius: 29,
+    backgroundColor: colors.ink,
+    marginTop: 8,
+    // A primary action should look pressable before it is pressed.
+    ...Platform.select({
+      ios: {
+        shadowColor: colors.ink,
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.22,
+        shadowRadius: 20,
+      },
+      android: { elevation: 6 },
+    }),
   },
-  signInText: {
-    fontSize: typography.fontSize.sm,
-    fontFamily: typography.fontFamily,
-    fontWeight: typography.fontWeight.medium,
-    color: colors.textDark,
+  ctaPressed: {
+    transform: [{ scale: 0.98 }],
+    opacity: 0.92,
   },
-  signInLink: {
+  ctaLoading: {
+    opacity: 0.75,
+  },
+  ctaLabel: {
     fontFamily: typography.fontFamily,
+    fontSize: 17,
+    fontWeight: typography.fontWeight.semiBold,
+    color: colors.white,
+    letterSpacing: 0.2,
+  },
+  footer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 'auto',
+    paddingTop: 36,
+  },
+  footerText: {
+    fontFamily: typography.fontFamily,
+    fontSize: 14,
+    color: colors.gray400,
+  },
+  footerLink: {
+    fontFamily: typography.fontFamily,
+    fontSize: 14,
     fontWeight: typography.fontWeight.bold,
-    color: colors.primary,
+    color: colors.ink,
   },
 });
