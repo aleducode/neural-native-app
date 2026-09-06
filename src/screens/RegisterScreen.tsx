@@ -203,7 +203,8 @@ export default function RegisterScreen() {
   };
 
   const handleSignIn = () => {
-    navigation.goBack();
+    if (navigation.canGoBack?.()) navigation.goBack();
+    else navigation.navigate('Login');
   };
 
   return (

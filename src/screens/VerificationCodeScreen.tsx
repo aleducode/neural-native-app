@@ -138,6 +138,13 @@ export default function VerificationCodeScreen({
     [secondsLeft]
   );
 
+  // A back control has to land somewhere even when there is no history —
+  // deep links and a direct launch both open this screen with an empty stack.
+  const goBack = () => {
+    if (navigation.canGoBack?.()) navigation.goBack();
+    else navigation.navigate('Login');
+  };
+
   const handleVerify = useCallback(
     async (value: string) => {
       if (submittingRef.current) return;
@@ -277,7 +284,7 @@ export default function VerificationCodeScreen({
           >
             <Animated.View style={headerStyle}>
               <Pressable
-                onPress={() => navigation.goBack()}
+                onPress={goBack}
                 accessibilityRole="button"
                 accessibilityLabel="Volver"
                 hitSlop={8}
