@@ -48,3 +48,9 @@ package-lock.json
 .playwright*
 pushes/
 secrets/
+
+# Agent tooling — machine-local, not part of the app
+.agents/
+.kiro/
+.claude/
+skills-lock.json
