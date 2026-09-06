@@ -1,71 +1,111 @@
-import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  ActivityIndicator,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
-import { colors, typography, spacing, borderRadius } from '../theme/colors';
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator } from 'react-native';
+import { Feather } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  withDelay,
+  Easing,
+} from 'react-native-reanimated';
+import Screen from '../components/ui/Screen';
+import AppHeader from '../components/ui/AppHeader';
+import Card from '../components/ui/Card';
+import PrimaryButton from '../components/ui/PrimaryButton';
+import { colors, typography } from '../theme/colors';
 import { membershipApi, MembershipResponse, NeuralPlan } from '../api/membership';
 
-interface BenefitItemProps {
-  text: string;
+/** What `createPayment` hands back: reference, amount and Bold's checkout credentials. */
+type PaymentReference = NonNullable<
+  Awaited<ReturnType<typeof membershipApi.createPayment>>['data']
+>;
+
+const BENEFITS = [
+  'Entrenos funcionales adaptados a tu progreso.',
+  'Seguimiento de tu rendimiento y estadísticas.',
+  'Acceso a todas las clases y horarios disponibles.',
+  'Planes que se ajustan a tus objetivos.',
+];
+
+function formatPrice(price: number, currency = 'COP') {
+  return new Intl.NumberFormat('es-CO', {
+    style: 'currency',
+    currency,
+    minimumFractionDigits: 0,
+  }).format(price);
 }
 
-function BenefitItem({ text }: BenefitItemProps) {
-  return (
-    <View style={styles.benefitItem}>
-      <View style={styles.benefitIconContainer}>
-        <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
-      </View>
-      <Text style={styles.benefitText}>{text}</Text>
-    </View>
-  );
+function getPlanDisplayName(plan: NeuralPlan) {
+  if (plan.slug_name === 'mensualidad' || plan.duration <= 31) {
+    return 'Plan Mensual';
+  } else if (plan.slug_name === 'trimestre' || plan.duration <= 92) {
+    return 'Plan Trimestral';
+  } else if (plan.slug_name === 'semestre' || plan.duration <= 183) {
+    return 'Plan Semestral';
+  }
+  return plan.name;
 }
 
 interface PlanCardProps {
-  title: string;
-  price: number;
+  plan: NeuralPlan;
   isSelected: boolean;
   onPress: () => void;
 }
 
-function PlanCard({ title, price, isSelected, onPress }: PlanCardProps) {
-  const formattedPrice = new Intl.NumberFormat('es-CO', {
-    style: 'currency',
-    currency: 'COP',
-    minimumFractionDigits: 0,
-  }).format(price);
-
+/** A plan reads as a row you can tick, not as a card that happens to be tappable. */
+function PlanCard({ plan, isSelected, onPress }: PlanCardProps) {
   return (
-    <TouchableOpacity
-      style={[styles.planCard, isSelected && styles.planCardSelected]}
+    <Pressable
       onPress={onPress}
-      activeOpacity={0.7}
+      style={({ pressed }) => [
+        styles.plan,
+        isSelected && styles.planOn,
+        pressed && styles.pressed,
+      ]}
+      accessibilityRole="radio"
+      accessibilityState={{ selected: isSelected }}
+      accessibilityLabel={`${getPlanDisplayName(plan)}, ${formatPrice(plan.price)} mensual`}
     >
-      {isSelected && (
-        <View style={styles.selectedBadge}>
-          <Ionicons name="checkmark-circle" size={18} color={colors.primary} />
-        </View>
-      )}
-      <Text style={styles.planTitle}>{title}</Text>
-      <Text style={styles.planPrice}>{formattedPrice}</Text>
-      <Text style={styles.planPeriod}>mensual</Text>
-    </TouchableOpacity>
+      <View style={styles.planText}>
+        <Text style={styles.planTitle}>{getPlanDisplayName(plan)}</Text>
+        <Text style={styles.planPrice}>{formatPrice(plan.price)}</Text>
+        <Text style={styles.planPeriod}>mensual</Text>
+      </View>
+
+      <View style={[styles.tick, isSelected && styles.tickOn]}>
+        {isSelected && <Feather name="check" size={16} color={colors.white} />}
+      </View>
+    </Pressable>
   );
 }
 
 export default function MembershipScreen() {
-  const navigation = useNavigation();
   const [isLoading, setIsLoading] = useState(true);
   const [membershipData, setMembershipData] = useState<MembershipResponse | null>(null);
   const [selectedPlan, setSelectedPlan] = useState<NeuralPlan | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  // Payment: the reference lives here until the Bold checkout exists to consume it.
+  const [isCreatingPayment, setIsCreatingPayment] = useState(false);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
+  const [pendingPayment, setPendingPayment] = useState<PaymentReference | null>(null);
+
+  const intro = useSharedValue(0);
+  useEffect(() => {
+    intro.value = withTiming(1, { duration: 460, easing: Easing.out(Easing.cubic) });
+  }, []);
+
+  const headerStyle = useAnimatedStyle(() => ({
+    opacity: intro.value,
+    transform: [{ translateY: (1 - intro.value) * 14 }],
+  }));
+  const bodyStyle = useAnimatedStyle(() => ({
+    opacity: withDelay(90, withTiming(intro.value, { duration: 400 })),
+    transform: [
+      { translateY: withDelay(90, withTiming((1 - intro.value) * 14, { duration: 400 })) },
+    ],
+  }));
 
   useEffect(() => {
     fetchMembership();
@@ -73,6 +113,7 @@ export default function MembershipScreen() {
 
   const fetchMembership = async () => {
     setIsLoading(true);
+    setLoadError(null);
     const { data, error } = await membershipApi.getMembership();
     if (data) {
       setMembershipData(data);
@@ -80,389 +121,359 @@ export default function MembershipScreen() {
       if (!data.current_membership && data.available_plans.length > 0) {
         setSelectedPlan(data.available_plans[0]);
       }
+    } else {
+      setLoadError(error || 'No pudimos cargar tu membresía.');
     }
     setIsLoading(false);
   };
 
-  const handleBack = () => {
-    navigation.goBack();
+  const handleSelectPlan = (plan: NeuralPlan) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setSelectedPlan(plan);
+    // A new plan invalidates any reference already created for the old one.
+    setPendingPayment(null);
+    setPaymentError(null);
   };
 
-  const getPlanDisplayName = (plan: NeuralPlan) => {
-    if (plan.slug_name === 'mensualidad' || plan.duration <= 31) {
-      return 'Plan Mensual';
-    } else if (plan.slug_name === 'trimestre' || plan.duration <= 92) {
-      return 'Plan Trimestral';
-    } else if (plan.slug_name === 'semestre' || plan.duration <= 183) {
-      return 'Plan Semestral';
+  /**
+   * Ask the backend for a payment reference for the selected plan.
+   *
+   * This is as far as the app can take the user today: the reference, the
+   * amount, the integrity signature and Bold's public key all come back here
+   * and there is nothing yet to hand them to.
+   */
+  const handleSubscribe = async () => {
+    if (!selectedPlan || isCreatingPayment) return;
+
+    setPaymentError(null);
+    setIsCreatingPayment(true);
+    const { data, error } = await membershipApi.createPayment(selectedPlan.id);
+    setIsCreatingPayment(false);
+
+    if (!data) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      setPaymentError(error || 'No pudimos iniciar el pago. Intenta de nuevo.');
+      return;
     }
-    return plan.name;
+
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    setPendingPayment(data);
+
+    // TODO(pago-bold): the checkout step is missing, and it needs the Bold SDK.
+    // Everything it consumes is already in `data`:
+    //   - data.bold_public_key      -> initialises the checkout
+    //   - data.reference            -> orderId, both for Bold and for verifyPayment
+    //   - data.amount, data.currency
+    //   - data.integrity_signature  -> signs the order server-side
+    // What has to be built:
+    //   1. Add the Bold checkout SDK (native module or WebView on the hosted
+    //      checkout URL) — a new dependency and a native rebuild.
+    //   2. Open it with the five fields above and wait for its callback.
+    //   3. Call membershipApi.verifyPayment(data.reference, txStatus) with the
+    //      tx_status Bold returns ('approved' | 'rejected' | 'failed' | ...).
+    //   4. On { success: true }, refetch with fetchMembership() so the active
+    //      membership card replaces the plan list, and surface the returned
+    //      message on failure.
+    //   5. Handle the user closing the checkout without paying: the reference
+    //      stays open, so it should be verified or discarded on the next visit.
+    // Until then the screen tells the user the reference exists and stops.
   };
 
   const currentMembership = membershipData?.current_membership;
   const currentPlanName = currentMembership?.plan?.name || 'Neural';
-
-  const benefits = [
-    'Entrenos funcionales adaptados a tu progreso.',
-    'Seguimiento de tu rendimiento y estadísticas.',
-    'Acceso a todas las clases y horarios disponibles.',
-    'Planes que se ajustan a tus objetivos.',
-  ];
+  const plans = membershipData?.available_plans ?? [];
+  const canSubscribe = !currentMembership;
 
   if (isLoading) {
     return (
-      <View style={styles.container}>
-        <SafeAreaView style={styles.safeArea}>
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={colors.primary} />
-          </View>
-        </SafeAreaView>
-      </View>
+      <Screen tone="surface" wash>
+        <AppHeader title="Membresía" />
+        <View style={styles.loading}>
+          <ActivityIndicator size="large" color={colors.ink} />
+        </View>
+      </Screen>
     );
   }
 
   return (
-    <View style={styles.container}>
-      {/* Subtle Background Gradients */}
-      <View style={styles.backgroundContainer}>
-        <LinearGradient
-          colors={['rgba(90, 107, 255, 0.15)', 'transparent']}
-          style={styles.gradientTop}
-        />
-        <LinearGradient
-          colors={['rgba(90, 107, 255, 0.15)', 'transparent']}
-          style={styles.gradientBottom}
-        />
-      </View>
+    <Screen tone="surface" wash>
+      <AppHeader title="Membresía" />
 
-      <SafeAreaView style={styles.safeArea} edges={['top']}>
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity style={styles.backButton} onPress={handleBack}>
-            <Ionicons name="chevron-back" size={24} color={colors.textDark} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Membresía</Text>
-          <View style={styles.headerSpacer} />
-        </View>
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        showsVerticalScrollIndicator={false}
+      >
+        <Animated.View style={[styles.hero, headerStyle]}>
+          <Text style={styles.heroLabel}>
+            {currentMembership ? 'MEMBRESÍA ACTIVA' : 'TU PLAN'}
+          </Text>
+          <Text style={styles.heroTitle}>
+            {currentMembership ? currentPlanName : 'Elige tu plan.'}
+          </Text>
+          {!currentMembership && (
+            <Text style={styles.heroSubtitle}>
+              Accede a entrenos personalizados y seguimiento de tu progreso.
+            </Text>
+          )}
+        </Animated.View>
 
-        <ScrollView
-          style={styles.scrollView}
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-        >
-          {/* Current Membership Info */}
-          {currentMembership ? (
-            <View style={styles.currentMembershipCard}>
-              <View style={styles.membershipHeader}>
-                <Ionicons name="checkmark-circle" size={32} color={colors.primary} />
-                <Text style={styles.membershipTitle}>Membresía Activa</Text>
-              </View>
-              <Text style={styles.planName}>{currentPlanName}</Text>
-              <View style={styles.membershipDetails}>
-                <View style={styles.detailRow}>
-                  <Ionicons name="calendar-outline" size={18} color={colors.gray400} />
-                  <Text style={styles.detailText}>
-                    Vence: {new Date(currentMembership.expiration_date).toLocaleDateString('es-CO', {
-                      day: 'numeric',
-                      month: 'long',
-                      year: 'numeric',
-                    })}
-                  </Text>
-                </View>
-                <View style={styles.daysLeftContainer}>
-                  <Text style={styles.daysLeftValue}>{currentMembership.days_left}</Text>
-                  <Text style={styles.daysLeftLabel}>días restantes</Text>
-                </View>
-              </View>
-            </View>
-          ) : (
-            <View style={styles.welcomeSection}>
-              <Text style={styles.welcomeTitle}>Elige tu plan</Text>
-              <Text style={styles.welcomeSubtitle}>
-                Accede a entrenos personalizados y seguimiento de tu progreso
-              </Text>
-            </View>
+        <Animated.View style={[styles.body, bodyStyle]}>
+          {!!loadError && (
+            <Card>
+              <Text style={styles.errorText}>{loadError}</Text>
+              <PrimaryButton label="Reintentar" variant="secondary" onPress={fetchMembership} />
+            </Card>
           )}
 
-          {/* Benefits Container */}
-          <View style={styles.benefitsContainer}>
-            {benefits.map((benefit, index) => (
-              <BenefitItem key={index} text={benefit} />
-            ))}
-          </View>
+          {currentMembership && (
+            <Card>
+              {/* Days left is the achievement on this screen, so it takes the accent. */}
+              <View style={styles.daysRow}>
+                <Text style={styles.daysValue}>{currentMembership.days_left}</Text>
+                <Text style={styles.daysLabel}>
+                  {currentMembership.days_left === 1 ? 'día restante' : 'días restantes'}
+                </Text>
+              </View>
+              <View style={styles.detailRow}>
+                <Feather name="calendar" size={16} color={colors.gray400} />
+                <Text style={styles.detailText}>
+                  Vence:{' '}
+                  {new Date(currentMembership.expiration_date).toLocaleDateString('es-CO', {
+                    day: 'numeric',
+                    month: 'long',
+                    year: 'numeric',
+                  })}
+                </Text>
+              </View>
+            </Card>
+          )}
 
-          {/* Plan Cards */}
-          {!currentMembership && membershipData?.available_plans && (
-            <View style={styles.plansContainer}>
-              {membershipData.available_plans.map((plan) => (
+          <Card title="Qué incluye" subtitle="Tu membresía Neural">
+            <View style={styles.benefits}>
+              {BENEFITS.map((benefit) => (
+                <View key={benefit} style={styles.benefit}>
+                  <Feather name="check-circle" size={18} color={colors.accentDeep} />
+                  <Text style={styles.benefitText}>{benefit}</Text>
+                </View>
+              ))}
+            </View>
+          </Card>
+
+          {canSubscribe && plans.length > 0 && (
+            <View style={styles.plans} accessibilityRole="radiogroup">
+              {plans.map((plan) => (
                 <PlanCard
                   key={plan.id}
-                  title={getPlanDisplayName(plan)}
-                  price={plan.price}
+                  plan={plan}
                   isSelected={selectedPlan?.id === plan.id}
-                  onPress={() => setSelectedPlan(plan)}
+                  onPress={() => handleSelectPlan(plan)}
                 />
               ))}
             </View>
           )}
 
-          {/* Bottom Spacer */}
-          <View style={styles.bottomSpacer} />
-        </ScrollView>
-
-        {/* Bottom Button */}
-        {!currentMembership && (
-          <View style={styles.bottomButtonContainer}>
-            <TouchableOpacity
-              style={[styles.subscribeButton, !selectedPlan && styles.subscribeButtonDisabled]}
-              disabled={!selectedPlan}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.subscribeButtonText}>
-                Suscribirse
+          {!!pendingPayment && (
+            <Card title="Referencia generada">
+              <Text style={styles.pendingText}>
+                Reservamos tu pago de{' '}
+                {formatPrice(pendingPayment.amount, pendingPayment.currency)} para el{' '}
+                {getPlanDisplayName(pendingPayment.plan)}. Todavía no podemos abrir el checkout
+                desde la app, así que el cobro queda pendiente.
               </Text>
-            </TouchableOpacity>
-          </View>
-        )}
-      </SafeAreaView>
-    </View>
+              <Text style={styles.pendingRef}>Referencia: {pendingPayment.reference}</Text>
+              <PrimaryButton
+                label="Entendido"
+                variant="secondary"
+                onPress={() => setPendingPayment(null)}
+              />
+            </Card>
+          )}
+        </Animated.View>
+      </ScrollView>
+
+      {canSubscribe && (
+        <View style={styles.footer}>
+          {!!paymentError && (
+            <Text style={styles.footerError} accessibilityLiveRegion="polite">
+              {paymentError}
+            </Text>
+          )}
+          <PrimaryButton
+            label="Suscribirse"
+            onPress={handleSubscribe}
+            loading={isCreatingPayment}
+            disabled={!selectedPlan}
+          />
+        </View>
+      )}
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  loading: {
     flex: 1,
-    backgroundColor: colors.bgDark,
-  },
-  safeArea: {
-    flex: 1,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  backgroundContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-  },
-  gradientTop: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 300,
-  },
-  gradientBottom: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 300,
-    transform: [{ rotate: '180deg' }],
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.xxl,
-    paddingVertical: spacing.lg,
-  },
-  backButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: colors.white,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: spacing.md,
   },
-  headerTitle: {
-    flex: 1,
-    fontSize: typography.fontSize.xxl,
+  scroll: {
+    paddingHorizontal: 16,
+    paddingBottom: 32,
+  },
+  hero: {
+    marginTop: 8,
+    marginBottom: 24,
+    gap: 8,
+  },
+  heroLabel: {
     fontFamily: typography.fontFamily,
+    fontSize: 11,
     fontWeight: typography.fontWeight.bold,
-    color: colors.white,
-  },
-  headerSpacer: {
-    width: 48,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingHorizontal: spacing.xxl,
-    paddingTop: spacing.lg,
-  },
-  welcomeSection: {
-    marginBottom: spacing.xxl,
-    alignItems: 'center',
-  },
-  welcomeTitle: {
-    fontSize: typography.fontSize.xxl,
-    fontFamily: typography.fontFamily,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.white,
-    marginBottom: spacing.md,
-    textAlign: 'center',
-  },
-  welcomeSubtitle: {
-    fontSize: typography.fontSize.md,
-    fontFamily: typography.fontFamily,
-    fontWeight: typography.fontWeight.regular,
+    letterSpacing: 1.2,
     color: colors.gray400,
-    textAlign: 'center',
-    lineHeight: typography.lineHeight.md,
   },
-  currentMembershipCard: {
-    backgroundColor: colors.white,
-    borderRadius: borderRadius.xxl,
-    padding: spacing.xxl,
-    marginBottom: spacing.xxl,
+  heroTitle: {
+    fontFamily: typography.fontFamily,
+    fontSize: 34,
+    fontWeight: typography.fontWeight.bold,
+    lineHeight: 40,
+    letterSpacing: -1,
+    color: colors.ink,
   },
-  membershipHeader: {
+  heroSubtitle: {
+    fontFamily: typography.fontFamily,
+    fontSize: 14,
+    lineHeight: 20,
+    color: colors.gray400,
+  },
+  body: {
+    gap: 12,
+  },
+  errorText: {
+    fontFamily: typography.fontFamily,
+    fontSize: 14,
+    lineHeight: 20,
+    color: colors.error,
+  },
+  daysRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: spacing.lg,
-    gap: spacing.md,
+    alignItems: 'baseline',
+    gap: 8,
   },
-  membershipTitle: {
-    fontSize: typography.fontSize.lg,
+  daysValue: {
     fontFamily: typography.fontFamily,
+    fontSize: 40,
     fontWeight: typography.fontWeight.bold,
-    color: colors.textDark,
+    letterSpacing: -1,
+    color: colors.accentDeep,
   },
-  planName: {
-    fontSize: typography.fontSize.xxxl,
+  daysLabel: {
     fontFamily: typography.fontFamily,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.textDark,
-    marginBottom: spacing.lg,
-  },
-  membershipDetails: {
-    gap: spacing.md,
+    fontSize: 14,
+    color: colors.gray400,
   },
   detailRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
+    gap: 8,
   },
   detailText: {
-    fontSize: typography.fontSize.md,
     fontFamily: typography.fontFamily,
-    fontWeight: typography.fontWeight.regular,
+    fontSize: 14,
     color: colors.gray400,
   },
-  daysLeftContainer: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    marginTop: spacing.sm,
-    gap: spacing.xs,
+  benefits: {
+    gap: 12,
   },
-  daysLeftValue: {
-    fontSize: typography.fontSize.xxxl,
-    fontFamily: typography.fontFamily,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.primary,
-  },
-  daysLeftLabel: {
-    fontSize: typography.fontSize.md,
-    fontFamily: typography.fontFamily,
-    fontWeight: typography.fontWeight.regular,
-    color: colors.gray400,
-  },
-  benefitsContainer: {
-    backgroundColor: colors.white,
-    borderRadius: borderRadius.xxl,
-    padding: spacing.xxl,
-    gap: spacing.lg,
-    marginBottom: spacing.xxl,
-  },
-  benefitItem: {
+  benefit: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: spacing.md,
-  },
-  benefitIconContainer: {
-    marginTop: 2,
+    gap: 10,
   },
   benefitText: {
     flex: 1,
-    fontSize: typography.fontSize.md,
     fontFamily: typography.fontFamily,
-    fontWeight: typography.fontWeight.regular,
-    color: colors.textDark,
-    lineHeight: typography.lineHeight.md,
+    fontSize: 14,
+    lineHeight: 20,
+    color: colors.ink,
   },
-  plansContainer: {
-    gap: spacing.lg,
-    marginBottom: spacing.xl,
+  plans: {
+    gap: 12,
   },
-  planCard: {
+  plan: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
     backgroundColor: colors.white,
-    borderRadius: borderRadius.xxl,
-    padding: spacing.xxl,
-    position: 'relative',
-  },
-  planCardSelected: {
+    borderRadius: 20,
+    padding: 16,
     borderWidth: 2,
-    borderColor: colors.primary,
-    backgroundColor: colors.gray200,
+    borderColor: colors.white,
   },
-  selectedBadge: {
-    position: 'absolute',
-    top: spacing.lg,
-    right: spacing.lg,
+  planOn: {
+    borderColor: colors.ink,
+  },
+  pressed: {
+    opacity: 0.85,
+  },
+  planText: {
+    flex: 1,
+    gap: 2,
   },
   planTitle: {
-    fontSize: typography.fontSize.lg,
     fontFamily: typography.fontFamily,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.textDark,
-    marginBottom: spacing.md,
-  },
-  planPrice: {
-    fontSize: typography.fontSize.xxxl,
-    fontFamily: typography.fontFamily,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.textDark,
-    marginBottom: spacing.xs,
-  },
-  planPeriod: {
-    fontSize: typography.fontSize.sm,
-    fontFamily: typography.fontFamily,
-    fontWeight: typography.fontWeight.regular,
+    fontSize: 14,
+    fontWeight: typography.fontWeight.semiBold,
     color: colors.gray400,
   },
-  bottomButtonContainer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    paddingHorizontal: spacing.xxl,
-    paddingBottom: spacing.xxl,
-    paddingTop: spacing.lg,
-    backgroundColor: colors.bgDark,
+  planPrice: {
+    fontFamily: typography.fontFamily,
+    fontSize: 26,
+    fontWeight: typography.fontWeight.bold,
+    letterSpacing: -0.8,
+    color: colors.ink,
   },
-  subscribeButton: {
-    backgroundColor: colors.primary,
-    borderRadius: borderRadius.full,
-    paddingVertical: spacing.lg,
+  planPeriod: {
+    fontFamily: typography.fontFamily,
+    fontSize: 12,
+    color: colors.gray400,
+  },
+  tick: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    borderWidth: 2,
+    borderColor: colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  subscribeButtonDisabled: {
-    opacity: 0.5,
+  tickOn: {
+    backgroundColor: colors.ink,
+    borderColor: colors.ink,
   },
-  subscribeButtonText: {
-    fontSize: typography.fontSize.lg,
+  pendingText: {
     fontFamily: typography.fontFamily,
-    fontWeight: typography.fontWeight.semiBold,
-    color: colors.textDark,
+    fontSize: 14,
+    lineHeight: 20,
+    color: colors.ink,
   },
-  bottomSpacer: {
-    height: 120,
+  pendingRef: {
+    fontFamily: typography.fontFamily,
+    fontSize: 12,
+    color: colors.gray400,
+  },
+  footer: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 24,
+    gap: 10,
+    backgroundColor: colors.surface,
+  },
+  footerError: {
+    fontFamily: typography.fontFamily,
+    fontSize: 13,
+    lineHeight: 18,
+    color: colors.error,
+    textAlign: 'center',
   },
 });
