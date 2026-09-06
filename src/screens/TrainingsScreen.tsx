@@ -1,22 +1,81 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
-  TouchableOpacity,
+  Pressable,
+  Modal,
   ActivityIndicator,
   RefreshControl,
-  Alert,
-  Image,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Feather } from '@expo/vector-icons';
-import { colors, typography, spacing, borderRadius } from '../theme/colors';
+import * as Haptics from 'expo-haptics';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  withDelay,
+  Easing,
+} from 'react-native-reanimated';
+import { colors, typography } from '../theme/colors';
 import { slotsApi } from '../api/slots';
 import { Training } from '../types';
-import ConfirmModal from '../components/ConfirmModal';
+import Screen from '../components/ui/Screen';
+import AppHeader from '../components/ui/AppHeader';
+import Card from '../components/ui/Card';
+import PrimaryButton from '../components/ui/PrimaryButton';
+
+interface ConfirmSheetProps {
+  visible: boolean;
+  title: string;
+  message: string;
+  confirmText: string;
+  cancelText?: string;
+  destructive?: boolean;
+  onConfirm: () => void;
+  onCancel: () => void;
+}
+
+/**
+ * Confirmation sheet in the new language: white card, editorial title, pill
+ * actions. The shared ConfirmModal still paints the legacy blue and shouts in
+ * uppercase, and it is owned by screens that have not migrated yet, so this
+ * screen carries its own rather than changing theirs.
+ */
+function ConfirmSheet({
+  visible,
+  title,
+  message,
+  confirmText,
+  cancelText,
+  destructive,
+  onConfirm,
+  onCancel,
+}: ConfirmSheetProps) {
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
+      <View style={sheetStyles.scrim}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={onCancel} accessibilityLabel="Cerrar" />
+        <View style={sheetStyles.card}>
+          <Text style={sheetStyles.title}>{title}</Text>
+          <Text style={sheetStyles.message}>{message}</Text>
+          <View style={sheetStyles.actions}>
+            <PrimaryButton
+              label={confirmText}
+              variant={destructive ? 'danger' : 'primary'}
+              onPress={onConfirm}
+            />
+            {!!cancelText && (
+              <PrimaryButton label={cancelText} variant="secondary" onPress={onCancel} />
+            )}
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
 
 export default function TrainingsScreen() {
   const navigation = useNavigation<any>();
@@ -32,8 +91,25 @@ export default function TrainingsScreen() {
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [trainingToCancel, setTrainingToCancel] = useState<Training | null>(null);
+  // A failed cancellation belongs on the card that failed, not in an alert
+  // that hides which of the listed sessions it was about.
+  const [cancelError, setCancelError] = useState<{ id: number; message: string } | null>(null);
 
   const LIMIT = 50;
+
+  const intro = useSharedValue(0);
+  useEffect(() => {
+    intro.value = withTiming(1, { duration: 460, easing: Easing.out(Easing.cubic) });
+  }, []);
+
+  const headStyle = useAnimatedStyle(() => ({
+    opacity: intro.value,
+    transform: [{ translateY: (1 - intro.value) * 14 }],
+  }));
+  const listStyle = useAnimatedStyle(() => ({
+    opacity: withDelay(90, withTiming(intro.value, { duration: 400 })),
+    transform: [{ translateY: withDelay(90, withTiming((1 - intro.value) * 14, { duration: 400 })) }],
+  }));
 
   const fetchTrainings = useCallback(async (reset: boolean = false) => {
     if (isFetching) return;
@@ -104,6 +180,8 @@ export default function TrainingsScreen() {
   }, [fetchTrainings, isFetching]);
 
   const handleCancel = (training: Training) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setCancelError(null);
     setTrainingToCancel(training);
     setShowCancelModal(true);
   };
@@ -111,17 +189,20 @@ export default function TrainingsScreen() {
   const confirmCancel = async () => {
     if (!trainingToCancel) return;
 
+    const target = trainingToCancel;
     setShowCancelModal(false);
-    setCancellingId(trainingToCancel.id);
+    setCancellingId(target.id);
 
-    const { success, error } = await slotsApi.cancelTraining(trainingToCancel.id);
+    const { success, error } = await slotsApi.cancelTraining(target.id);
     setCancellingId(null);
 
     if (success) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setShowSuccessModal(true);
       fetchTrainings(true);
     } else {
-      Alert.alert('Error', error || 'No se pudo cancelar el entrenamiento');
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      setCancelError({ id: target.id, message: error || 'No se pudo cancelar el entrenamiento' });
     }
 
     setTrainingToCancel(null);
@@ -140,6 +221,7 @@ export default function TrainingsScreen() {
   };
 
   const handleSchedule = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     navigation.navigate('Calendar');
   };
 
@@ -185,114 +267,143 @@ export default function TrainingsScreen() {
     }
   };
 
+  const sheets = (
+    <>
+      <ConfirmSheet
+        visible={showCancelModal}
+        title="Cancelar entreno"
+        message="¿Deseas cancelar este entrenamiento? Tu lugar quedará libre para alguien más."
+        confirmText="Sí, cancelar"
+        cancelText="No, volver"
+        destructive
+        onConfirm={confirmCancel}
+        onCancel={closeCancelModal}
+      />
+
+      <ConfirmSheet
+        visible={showSuccessModal}
+        title="Entreno cancelado"
+        message="Tu sesión ha sido cancelada correctamente."
+        confirmText="Aceptar"
+        onConfirm={() => setShowSuccessModal(false)}
+        onCancel={() => setShowSuccessModal(false)}
+      />
+    </>
+  );
+
   if (isLoading) {
     return (
-      <View style={styles.container}>
-        <SafeAreaView style={styles.safeArea}>
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="small" color={colors.white} />
-          </View>
-        </SafeAreaView>
-      </View>
+      <Screen tone="surface" wash>
+        <AppHeader
+          title="Entrenos"
+          showBack={false}
+          action={{ icon: 'plus', label: 'Agendar entrenamiento', onPress: handleSchedule }}
+        />
+        <View style={styles.loading}>
+          <ActivityIndicator size="small" color={colors.ink} />
+        </View>
+      </Screen>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <SafeAreaView style={styles.safeArea} edges={['top']}>
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => navigation.goBack()}
-          >
-            <Feather name="arrow-left" size={22} color={colors.white} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Mis entrenos</Text>
-          <TouchableOpacity
-            style={styles.addButton}
-            onPress={handleSchedule}
-          >
-            <Feather name="plus" size={22} color={colors.white} />
-          </TouchableOpacity>
-        </View>
+    <Screen tone="surface" wash>
+      {/* A tab root has nothing behind it, so it carries no back control. */}
+      <AppHeader
+        title="Entrenos"
+        showBack={false}
+        action={{ icon: 'plus', label: 'Agendar entrenamiento', onPress: handleSchedule }}
+      />
 
-        {trainings.length > 0 ? (
-          <ScrollView
-            style={styles.scrollView}
-            contentContainerStyle={styles.scrollContent}
-            showsVerticalScrollIndicator={false}
-            refreshControl={
-              <RefreshControl
-                refreshing={isRefreshing}
-                onRefresh={onRefresh}
-                tintColor={colors.white}
-              />
+      {trainings.length > 0 ? (
+        <ScrollView
+          contentContainerStyle={styles.scroll}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor={colors.ink} />
+          }
+          onScroll={({ nativeEvent }) => {
+            const { layoutMeasurement, contentOffset, contentSize } = nativeEvent;
+            const paddingToBottom = 200;
+            const isCloseToBottom = layoutMeasurement.height + contentOffset.y >=
+              contentSize.height - paddingToBottom;
+
+            if (isCloseToBottom && hasMore && !isLoadingMore && !isFetching) {
+              loadMore();
             }
-            onScroll={({ nativeEvent }) => {
-              const { layoutMeasurement, contentOffset, contentSize } = nativeEvent;
-              const paddingToBottom = 200;
-              const isCloseToBottom = layoutMeasurement.height + contentOffset.y >=
-                contentSize.height - paddingToBottom;
+          }}
+          scrollEventThrottle={400}
+        >
+          <Animated.View style={[styles.head, headStyle]}>
+            <Text style={styles.title}>Tu agenda</Text>
+            <Text style={styles.subtitle}>
+              {trainings.length === 1
+                ? '1 sesión en tu historial'
+                : `${trainings.length} sesiones en tu historial`}
+            </Text>
+          </Animated.View>
 
-              if (isCloseToBottom && hasMore && !isLoadingMore && !isFetching) {
-                loadMore();
-              }
-            }}
-            scrollEventThrottle={400}
-          >
+          <Animated.View style={listStyle}>
             {trainings.map((training, index) => {
               const isPast = isTrainingPast(training);
               const canCancel = training.can_cancel && !isPast;
               const isFirst = index === 0;
               const showDateHeader = isFirst ||
                 trainings[index - 1]?.slot.date !== training.slot.date;
+              const failed = cancelError?.id === training.id ? cancelError.message : null;
 
               return (
                 <View key={training.id}>
-                  {/* Date Header */}
                   {showDateHeader && (
-                    <View style={styles.dateHeader}>
-                      <Text style={styles.dateHeaderText}>
-                        {formatDate(training.slot.date)}
-                      </Text>
-                    </View>
+                    <Text style={styles.dateHeader}>
+                      {formatDate(training.slot.date).toUpperCase()}
+                    </Text>
                   )}
 
-                  {/* Training Card */}
-                  <View style={[styles.trainingCard, isPast && styles.trainingCardPast]}>
-                    <View style={styles.cardContent}>
-                      {/* Left: Training Info */}
-                      <View style={styles.infoSection}>
-                        <Text style={[styles.trainingType, isPast && styles.trainingTypePast]} numberOfLines={1}>
+                  <Card style={styles.trainingCard}>
+                    <View style={styles.cardRow}>
+                      <View style={styles.info}>
+                        <Text
+                          style={[styles.trainingType, isPast && styles.trainingTypePast]}
+                          numberOfLines={1}
+                        >
                           {training.training_type?.name || training.slot.training_type?.name}
                         </Text>
-                        <Text style={styles.timeText}>
+                        <Text style={styles.time}>
                           {training.slot.hour_init} - {training.slot.hour_end}
                         </Text>
                       </View>
 
-                      {/* Right: Status Badge */}
                       {isPast ? (
-                        <View style={styles.completedBadge}>
-                          <Feather name="check" size={14} color={colors.gray400} />
+                        <View style={styles.doneBadge}>
+                          <Feather name="check" size={13} color={colors.gray400} />
+                          <Text style={styles.doneText}>Completado</Text>
                         </View>
                       ) : training.is_today ? (
                         <View style={styles.todayBadge}>
                           <Text style={styles.todayText}>Hoy</Text>
                         </View>
                       ) : (
-                        <Feather name="chevron-right" size={20} color={colors.gray400} />
+                        <View style={styles.nextBadge}>
+                          <Text style={styles.nextText}>Próximo</Text>
+                        </View>
                       )}
                     </View>
 
-                    {/* Cancel Button */}
+                    {!!failed && (
+                      <View style={styles.errorRow}>
+                        <Feather name="alert-circle" size={14} color={colors.error} />
+                        <Text style={styles.errorText}>{failed}</Text>
+                      </View>
+                    )}
+
                     {canCancel && (
-                      <TouchableOpacity
-                        style={styles.cancelButton}
+                      <Pressable
+                        style={({ pressed }) => [styles.cancelButton, pressed && styles.pressed]}
                         onPress={() => handleCancel(training)}
                         disabled={cancellingId === training.id}
-                        activeOpacity={0.6}
+                        accessibilityRole="button"
+                        accessibilityLabel="Cancelar este entrenamiento"
                       >
                         {cancellingId === training.id ? (
                           <ActivityIndicator size="small" color={colors.error} />
@@ -302,253 +413,253 @@ export default function TrainingsScreen() {
                             <Text style={styles.cancelText}>Cancelar</Text>
                           </>
                         )}
-                      </TouchableOpacity>
+                      </Pressable>
                     )}
-                  </View>
+                  </Card>
                 </View>
               );
             })}
+          </Animated.View>
 
-            {/* Loading More Indicator */}
-            {isLoadingMore && (
-              <View style={styles.loadingMore}>
-                <ActivityIndicator size="small" color={colors.gray400} />
-              </View>
-            )}
-
-            <View style={styles.bottomSpacer} />
-          </ScrollView>
-        ) : (
-          <View style={styles.emptyContainer}>
-            <View style={styles.emptyIconContainer}>
-              <Feather name="calendar" size={40} color={colors.gray400} />
+          {isLoadingMore && (
+            <View style={styles.loadingMore}>
+              <ActivityIndicator size="small" color={colors.gray400} />
             </View>
-            <Text style={styles.emptyTitle}>Sin entrenos</Text>
-            <Text style={styles.emptySubtitle}>
-              Agenda tu primer entrenamiento
-            </Text>
-            <TouchableOpacity
-              style={styles.scheduleButton}
-              onPress={handleSchedule}
-              activeOpacity={0.8}
-            >
-              <Feather name="plus" size={18} color={colors.white} />
-              <Text style={styles.scheduleButtonText}>Agendar</Text>
-            </TouchableOpacity>
+          )}
+
+          {/* Clears the tab bar. */}
+          <View style={{ height: 120 }} />
+        </ScrollView>
+      ) : (
+        <Animated.View style={[styles.empty, listStyle]}>
+          <View style={styles.emptyIcon}>
+            <Feather name="calendar" size={32} color={colors.ink} />
           </View>
-        )}
+          <Text style={styles.emptyTitle}>Sin entrenos</Text>
+          <Text style={styles.emptySubtitle}>
+            Agenda tu primer entrenamiento y aparecerá aquí.
+          </Text>
+          <PrimaryButton
+            label="Agendar"
+            icon="plus"
+            onPress={handleSchedule}
+            style={styles.emptyCta}
+          />
+        </Animated.View>
+      )}
 
-        {/* Cancel Modal */}
-        <ConfirmModal
-          visible={showCancelModal}
-          title="Cancelar"
-          message="¿Deseas cancelar este entrenamiento?"
-          confirmText="Sí, cancelar"
-          cancelText="No"
-          onConfirm={confirmCancel}
-          onCancel={closeCancelModal}
-        />
-
-        {/* Success Modal */}
-        <ConfirmModal
-          visible={showSuccessModal}
-          title="Entreno cancelado"
-          message="Tu sesión ha sido cancelada correctamente"
-          confirmText="Aceptar"
-          onConfirm={() => setShowSuccessModal(false)}
-          onCancel={() => setShowSuccessModal(false)}
-          singleButton
-        />
-      </SafeAreaView>
-    </View>
+      {sheets}
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  loading: {
     flex: 1,
-    backgroundColor: colors.bgDark,
-  },
-  safeArea: {
-    flex: 1,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.md,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  headerTitle: {
-    fontSize: typography.fontSize.lg,
+  scroll: {
+    paddingHorizontal: 16,
+  },
+  head: {
+    marginTop: 8,
+    marginBottom: 8,
+  },
+  title: {
     fontFamily: typography.fontFamily,
-    fontWeight: typography.fontWeight.semiBold,
-    color: colors.white,
-    letterSpacing: -0.3,
+    fontSize: 32,
+    fontWeight: typography.fontWeight.bold,
+    lineHeight: 38,
+    letterSpacing: -1,
+    color: colors.ink,
   },
-  addButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingHorizontal: spacing.xl,
-    paddingTop: spacing.lg,
+  subtitle: {
+    marginTop: 4,
+    fontFamily: typography.fontFamily,
+    fontSize: 14,
+    color: colors.gray400,
   },
   dateHeader: {
-    paddingVertical: spacing.md,
-    marginTop: spacing.md,
-  },
-  dateHeaderText: {
-    fontSize: typography.fontSize.xs,
     fontFamily: typography.fontFamily,
-    fontWeight: typography.fontWeight.medium,
+    fontSize: 11,
+    fontWeight: typography.fontWeight.bold,
+    letterSpacing: 1.2,
     color: colors.gray400,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    marginTop: 20,
+    marginBottom: 10,
   },
   trainingCard: {
-    backgroundColor: colors.cardDark,
-    borderRadius: borderRadius.lg,
-    marginBottom: spacing.sm,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.04)',
-    overflow: 'hidden',
+    marginBottom: 10,
+    gap: 12,
   },
-  trainingCardPast: {
-    opacity: 0.5,
-  },
-  cardContent: {
+  cardRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: spacing.lg,
-    gap: spacing.md,
+    gap: 12,
   },
-  infoSection: {
+  info: {
     flex: 1,
+    gap: 2,
   },
   trainingType: {
-    fontSize: typography.fontSize.md,
     fontFamily: typography.fontFamily,
+    fontSize: 17,
     fontWeight: typography.fontWeight.semiBold,
-    color: colors.white,
-    marginBottom: 4,
+    color: colors.ink,
   },
   trainingTypePast: {
+    // Past sessions step back through the badge, not through opacity: dimming
+    // the whole card was what pushed this text under the contrast floor.
     color: colors.gray400,
   },
-  timeText: {
-    fontSize: typography.fontSize.sm,
+  time: {
     fontFamily: typography.fontFamily,
-    fontWeight: typography.fontWeight.regular,
+    fontSize: 13,
     color: colors.gray400,
   },
-  completedBadge: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+  doneBadge: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: colors.surface,
+  },
+  doneText: {
+    fontFamily: typography.fontFamily,
+    fontSize: 12,
+    fontWeight: typography.fontWeight.semiBold,
+    color: colors.gray400,
   },
   todayBadge: {
-    backgroundColor: colors.primary,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-    borderRadius: borderRadius.full,
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: colors.accent,
   },
   todayText: {
-    fontSize: typography.fontSize.xs,
     fontFamily: typography.fontFamily,
+    fontSize: 12,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.ink,
+  },
+  nextBadge: {
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: colors.accentSoft,
+  },
+  nextText: {
+    fontFamily: typography.fontFamily,
+    fontSize: 12,
     fontWeight: typography.fontWeight.semiBold,
-    color: colors.white,
+    color: colors.accentDeep,
+  },
+  errorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  errorText: {
+    flex: 1,
+    fontFamily: typography.fontFamily,
+    fontSize: 13,
+    color: colors.error,
   },
   cancelButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: spacing.md,
-    gap: spacing.xs,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.04)',
-    backgroundColor: 'rgba(255, 77, 77, 0.04)',
+    gap: 6,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 77, 77, 0.10)',
   },
   cancelText: {
-    fontSize: typography.fontSize.sm,
     fontFamily: typography.fontFamily,
-    fontWeight: typography.fontWeight.medium,
+    fontSize: 14,
+    fontWeight: typography.fontWeight.semiBold,
     color: colors.error,
   },
+  pressed: {
+    opacity: 0.85,
+  },
   loadingMore: {
-    paddingVertical: spacing.xl,
+    paddingVertical: 20,
     alignItems: 'center',
   },
-  bottomSpacer: {
-    height: 120,
-  },
-  emptyContainer: {
+  empty: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: spacing.xxl,
+    paddingHorizontal: 32,
+    paddingBottom: 80,
   },
-  emptyIconContainer: {
+  emptyIcon: {
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    backgroundColor: colors.white,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: spacing.xl,
+    marginBottom: 20,
   },
   emptyTitle: {
-    fontSize: typography.fontSize.xl,
     fontFamily: typography.fontFamily,
+    fontSize: 28,
     fontWeight: typography.fontWeight.bold,
-    color: colors.white,
-    letterSpacing: -0.5,
-    marginBottom: spacing.sm,
+    letterSpacing: -0.8,
+    color: colors.ink,
+    marginBottom: 8,
   },
   emptySubtitle: {
-    fontSize: typography.fontSize.md,
     fontFamily: typography.fontFamily,
-    fontWeight: typography.fontWeight.regular,
+    fontSize: 15,
+    lineHeight: 21,
     color: colors.gray400,
     textAlign: 'center',
-    marginBottom: spacing.xxl,
+    marginBottom: 24,
   },
-  scheduleButton: {
-    flexDirection: 'row',
+  emptyCta: {
+    alignSelf: 'stretch',
+  },
+});
+
+const sheetStyles = StyleSheet.create({
+  scrim: {
+    flex: 1,
+    backgroundColor: 'rgba(17, 17, 17, 0.45)',
     alignItems: 'center',
-    gap: spacing.sm,
-    backgroundColor: colors.primary,
-    paddingHorizontal: spacing.xxl,
-    paddingVertical: spacing.lg,
-    borderRadius: borderRadius.full,
+    justifyContent: 'center',
+    paddingHorizontal: 24,
   },
-  scheduleButtonText: {
-    fontSize: typography.fontSize.md,
+  card: {
+    width: '100%',
+    maxWidth: 360,
+    backgroundColor: colors.white,
+    borderRadius: 24,
+    padding: 24,
+  },
+  title: {
     fontFamily: typography.fontFamily,
-    fontWeight: typography.fontWeight.semiBold,
-    color: colors.white,
+    fontSize: 24,
+    fontWeight: typography.fontWeight.bold,
+    letterSpacing: -0.6,
+    color: colors.ink,
+  },
+  message: {
+    marginTop: 8,
+    fontFamily: typography.fontFamily,
+    fontSize: 15,
+    lineHeight: 21,
+    color: colors.gray400,
+  },
+  actions: {
+    marginTop: 24,
+    gap: 10,
   },
 });

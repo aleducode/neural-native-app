@@ -1,20 +1,38 @@
-import React from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  Linking,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
+import React, { useEffect } from 'react';
+import { View, Text, StyleSheet, Linking, ScrollView } from 'react-native';
+import { Feather } from '@expo/vector-icons';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  withDelay,
+  Easing,
+} from 'react-native-reanimated';
 import { colors, typography } from '../theme/colors';
-import Button from '../components/Button';
 import { useAuth } from '../context/AuthContext';
 import { NEURAL_PHONE } from '../constants/config';
+import Screen from '../components/ui/Screen';
+import PrimaryButton from '../components/ui/PrimaryButton';
 
 export default function PendingScreen() {
   const { logout, user } = useAuth();
+
+  const intro = useSharedValue(0);
+  useEffect(() => {
+    intro.value = withTiming(1, { duration: 460, easing: Easing.out(Easing.cubic) });
+  }, []);
+
+  const headStyle = useAnimatedStyle(() => ({
+    opacity: intro.value,
+    transform: [{ translateY: (1 - intro.value) * 16 }],
+  }));
+  const bodyStyle = useAnimatedStyle(() => ({
+    opacity: withDelay(90, withTiming(intro.value, { duration: 400 })),
+    transform: [{ translateY: withDelay(90, withTiming((1 - intro.value) * 16, { duration: 400 })) }],
+  }));
+  const actionsStyle = useAnimatedStyle(() => ({
+    opacity: withDelay(170, withTiming(intro.value, { duration: 400 })),
+  }));
 
   const handleContactWhatsApp = () => {
     // Use the same WhatsApp link format as Django backend
@@ -22,7 +40,7 @@ export default function PendingScreen() {
     const phone = `57${NEURAL_PHONE}`;
     const message = `Hola Neural estoy listo para iniciar mis entrenos mi nombre es ${user?.first_name} ${user?.last_name}.`;
     const url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
-    
+
     Linking.openURL(url).catch((err) => {
       console.error('Error opening WhatsApp:', err);
       // Fallback to web version
@@ -35,138 +53,108 @@ export default function PendingScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      {/* Background Decorative Elements */}
-      <View style={styles.backgroundContainer}>
-        <LinearGradient
-          colors={['rgba(90, 107, 255, 0.15)', 'transparent']}
-          style={styles.gradientTop}
-        />
-        <LinearGradient
-          colors={['rgba(90, 107, 255, 0.15)', 'transparent']}
-          style={styles.gradientBottom}
-        />
-      </View>
+    <Screen tone="plain" wash edges={['top', 'bottom']}>
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        showsVerticalScrollIndicator={false}
+      >
+        <Animated.View style={headStyle}>
+          <View style={styles.icon}>
+            <Feather name="clock" size={30} color={colors.accentDeep} />
+          </View>
 
-      <View style={styles.content}>
-        {/* Icon */}
-        <View style={styles.iconContainer}>
-          <Ionicons name="time-outline" size={80} color={colors.primary} />
-        </View>
+          <Text style={styles.title}>Estamos{'\n'}verificando tu cuenta</Text>
+          <Text style={styles.message}>
+            Tu cuenta está pendiente de verificación. Escríbenos y completamos el proceso contigo.
+          </Text>
+        </Animated.View>
 
-        {/* Title */}
-        <Text style={styles.title}>Verificación Pendiente</Text>
-
-        {/* Message */}
-        <Text style={styles.message}>
-          Tu cuenta está pendiente de verificación. Por favor contacta a soporte para completar el proceso.
-        </Text>
-
-        {/* User Info */}
         {user && (
-          <View style={styles.userInfo}>
-            <Text style={styles.userInfoText}>
+          <Animated.View style={[styles.userCard, bodyStyle]}>
+            <Text style={styles.userLabel}>TU REGISTRO</Text>
+            <Text style={styles.userName}>
               {user.first_name} {user.last_name}
             </Text>
             <Text style={styles.userEmail}>{user.email}</Text>
-          </View>
+          </Animated.View>
         )}
 
-        {/* Buttons */}
-        <View style={styles.buttonsContainer}>
-          <Button
-            title="Contactar por WhatsApp"
+        <Animated.View style={[styles.actions, actionsStyle]}>
+          <PrimaryButton
+            label="Contactar por WhatsApp"
+            icon="message-circle"
             onPress={handleContactWhatsApp}
           />
-
-          <Button
-            title="Cerrar sesión"
+          <PrimaryButton
+            label="Cerrar sesión"
+            variant="secondary"
             onPress={handleLogout}
-            variant="outline"
           />
-        </View>
-      </View>
-    </SafeAreaView>
+        </Animated.View>
+      </ScrollView>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.bgDark,
-  },
-  backgroundContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-  },
-  gradientTop: {
-    position: 'absolute',
-    top: 74,
-    left: -240,
-    width: 336,
-    height: 336,
-    borderRadius: 168,
-  },
-  gradientBottom: {
-    position: 'absolute',
-    top: 555,
-    right: -240,
-    width: 336,
-    height: 336,
-    borderRadius: 168,
-  },
-  content: {
-    flex: 1,
+  scroll: {
+    flexGrow: 1,
     justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 32,
+    paddingHorizontal: 24,
+    paddingVertical: 32,
   },
-  iconContainer: {
-    width: 140,
-    height: 140,
-    borderRadius: 70,
-    backgroundColor: 'rgba(90, 107, 255, 0.1)',
-    justifyContent: 'center',
+  icon: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: colors.accentSoft,
     alignItems: 'center',
-    marginBottom: 32,
+    justifyContent: 'center',
+    marginBottom: 28,
   },
   title: {
-    fontSize: typography.fontSize.xxxl,
+    fontFamily: typography.fontFamily,
+    fontSize: 36,
     fontWeight: typography.fontWeight.bold,
-    color: colors.white,
-    textAlign: 'center',
-    marginBottom: 16,
+    lineHeight: 41,
+    letterSpacing: -1,
+    color: colors.ink,
   },
   message: {
-    fontSize: typography.fontSize.md,
-    color: colors.textSecondary,
-    textAlign: 'center',
-    lineHeight: 24,
-    marginBottom: 24,
+    marginTop: 14,
+    fontFamily: typography.fontFamily,
+    fontSize: 15,
+    lineHeight: 22,
+    color: colors.gray400,
   },
-  userInfo: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 16,
-    padding: 16,
-    alignItems: 'center',
-    marginBottom: 32,
-    width: '100%',
+  userCard: {
+    marginTop: 32,
+    backgroundColor: colors.surface,
+    borderRadius: 20,
+    padding: 20,
   },
-  userInfoText: {
-    fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.white,
-    marginBottom: 4,
+  userLabel: {
+    fontFamily: typography.fontFamily,
+    fontSize: 11,
+    fontWeight: typography.fontWeight.bold,
+    letterSpacing: 1.2,
+    color: colors.gray400,
+    marginBottom: 8,
+  },
+  userName: {
+    fontFamily: typography.fontFamily,
+    fontSize: 20,
+    fontWeight: typography.fontWeight.semiBold,
+    color: colors.ink,
   },
   userEmail: {
-    fontSize: typography.fontSize.sm,
-    color: colors.textSecondary,
+    marginTop: 2,
+    fontFamily: typography.fontFamily,
+    fontSize: 14,
+    color: colors.gray400,
   },
-  buttonsContainer: {
-    width: '100%',
-    gap: 16,
+  actions: {
+    marginTop: 32,
+    gap: 12,
   },
 });

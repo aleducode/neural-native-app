@@ -4,57 +4,58 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  TouchableOpacity,
-  TextInput,
+  Pressable,
+  Modal,
   Image,
-  Alert,
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
+import { Feather } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  withDelay,
+  Easing,
+} from 'react-native-reanimated';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../context/AuthContext';
-import { colors, typography, spacing, borderRadius } from '../theme/colors';
+import { colors, typography } from '../theme/colors';
 import { authApi } from '../api/auth';
 import { profileApi, ProfileResponse } from '../api/profile';
-import ConfirmModal from '../components/ConfirmModal';
+import AuthField from '../components/AuthField';
+import Screen from '../components/ui/Screen';
+import AppHeader from '../components/ui/AppHeader';
+import PrimaryButton from '../components/ui/PrimaryButton';
 
-interface InputFieldProps {
+interface MetricTileProps {
   label: string;
-  value: string;
-  onChangeText?: (text: string) => void;
-  placeholder?: string;
-  editable?: boolean;
-  keyboardType?: 'default' | 'email-address' | 'phone-pad';
+  value: string | number;
+  unit: string;
+  onPress: () => void;
 }
 
-function InputField({
-  label,
-  value,
-  onChangeText,
-  placeholder,
-  editable = true,
-  keyboardType = 'default',
-}: InputFieldProps) {
+/** One of the three measurements that live on their own screens. */
+function MetricTile({ label, value, unit, onPress }: MetricTileProps) {
   return (
-    <View style={styles.inputContainer}>
-      <Text style={styles.inputLabel}>{label}</Text>
-      <View style={[styles.inputWrapper, !editable && styles.inputDisabled]}>
-        <TextInput
-          style={styles.input}
-          value={value}
-          onChangeText={onChangeText}
-          placeholder={placeholder}
-          placeholderTextColor={colors.gray400}
-          editable={editable}
-          keyboardType={keyboardType}
-        />
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [styles.tile, pressed && styles.pressed]}
+      accessibilityRole="button"
+      accessibilityLabel={`${label}: ${value} ${unit}. Tocar para editar`}
+    >
+      <View style={styles.tileHead}>
+        <Text style={styles.tileLabel}>{label}</Text>
+        <Feather name="edit-2" size={12} color={colors.gray400} />
       </View>
-    </View>
+      <View style={styles.tileValueRow}>
+        <Text style={styles.tileValue}>{value}</Text>
+        <Text style={styles.tileUnit}>{unit}</Text>
+      </View>
+    </Pressable>
   );
 }
 
@@ -68,6 +69,11 @@ export default function EditProfileScreen() {
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [profileData, setProfileData] = useState<ProfileResponse | null>(null);
+  // Everything that can fail on this screen now fails beside the thing that
+  // failed: the name field, the avatar, or the save button.
+  const [nameError, setNameError] = useState<string | undefined>(undefined);
+  const [photoError, setPhotoError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const userEmail = user?.email || '';
   const userPhone = user?.phone_number || '';
@@ -89,22 +95,37 @@ export default function EditProfileScreen() {
     }, [])
   );
 
+  const intro = useSharedValue(0);
+  useEffect(() => {
+    intro.value = withTiming(1, { duration: 460, easing: Easing.out(Easing.cubic) });
+  }, []);
+
+  const headStyle = useAnimatedStyle(() => ({
+    opacity: intro.value,
+    transform: [{ translateY: (1 - intro.value) * 14 }],
+  }));
+  const bodyStyle = useAnimatedStyle(() => ({
+    opacity: withDelay(90, withTiming(intro.value, { duration: 400 })),
+    transform: [{ translateY: withDelay(90, withTiming((1 - intro.value) * 14, { duration: 400 })) }],
+  }));
+
   const age = profileData?.profile.age;
   const height = profileData?.profile.height;
   const weight = profileData?.latest_weight?.weight;
 
-  const handleBack = () => {
-    navigation.goBack();
+  const go = (screen: string) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    navigation.navigate(screen);
   };
 
   const handleChangePhoto = async () => {
+    setPhotoError(null);
+
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
 
     if (status !== 'granted') {
-      Alert.alert(
-        'Permiso requerido',
-        'Necesitamos acceso a tu galería para cambiar la foto de perfil.'
-      );
+      setPhotoError('Necesitamos acceso a tu galería para cambiar la foto de perfil.');
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
       return;
     }
 
@@ -129,17 +150,23 @@ export default function EditProfileScreen() {
 
       if (data) {
         updateUser(data);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       } else {
-        Alert.alert('Error', error || 'No se pudo actualizar la foto de perfil.');
+        setPhotoError(error || 'No se pudo actualizar la foto de perfil.');
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       }
     }
   };
 
   const handleSave = async () => {
+    setSaveError(null);
+
     if (!firstName.trim()) {
-      Alert.alert('Error', 'El nombre es requerido');
+      setNameError('El nombre es requerido');
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
       return;
     }
+    setNameError(undefined);
 
     setIsSaving(true);
 
@@ -152,9 +179,11 @@ export default function EditProfileScreen() {
 
     if (data) {
       updateUser(data);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setShowSuccessModal(true);
     } else {
-      Alert.alert('Error', error || 'No se pudo actualizar el perfil.');
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      setSaveError(error || 'No se pudo actualizar el perfil.');
     }
   };
 
@@ -167,288 +196,211 @@ export default function EditProfileScreen() {
     firstName !== (user?.first_name || '') || lastName !== (user?.last_name || '');
 
   return (
-    <View style={styles.container}>
-      {/* Background Gradients */}
-      <View style={styles.backgroundContainer}>
-        <LinearGradient
-          colors={['rgba(90, 107, 255, 0.15)', 'transparent']}
-          style={styles.gradientTop}
-        />
-        <LinearGradient
-          colors={['rgba(90, 107, 255, 0.15)', 'transparent']}
-          style={styles.gradientBottom}
-        />
-      </View>
+    <Screen tone="plain" wash edges={['top', 'bottom']}>
+      <AppHeader title="Editar perfil" />
 
-      <SafeAreaView style={styles.safeArea} edges={['top']}>
-        <KeyboardAvoidingView
-          style={styles.keyboardView}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <ScrollView
+          contentContainerStyle={styles.scroll}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
         >
-          {/* Header */}
-          <View style={styles.header}>
-            <TouchableOpacity style={styles.backButton} onPress={handleBack}>
-              <Ionicons name="chevron-back" size={24} color={colors.textDark} />
-            </TouchableOpacity>
-            <Text style={styles.headerTitle}>Editar Perfil</Text>
-            <View style={styles.headerSpacer} />
-          </View>
-
-          <ScrollView
-            style={styles.scrollView}
-            contentContainerStyle={styles.scrollContent}
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-          >
-            {/* Profile Card */}
-            <View style={styles.profileCardContainer}>
-              {/* Avatar */}
-              <TouchableOpacity
-                style={styles.avatarContainer}
-                onPress={handleChangePhoto}
-                disabled={isUploadingPhoto}
-                activeOpacity={0.8}
-              >
+          <Animated.View style={headStyle}>
+            <Pressable
+              onPress={handleChangePhoto}
+              disabled={isUploadingPhoto}
+              style={({ pressed }) => [styles.photoRow, pressed && styles.pressed]}
+              accessibilityRole="button"
+              accessibilityLabel="Cambiar foto de perfil"
+            >
+              <View style={styles.avatarWrap}>
                 {userPhoto ? (
                   <Image source={{ uri: userPhoto }} style={styles.avatar} />
                 ) : (
-                  <View style={styles.avatarPlaceholder}>
+                  <View style={[styles.avatar, styles.avatarFallback]}>
                     <Text style={styles.avatarText}>{userInitials}</Text>
                   </View>
                 )}
+
                 {isUploadingPhoto ? (
                   <View style={styles.avatarOverlay}>
                     <ActivityIndicator size="small" color={colors.white} />
                   </View>
                 ) : (
-                  <View style={styles.cameraIconContainer}>
-                    <Ionicons name="camera" size={16} color={colors.white} />
+                  <View style={styles.cameraBadge}>
+                    <Feather name="camera" size={13} color={colors.white} />
                   </View>
                 )}
-              </TouchableOpacity>
+              </View>
 
-              {/* Gradient Card */}
-              <LinearGradient
-                colors={['#5a6bff', '#9aabff', '#FFFFFF']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.profileCard}
-              >
-                <View style={styles.statsContainer}>
-                  <TouchableOpacity
-                    style={styles.statItem}
-                    onPress={() => navigation.navigate('BirthdateInput')}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={styles.statLabel}>Edad</Text>
-                    <View style={styles.statValueContainer}>
-                      <Text style={styles.statValue}>{age ?? '--'}</Text>
-                      <Text style={styles.statUnit}> años</Text>
-                    </View>
-                  </TouchableOpacity>
+              <View style={styles.photoText}>
+                <Text style={styles.photoTitle}>Foto de perfil</Text>
+                <Text style={styles.photoHint}>Toca para cambiarla</Text>
+              </View>
+            </Pressable>
 
-                  <TouchableOpacity
-                    style={styles.statItem}
-                    onPress={() => navigation.navigate('WeightInput')}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={styles.statLabel}>Peso</Text>
-                    <View style={styles.statValueContainer}>
-                      <Text style={styles.statValue}>{weight ?? '--'}</Text>
-                      <Text style={styles.statUnit}> Kg</Text>
-                    </View>
-                  </TouchableOpacity>
+            {!!photoError && (
+              <View style={styles.errorRow}>
+                <Feather name="alert-circle" size={14} color={colors.error} />
+                <Text style={styles.errorText}>{photoError}</Text>
+              </View>
+            )}
+          </Animated.View>
 
-                  <TouchableOpacity
-                    style={styles.statItem}
-                    onPress={() => navigation.navigate('HeightInput')}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={styles.statLabel}>Altura</Text>
-                    <View style={styles.statValueContainer}>
-                      <Text style={styles.statValue}>{height ?? '--'}</Text>
-                      <Text style={styles.statUnit}> Cm</Text>
-                    </View>
-                  </TouchableOpacity>
-                </View>
-              </LinearGradient>
+          <Animated.View style={bodyStyle}>
+            <Text style={styles.sectionLabel}>MEDIDAS</Text>
+            <View style={styles.tiles}>
+              <MetricTile
+                label="Edad"
+                value={age ?? '--'}
+                unit="años"
+                onPress={() => go('BirthdateInput')}
+              />
+              <MetricTile
+                label="Peso"
+                value={weight ?? '--'}
+                unit="Kg"
+                onPress={() => go('WeightInput')}
+              />
+              <MetricTile
+                label="Altura"
+                value={height ?? '--'}
+                unit="Cm"
+                onPress={() => go('HeightInput')}
+              />
             </View>
 
-            {/* Form Fields */}
-            <View style={styles.formContainer}>
-              <InputField
+            <Text style={styles.sectionLabel}>TUS DATOS</Text>
+            <View style={styles.form}>
+              <AuthField
+                kind="text"
                 label="Nombre"
                 value={firstName}
-                onChangeText={setFirstName}
-                placeholder="Tu nombre"
+                error={nameError}
+                editable={!isSaving}
+                returnKeyType="next"
+                onChangeText={(text) => {
+                  setFirstName(text);
+                  if (nameError) setNameError(undefined);
+                }}
               />
-              <InputField
+              <AuthField
+                kind="text"
                 label="Apellido"
                 value={lastName}
+                editable={!isSaving}
+                returnKeyType="done"
                 onChangeText={setLastName}
-                placeholder="Tu apellido"
               />
-              <InputField
-                label="Email"
+              <AuthField
+                kind="email"
+                label="Correo electrónico"
                 value={userEmail}
                 editable={false}
-                keyboardType="email-address"
+                onChangeText={() => {}}
               />
-              <InputField
+              <AuthField
+                kind="phone"
                 label="Teléfono"
                 value={userPhone}
                 editable={false}
-                keyboardType="phone-pad"
+                onChangeText={() => {}}
               />
+              {/* Two of the four fields cannot be edited here, so the screen
+                  says why instead of leaving them looking broken. */}
+              <Text style={styles.readOnlyNote}>
+                El correo y el teléfono los gestiona Neural. Escríbenos si necesitas cambiarlos.
+              </Text>
             </View>
 
-            {/* Bottom Spacer */}
-            <View style={{ height: 120 }} />
-          </ScrollView>
+            {!!saveError && (
+              <View style={styles.errorRow}>
+                <Feather name="alert-circle" size={14} color={colors.error} />
+                <Text style={styles.errorText}>{saveError}</Text>
+              </View>
+            )}
+          </Animated.View>
+        </ScrollView>
 
-          {/* Save Button */}
-          <View style={styles.bottomButtonContainer}>
-            <TouchableOpacity
-              style={[styles.saveButton, (!hasChanges || isSaving) && styles.saveButtonDisabled]}
-              onPress={handleSave}
-              disabled={!hasChanges || isSaving}
-              activeOpacity={0.8}
-            >
-              {isSaving ? (
-                <ActivityIndicator size="small" color={colors.textDark} />
-              ) : (
-                <Text style={styles.saveButtonText}>Guardar</Text>
-              )}
-            </TouchableOpacity>
+        <View style={styles.footer}>
+          <PrimaryButton
+            label="Guardar"
+            onPress={handleSave}
+            loading={isSaving}
+            disabled={!hasChanges || isSaving}
+          />
+        </View>
+      </KeyboardAvoidingView>
+
+      {/* The shared ConfirmModal is still legacy blue and uppercase, and other
+          unmigrated screens depend on it, so this confirmation is local. */}
+      <Modal
+        visible={showSuccessModal}
+        transparent
+        animationType="fade"
+        onRequestClose={handleSuccessModalClose}
+      >
+        <View style={styles.scrim}>
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={handleSuccessModalClose}
+            accessibilityLabel="Cerrar"
+          />
+          <View style={styles.sheet}>
+            <View style={styles.sheetIcon}>
+              <Feather name="check" size={22} color={colors.accentDeep} />
+            </View>
+            <Text style={styles.sheetTitle}>Perfil actualizado</Text>
+            <Text style={styles.sheetMessage}>Tus datos se guardaron correctamente.</Text>
+            <PrimaryButton
+              label="Listo"
+              onPress={handleSuccessModalClose}
+              style={styles.sheetCta}
+            />
           </View>
-        </KeyboardAvoidingView>
-
-        {/* Success Modal */}
-        <ConfirmModal
-          visible={showSuccessModal}
-          title="Actualizado"
-          message="Tu perfil ha sido actualizado correctamente."
-          confirmText="OK"
-          onConfirm={handleSuccessModalClose}
-          onCancel={handleSuccessModalClose}
-          singleButton
-        />
-      </SafeAreaView>
-    </View>
+        </View>
+      </Modal>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.bgDark,
-  },
-  safeArea: {
+  flex: {
     flex: 1,
   },
-  keyboardView: {
-    flex: 1,
+  scroll: {
+    paddingHorizontal: 20,
+    paddingBottom: 24,
   },
-  backgroundContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-  },
-  gradientTop: {
-    position: 'absolute',
-    top: 50,
-    left: -150,
-    width: 250,
-    height: 250,
-    borderRadius: 125,
-  },
-  gradientBottom: {
-    position: 'absolute',
-    bottom: 80,
-    right: -150,
-    width: 250,
-    height: 250,
-    borderRadius: 125,
-  },
-  header: {
+  photoRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
+    gap: 16,
+    marginTop: 8,
   },
-  backButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: colors.white,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    fontSize: typography.fontSize.xxl,
-    fontFamily: typography.fontFamily,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.white,
-    textTransform: 'uppercase',
-  },
-  headerSpacer: {
-    width: 48,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingHorizontal: spacing.lg,
-  },
-  profileCardContainer: {
-    marginTop: 50,
-    marginBottom: spacing.xl,
-  },
-  avatarContainer: {
-    position: 'absolute',
-    top: -50,
-    left: '50%',
-    marginLeft: -50,
-    zIndex: 10,
+  avatarWrap: {
+    width: 76,
+    height: 76,
   },
   avatar: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    borderWidth: 3,
-    borderColor: colors.white,
+    width: 76,
+    height: 76,
+    borderRadius: 38,
   },
-  avatarPlaceholder: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: colors.primary,
+  avatarFallback: {
+    backgroundColor: colors.ink,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 3,
-    borderColor: colors.white,
   },
   avatarText: {
-    fontSize: 36,
     fontFamily: typography.fontFamily,
+    fontSize: 24,
     fontWeight: typography.fontWeight.bold,
-    color: colors.textDark,
-  },
-  cameraIconContainer: {
-    position: 'absolute',
-    bottom: 0,
-    right: 0,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: colors.white,
+    color: colors.white,
   },
   avatarOverlay: {
     position: 'absolute',
@@ -456,104 +408,155 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    borderRadius: 50,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    borderRadius: 38,
+    backgroundColor: 'rgba(17, 17, 17, 0.5)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  profileCard: {
-    borderRadius: borderRadius.xl,
-    paddingTop: 70,
-    paddingBottom: spacing.xxl,
-    paddingHorizontal: spacing.xxl,
-    borderWidth: 2,
-    borderColor: 'rgba(255, 255, 255, 0.5)',
-  },
-  statsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  statItem: {
-    alignItems: 'flex-start',
-  },
-  statLabel: {
-    fontSize: typography.fontSize.md,
-    fontFamily: typography.fontFamily,
-    fontWeight: typography.fontWeight.medium,
-    color: colors.gray400,
-    marginBottom: 4,
-  },
-  statValueContainer: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-  },
-  statValue: {
-    fontSize: typography.fontSize.title1,
-    fontFamily: typography.fontFamily,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.textDark,
-  },
-  statUnit: {
-    fontSize: typography.fontSize.md,
-    fontFamily: typography.fontFamily,
-    fontWeight: typography.fontWeight.medium,
-    color: colors.textDark,
-  },
-  formContainer: {
-    backgroundColor: colors.white,
-    borderRadius: borderRadius.xl,
-    padding: spacing.lg,
-    gap: spacing.lg,
-  },
-  inputContainer: {
-    gap: spacing.xs,
-  },
-  inputLabel: {
-    fontSize: typography.fontSize.lg,
-    fontFamily: typography.fontFamily,
-    fontWeight: typography.fontWeight.medium,
-    color: colors.textDark,
-  },
-  inputWrapper: {
-    backgroundColor: colors.gray200,
-    borderRadius: 30,
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.md,
-    height: 50,
-    justifyContent: 'center',
-  },
-  inputDisabled: {
-    opacity: 0.6,
-  },
-  input: {
-    fontSize: typography.fontSize.lg,
-    fontFamily: typography.fontFamily,
-    fontWeight: typography.fontWeight.medium,
-    color: colors.textDark,
-  },
-  bottomButtonContainer: {
+  cameraBadge: {
     position: 'absolute',
     bottom: 0,
-    left: 0,
     right: 0,
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.xxl,
-    paddingTop: spacing.lg,
-  },
-  saveButton: {
-    backgroundColor: colors.primary,
-    borderRadius: 1000,
-    paddingVertical: spacing.lg,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: colors.ink,
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 3,
+    borderColor: colors.white,
   },
-  saveButtonDisabled: {
-    opacity: 0.5,
+  photoText: {
+    flex: 1,
+    gap: 2,
   },
-  saveButtonText: {
-    fontSize: typography.fontSize.lg,
-    fontFamily: typography.fontFamily.semibold,
-    color: colors.textDark,
-    textTransform: 'uppercase',
+  photoTitle: {
+    fontFamily: typography.fontFamily,
+    fontSize: 18,
+    fontWeight: typography.fontWeight.semiBold,
+    color: colors.ink,
+  },
+  photoHint: {
+    fontFamily: typography.fontFamily,
+    fontSize: 13,
+    color: colors.gray400,
+  },
+  sectionLabel: {
+    fontFamily: typography.fontFamily,
+    fontSize: 11,
+    fontWeight: typography.fontWeight.bold,
+    letterSpacing: 1.2,
+    color: colors.gray400,
+    marginTop: 28,
+    marginBottom: 10,
+  },
+  tiles: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  tile: {
+    flex: 1,
+    backgroundColor: colors.surface,
+    borderRadius: 16,
+    padding: 14,
+    gap: 8,
+  },
+  tileHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  tileLabel: {
+    fontFamily: typography.fontFamily,
+    fontSize: 12,
+    fontWeight: typography.fontWeight.semiBold,
+    color: colors.gray400,
+  },
+  tileValueRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 4,
+  },
+  tileValue: {
+    fontFamily: typography.fontFamily,
+    fontSize: 26,
+    fontWeight: typography.fontWeight.bold,
+    letterSpacing: -0.8,
+    color: colors.ink,
+  },
+  tileUnit: {
+    fontFamily: typography.fontFamily,
+    fontSize: 12,
+    color: colors.gray400,
+  },
+  form: {
+    gap: 18,
+  },
+  readOnlyNote: {
+    fontFamily: typography.fontFamily,
+    fontSize: 13,
+    lineHeight: 18,
+    color: colors.gray400,
+  },
+  errorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 16,
+  },
+  errorText: {
+    flex: 1,
+    fontFamily: typography.fontFamily,
+    fontSize: 13,
+    color: colors.error,
+  },
+  pressed: {
+    opacity: 0.85,
+  },
+  footer: {
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 12,
+    backgroundColor: colors.white,
+  },
+  scrim: {
+    flex: 1,
+    backgroundColor: 'rgba(17, 17, 17, 0.45)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+  },
+  sheet: {
+    width: '100%',
+    maxWidth: 360,
+    backgroundColor: colors.white,
+    borderRadius: 24,
+    padding: 24,
+  },
+  sheetIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.accentSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  sheetTitle: {
+    fontFamily: typography.fontFamily,
+    fontSize: 24,
+    fontWeight: typography.fontWeight.bold,
+    letterSpacing: -0.6,
+    color: colors.ink,
+  },
+  sheetMessage: {
+    marginTop: 8,
+    fontFamily: typography.fontFamily,
+    fontSize: 15,
+    lineHeight: 21,
+    color: colors.gray400,
+  },
+  sheetCta: {
+    marginTop: 24,
   },
 });

@@ -1,43 +1,64 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
-  TouchableOpacity,
+  Pressable,
   Image,
   Alert,
   ActivityIndicator,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  withDelay,
+  Easing,
+} from 'react-native-reanimated';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../context/AuthContext';
-import { colors, typography, spacing, borderRadius } from '../theme/colors';
+import { colors, typography } from '../theme/colors';
 import { dashboardApi, DashboardResponse } from '../api/dashboard';
 import { authApi } from '../api/auth';
-import ConfirmModal from '../components/ConfirmModal';
+import Screen from '../components/ui/Screen';
+import AppHeader from '../components/ui/AppHeader';
+import Card from '../components/ui/Card';
+import PrimaryButton from '../components/ui/PrimaryButton';
 
-interface MenuItemProps {
+interface MenuRowProps {
   icon: keyof typeof Feather.glyphMap;
   title: string;
   subtitle?: string;
   onPress: () => void;
+  first?: boolean;
 }
 
-function MenuItem({ icon, title, subtitle, onPress }: MenuItemProps) {
+/**
+ * One line of the account menu. Rows share a card, so the separator is drawn
+ * on every row but the first instead of after every row — a trailing rule
+ * inside a rounded card reads as a rendering fault.
+ */
+function MenuRow({ icon, title, subtitle, onPress, first }: MenuRowProps) {
   return (
-    <TouchableOpacity style={styles.menuItem} onPress={onPress} activeOpacity={0.6}>
-      <View style={styles.menuIconContainer}>
-        <Feather name={icon} size={20} color={colors.white} />
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [styles.menuRow, !first && styles.menuRowDivided, pressed && styles.pressed]}
+      accessibilityRole="button"
+      accessibilityLabel={subtitle ? `${title}. ${subtitle}` : title}
+    >
+      <View style={styles.menuIcon}>
+        <Feather name={icon} size={18} color={colors.ink} />
       </View>
-      <View style={styles.menuContent}>
+      <View style={styles.menuText}>
         <Text style={styles.menuTitle}>{title}</Text>
-        {subtitle && <Text style={styles.menuSubtitle}>{subtitle}</Text>}
+        {!!subtitle && <Text style={styles.menuSubtitle}>{subtitle}</Text>}
       </View>
       <Feather name="chevron-right" size={20} color={colors.gray400} />
-    </TouchableOpacity>
+    </Pressable>
   );
 }
 
@@ -45,8 +66,10 @@ export default function ProfileScreen() {
   const navigation = useNavigation<any>();
   const { user, logout, updateUser } = useAuth();
   const [dashboardData, setDashboardData] = useState<DashboardResponse | null>(null);
-  const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  // The photo flow used to fail into an Alert. It belongs next to the avatar
+  // that failed, where you can see what you were trying to change.
+  const [photoError, setPhotoError] = useState<string | null>(null);
 
   const fetchDashboard = useCallback(async () => {
     const { data } = await dashboardApi.getDashboard();
@@ -61,6 +84,20 @@ export default function ProfileScreen() {
     }, [fetchDashboard])
   );
 
+  const intro = useSharedValue(0);
+  useEffect(() => {
+    intro.value = withTiming(1, { duration: 460, easing: Easing.out(Easing.cubic) });
+  }, []);
+
+  const identityStyle = useAnimatedStyle(() => ({
+    opacity: intro.value,
+    transform: [{ translateY: (1 - intro.value) * 14 }],
+  }));
+  const bodyStyle = useAnimatedStyle(() => ({
+    opacity: withDelay(90, withTiming(intro.value, { duration: 400 })),
+    transform: [{ translateY: withDelay(90, withTiming((1 - intro.value) * 14, { duration: 400 })) }],
+  }));
+
   const userName = user ? `${user.first_name} ${user.last_name}`.trim() : 'Usuario';
   const userEmail = user?.email || '';
   const userInitials = user
@@ -72,23 +109,33 @@ export default function ProfileScreen() {
   const trainingsCount = dashboardData?.stats?.trainings ?? 0;
   const strikeWeeks = dashboardData?.strike?.weeks ?? 0;
 
-  const handleLogout = () => {
-    setShowLogoutModal(true);
+  const go = (screen: string) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    navigation.navigate(screen);
   };
 
-  const confirmLogout = () => {
-    setShowLogoutModal(false);
-    logout();
+  const handleLogout = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    // Signing out throws away the session, so it keeps its confirmation. A
+    // native alert is the right shape for a destructive yes/no.
+    Alert.alert(
+      'Cerrar sesión',
+      '¿Estás seguro que deseas cerrar sesión?',
+      Array.from([
+        { text: 'No', style: 'cancel' as const },
+        { text: 'Sí, cerrar', style: 'destructive' as const, onPress: () => logout() },
+      ])
+    );
   };
 
   const handleChangePhoto = async () => {
+    setPhotoError(null);
+
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
 
     if (status !== 'granted') {
-      Alert.alert(
-        'Permiso requerido',
-        'Necesitamos acceso a tu galería para cambiar la foto de perfil.'
-      );
+      setPhotoError('Necesitamos acceso a tu galería para cambiar la foto de perfil.');
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
       return;
     }
 
@@ -113,221 +160,156 @@ export default function ProfileScreen() {
 
       if (data) {
         updateUser(data);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       } else {
-        Alert.alert('Error', error || 'No se pudo actualizar la foto.');
+        setPhotoError(error || 'No se pudo actualizar la foto.');
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       }
     }
   };
 
   return (
-    <View style={styles.container}>
-      <SafeAreaView style={styles.safeArea} edges={['top']}>
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-            <Feather name="arrow-left" size={22} color={colors.white} />
-          </TouchableOpacity>
-        </View>
+    <Screen tone="surface" wash>
+      {/* A tab root has nothing behind it, so it carries no back control. */}
+      <AppHeader title="Perfil" showBack={false} />
 
-        <ScrollView
-          style={styles.scrollView}
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-        >
-          {/* Profile Section */}
-          <View style={styles.profileSection}>
-            <TouchableOpacity
-              style={styles.avatarContainer}
-              onPress={handleChangePhoto}
-              disabled={isUploadingPhoto}
-              activeOpacity={0.8}
-            >
-              {userPhoto ? (
-                <Image source={{ uri: userPhoto }} style={styles.avatar} />
-              ) : (
-                <View style={styles.avatarPlaceholder}>
-                  <Text style={styles.avatarText}>{userInitials}</Text>
-                </View>
-              )}
-              {isUploadingPhoto ? (
-                <View style={styles.avatarOverlay}>
-                  <ActivityIndicator size="small" color={colors.white} />
-                </View>
-              ) : (
-                <View style={styles.cameraButton}>
-                  <Feather name="camera" size={14} color={colors.white} />
-                </View>
-              )}
-            </TouchableOpacity>
-
-            <Text style={styles.userName}>{userName}</Text>
-            <Text style={styles.userEmail}>{userEmail}</Text>
-          </View>
-
-          {/* Divider */}
-          <View style={styles.divider} />
-
-          {/* Stats Section */}
-          <View style={styles.statsSection}>
-            <View style={styles.statItem}>
-              <View style={styles.statIconContainer}>
-                <Feather name="credit-card" size={18} color={colors.primary} />
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        showsVerticalScrollIndicator={false}
+      >
+        <Animated.View style={[styles.identity, identityStyle]}>
+          <Pressable
+            onPress={handleChangePhoto}
+            disabled={isUploadingPhoto}
+            style={({ pressed }) => [styles.avatarWrap, pressed && styles.pressed]}
+            accessibilityRole="button"
+            accessibilityLabel="Cambiar foto de perfil"
+          >
+            {userPhoto ? (
+              <Image source={{ uri: userPhoto }} style={styles.avatar} />
+            ) : (
+              <View style={[styles.avatar, styles.avatarFallback]}>
+                <Text style={styles.avatarText}>{userInitials}</Text>
               </View>
-              <Text style={styles.statValue}>{membershipDays}</Text>
-              <Text style={styles.statLabel}>Días</Text>
-            </View>
+            )}
 
-            <View style={styles.statItem}>
-              <View style={styles.statIconContainer}>
-                <Feather name="activity" size={18} color={colors.primary} />
+            {isUploadingPhoto ? (
+              <View style={styles.avatarOverlay}>
+                <ActivityIndicator size="small" color={colors.white} />
               </View>
-              <Text style={styles.statValue}>{trainingsCount}</Text>
-              <Text style={styles.statLabel}>Entrenos</Text>
-            </View>
-
-            <View style={styles.statItem}>
-              <View style={styles.statIconContainer}>
-                <Feather name="zap" size={18} color={colors.primary} />
+            ) : (
+              <View style={styles.cameraBadge}>
+                <Feather name="camera" size={14} color={colors.white} />
               </View>
-              <Text style={styles.statValue}>{strikeWeeks}</Text>
-              <Text style={styles.statLabel}>Semanas</Text>
+            )}
+          </Pressable>
+
+          <Text style={styles.name}>{userName}</Text>
+          {!!userEmail && <Text style={styles.email}>{userEmail}</Text>}
+
+          {!!photoError && (
+            <View style={styles.errorRow}>
+              <Feather name="alert-circle" size={14} color={colors.error} />
+              <Text style={styles.errorText}>{photoError}</Text>
             </View>
-          </View>
+          )}
+        </Animated.View>
 
-          {/* Divider */}
-          <View style={styles.divider} />
+        <Animated.View style={bodyStyle}>
+          <Card title="Tu progreso" subtitle="Membresía, entrenos y racha">
+            <View style={styles.statRow}>
+              {(
+                [
+                  ['credit-card', membershipDays, 'Días', colors.link],
+                  ['activity', trainingsCount, 'Entrenos', colors.accentDeep],
+                  ['zap', strikeWeeks, 'Semanas', colors.error],
+                ] as const
+              ).map(([icon, value, label, tint]) => (
+                <View key={label} style={styles.stat}>
+                  <Feather name={icon} size={18} color={tint} />
+                  <Text style={styles.statValue}>{value}</Text>
+                  <Text style={styles.statLabel}>{label}</Text>
+                </View>
+              ))}
+            </View>
+          </Card>
 
-          {/* Menu Section */}
-          <View style={styles.menuSection}>
-            <Text style={styles.sectionLabel}>Cuenta</Text>
+          <Text style={styles.sectionLabel}>CUENTA</Text>
 
-            <MenuItem
+          <Card style={styles.menuCard}>
+            <MenuRow
+              first
               icon="calendar"
               title="Mi calendario"
               subtitle="Ver mis entrenamientos"
-              onPress={() => navigation.navigate('Trainings')}
+              onPress={() => go('Trainings')}
             />
-
-            <MenuItem
+            <MenuRow
               icon="credit-card"
               title="Membresía"
               subtitle={`${membershipDays} días restantes`}
-              onPress={() => navigation.navigate('Membership')}
+              onPress={() => go('Membership')}
             />
-
-            <MenuItem
+            <MenuRow
               icon="user"
               title="Editar perfil"
               subtitle="Información personal"
-              onPress={() => navigation.navigate('EditProfile')}
+              onPress={() => go('EditProfile')}
             />
-
-            <MenuItem
+            <MenuRow
               icon="bell"
               title="Notificaciones"
-              subtitle="Preferencias de alertas"
-              onPress={() => navigation.navigate('Notifications')}
+              // The row opens the list of notifications, not a settings pane,
+              // so it no longer promises preferences it cannot show.
+              subtitle="Tus avisos y novedades"
+              onPress={() => go('Notifications')}
             />
-          </View>
+          </Card>
 
-          {/* Logout */}
-          <TouchableOpacity style={styles.logoutButton} onPress={handleLogout} activeOpacity={0.6}>
-            <Feather name="log-out" size={18} color={colors.error} />
-            <Text style={styles.logoutText}>Cerrar sesión</Text>
-          </TouchableOpacity>
+          <PrimaryButton
+            label="Cerrar sesión"
+            variant="danger"
+            icon="log-out"
+            onPress={handleLogout}
+            style={styles.logout}
+          />
+        </Animated.View>
 
-          <View style={styles.bottomSpacer} />
-        </ScrollView>
-
-        {/* Logout Modal */}
-        <ConfirmModal
-          visible={showLogoutModal}
-          title="Cerrar Sesión"
-          message="¿Estás seguro que deseas cerrar sesión?"
-          confirmText="Sí"
-          cancelText="No"
-          onConfirm={confirmLogout}
-          onCancel={() => setShowLogoutModal(false)}
-        />
-      </SafeAreaView>
-    </View>
+        {/* Clears the tab bar. */}
+        <View style={{ height: 96 }} />
+      </ScrollView>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.bgDark,
+  scroll: {
+    paddingHorizontal: 16,
   },
-  safeArea: {
-    flex: 1,
+  identity: {
+    marginTop: 8,
+    marginBottom: 24,
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.md,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingBottom: 40,
-  },
-  profileSection: {
-    alignItems: 'center',
-    paddingHorizontal: spacing.xxl,
-    paddingTop: spacing.xl,
-    paddingBottom: spacing.xxxl,
-  },
-  avatarContainer: {
-    position: 'relative',
-    marginBottom: spacing.xxl,
+  avatarWrap: {
+    width: 88,
+    height: 88,
+    marginBottom: 16,
   },
   avatar: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    borderWidth: 2,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
+    width: 88,
+    height: 88,
+    borderRadius: 44,
   },
-  avatarPlaceholder: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    backgroundColor: colors.cardDark,
+  avatarFallback: {
+    backgroundColor: colors.ink,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: 'rgba(255, 255, 255, 0.06)',
   },
   avatarText: {
-    fontSize: 28,
     fontFamily: typography.fontFamily,
-    fontWeight: typography.fontWeight.semiBold,
-    color: colors.gray400,
-    letterSpacing: 1,
-  },
-  cameraButton: {
-    position: 'absolute',
-    bottom: 0,
-    right: 0,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: colors.bgDark,
+    fontSize: 28,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.white,
   },
   avatarOverlay: {
     position: 'absolute',
@@ -335,135 +317,121 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    borderRadius: 48,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    borderRadius: 44,
+    backgroundColor: 'rgba(17, 17, 17, 0.5)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  userName: {
-    fontSize: typography.fontSize.xxl,
+  cameraBadge: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.ink,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 3,
+    borderColor: colors.surface,
+  },
+  name: {
     fontFamily: typography.fontFamily,
+    fontSize: 32,
     fontWeight: typography.fontWeight.bold,
-    color: colors.white,
-    letterSpacing: -0.5,
+    lineHeight: 38,
+    letterSpacing: -1,
+    color: colors.ink,
   },
-  userEmail: {
-    fontSize: typography.fontSize.sm,
+  email: {
+    marginTop: 4,
     fontFamily: typography.fontFamily,
-    fontWeight: typography.fontWeight.regular,
+    fontSize: 14,
     color: colors.gray400,
-    marginTop: spacing.xs,
   },
-  divider: {
-    height: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
-    marginHorizontal: spacing.xxl,
-  },
-  statsSection: {
+  errorRow: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingVertical: spacing.xxxl,
-    paddingHorizontal: spacing.xxl,
-  },
-  statItem: {
     alignItems: 'center',
+    gap: 6,
+    marginTop: 12,
+  },
+  errorText: {
     flex: 1,
+    fontFamily: typography.fontFamily,
+    fontSize: 13,
+    color: colors.error,
   },
-  statIconContainer: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'rgba(90, 107, 255, 0.08)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.md,
+  statRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  stat: {
+    flex: 1,
+    gap: 6,
   },
   statValue: {
-    fontSize: typography.fontSize.xl,
     fontFamily: typography.fontFamily,
+    fontSize: 24,
     fontWeight: typography.fontWeight.bold,
-    color: colors.white,
-    letterSpacing: -0.5,
+    color: colors.ink,
   },
   statLabel: {
-    fontSize: typography.fontSize.xs,
     fontFamily: typography.fontFamily,
-    fontWeight: typography.fontWeight.regular,
+    fontSize: 12,
     color: colors.gray400,
-    marginTop: spacing.xs,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  menuSection: {
-    paddingHorizontal: spacing.xl,
-    paddingTop: spacing.xxxl,
   },
   sectionLabel: {
-    fontSize: typography.fontSize.xs,
     fontFamily: typography.fontFamily,
-    fontWeight: typography.fontWeight.medium,
+    fontSize: 11,
+    fontWeight: typography.fontWeight.bold,
+    letterSpacing: 1.2,
     color: colors.gray400,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: spacing.lg,
-    paddingHorizontal: spacing.xs,
+    marginTop: 24,
+    marginBottom: 10,
   },
-  menuItem: {
+  menuCard: {
+    padding: 0,
+    gap: 0,
+    overflow: 'hidden',
+  },
+  menuRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.cardDark,
-    borderRadius: borderRadius.lg,
-    paddingVertical: spacing.lg,
-    paddingHorizontal: spacing.lg,
-    marginBottom: spacing.sm,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.04)',
+    gap: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
   },
-  menuIconContainer: {
+  menuRowDivided: {
+    borderTopWidth: 1,
+    borderTopColor: colors.surface,
+  },
+  menuIcon: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    backgroundColor: colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: spacing.lg,
   },
-  menuContent: {
+  menuText: {
     flex: 1,
+    gap: 2,
   },
   menuTitle: {
-    fontSize: typography.fontSize.md,
     fontFamily: typography.fontFamily,
-    fontWeight: typography.fontWeight.medium,
-    color: colors.white,
+    fontSize: 16,
+    fontWeight: typography.fontWeight.semiBold,
+    color: colors.ink,
   },
   menuSubtitle: {
-    fontSize: typography.fontSize.sm,
     fontFamily: typography.fontFamily,
-    fontWeight: typography.fontWeight.regular,
+    fontSize: 13,
     color: colors.gray400,
-    marginTop: 2,
   },
-  logoutButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: spacing.xxxl,
-    marginHorizontal: spacing.xxl,
-    paddingVertical: spacing.lg,
-    gap: spacing.sm,
-    borderRadius: borderRadius.lg,
-    backgroundColor: 'rgba(255, 77, 77, 0.08)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 77, 77, 0.15)',
+  pressed: {
+    opacity: 0.85,
   },
-  logoutText: {
-    fontSize: typography.fontSize.md,
-    fontFamily: typography.fontFamily,
-    fontWeight: typography.fontWeight.medium,
-    color: colors.error,
-  },
-  bottomSpacer: {
-    height: 100,
+  logout: {
+    marginTop: 24,
   },
 });
