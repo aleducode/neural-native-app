@@ -290,7 +290,7 @@ export default function SlotDetailScreen() {
           </View>
         </Animated.View>
 
-        <Animated.View style={bodyStyle}>
+        <Animated.View style={[styles.body, bodyStyle]}>
           <View style={styles.stats}>
             <Stat icon="zap" value={hourValue} unit={hourUnit} label="Horario" />
             <Stat icon="clock" value={String(duration)} unit="min" label="Duración" />
@@ -454,6 +454,14 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
     gap: 24,
   },
+  /**
+   * The design's Content frame stacks everything below the hero at 24. The
+   * scroll container's gap only separated the hero from this block; inside it
+   * the stats, the occupancy card and the roster were flush against each other.
+   */
+  body: {
+    gap: 24,
+  },
   hero: {
     height: 268,
     borderRadius: 20,
@@ -522,7 +530,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   statCol: {
-    gap: 4,
+    gap: 6,
   },
   statValueRow: {
     flexDirection: 'row',
@@ -550,7 +558,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
     borderRadius: 20,
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 16,
     gap: 20,
   },
   occupancyTop: {
