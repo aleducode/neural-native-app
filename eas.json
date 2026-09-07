@@ -40,6 +40,12 @@
         "serviceAccountKeyPath": "./secrets/play-service-account.json",
         "track": "alpha",
         "releaseStatus": "completed"
+      },
+      "ios": {
+        "ascApiKeyPath": "./secrets/AuthKey_B39RJNLCC7.p8",
+        "ascApiKeyId": "B39RJNLCC7",
+        "ascApiKeyIssuerId": "7e18aeb4-6e62-4c33-b58f-2fa0f30003d4",
+        "ascAppId": "6756985459"
       }
     }
   }
