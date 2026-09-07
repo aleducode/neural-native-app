@@ -408,23 +408,27 @@ const styles = StyleSheet.create({
   },
   numberFar: {
     fontFamily: typography.fontFamily,
-    fontSize: 32,
+    // The five values used to run 32/48/64/48/32 in full ink, which at three
+    // digits came to about 420 points of text on a 343 screen — heights ran
+    // off both edges. They now fade outward, which buys the room and makes
+    // the hierarchy at the same time.
+    fontSize: 22,
     fontWeight: typography.fontWeight.regular,
-    color: colors.ink,
+    color: '#C9C9C9',
   },
   numberNear: {
     fontFamily: typography.fontFamily,
-    fontSize: 48,
+    fontSize: 30,
     fontWeight: typography.fontWeight.regular,
     letterSpacing: -0.48,
-    color: colors.ink,
+    color: colors.gray400,
   },
   numberBoxWrap: {
     height: 74,
     justifyContent: 'center',
   },
   numberBox: {
-    minWidth: 110,
+    minWidth: 104,
     height: 74,
     padding: 1,
   },
@@ -437,10 +441,10 @@ const styles = StyleSheet.create({
   },
   numberCenter: {
     fontFamily: typography.fontFamily,
-    fontSize: 64,
+    fontSize: 44,
     fontWeight: typography.fontWeight.semiBold,
-    lineHeight: 64,
-    letterSpacing: -2.56,
+    lineHeight: 46,
+    letterSpacing: -1.5,
     color: colors.ink,
   },
   hint: {
