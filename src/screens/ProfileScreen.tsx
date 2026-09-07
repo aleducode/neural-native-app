@@ -478,8 +478,8 @@ export default function ProfileScreen() {
             />
             <MenuRow
               icon="bar-chart-2"
-              title="Historial de peso"
-              subtitle="Tu progreso corporal"
+              title="Tu progreso"
+              subtitle="Peso, evolución y registros"
               onPress={() => go('WeightHistory')}
             />
             <MenuRow
