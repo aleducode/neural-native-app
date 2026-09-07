@@ -37643,6 +37643,17 @@
           "gap": 18,
           "children": [
             {
+              "type": "text",
+              "id": "xkwyd",
+              "name": "Label",
+              "fill": "#111111",
+              "content": "04 · Datos de perfil",
+              "fontFamily": "Rethink Sans",
+              "fontSize": 24,
+              "fontWeight": "600",
+              "letterSpacing": -0.48
+            },
+            {
               "type": "frame",
               "id": "T6CMbY",
               "name": "Screens",
