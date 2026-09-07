@@ -30,6 +30,11 @@ const BASE_HEIGHT = [84, 56, 40] as const;
  * instead of just closing the table). The header below matches AppHeader's
  * look but wires back to `onBack`.
  */
+/** First name only: a full name will not fit a third of the podium. */
+function firstName(name: string): string {
+  return (name || '').trim().split(/\s+/)[0] || name;
+}
+
 export default function Ranking({ currentUserId, onBack, onSelectUser }: RankingProps) {
   const [metric, setMetric] = useState<Metric>('trainings');
   const [board, setBoard] = useState<Leaderboard | null>(null);
@@ -141,7 +146,16 @@ export default function Ranking({ currentUserId, onBack, onSelectUser }: Ranking
                         initials={member.initials}
                         size={avatarSize}
                       />
-                      <Text style={styles.podiumValue}>{member.value}</Text>
+                      {/* Two initials do not tell three people apart, and with
+                          ties the base repeats a place — the name is the only
+                          thing that says who this is. */}
+                      <Text style={styles.podiumName} numberOfLines={1}>
+                        {firstName(member.name)}
+                      </Text>
+                      <View style={styles.podiumValueRow}>
+                        <Text style={styles.podiumValue}>{member.value}</Text>
+                        <Text style={styles.podiumUnit}>{unitFor(metric)}</Text>
+                      </View>
                       <View style={[styles.podiumBase, { height: baseHeight }]}>
                         <Text
                           style={[
@@ -318,11 +332,29 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
   },
+  podiumName: {
+    fontFamily: typography.fontFamily,
+    fontSize: 12,
+    color: colors.white,
+    maxWidth: 88,
+  },
+  podiumValueRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 3,
+  },
   podiumValue: {
     fontFamily: typography.fontFamily,
     fontSize: 20,
     fontWeight: typography.fontWeight.semiBold,
+    letterSpacing: -0.2,
     color: colors.white,
+  },
+  podiumUnit: {
+    fontFamily: typography.fontFamily,
+    fontSize: 11,
+    // gray400 is 3.9:1 on ink; this is the grey the dark surfaces already use.
+    color: '#8A8A8A',
   },
   podiumBase: {
     width: '100%',

@@ -42387,6 +42387,17 @@
                                 },
                                 {
                                   "type": "text",
+                                  "id": "eAguH",
+                                  "name": "Name",
+                                  "fill": "#FFFFFF",
+                                  "content": "Juan",
+                                  "textAlign": "center",
+                                  "fontFamily": "Rethink Sans",
+                                  "fontSize": 12,
+                                  "fontWeight": "normal"
+                                },
+                                {
+                                  "type": "text",
                                   "id": "Dh8rB",
                                   "name": "Value",
                                   "fill": "#C6FF40",
@@ -42455,6 +42466,17 @@
                                       "fontWeight": "600"
                                     }
                                   ]
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "Sb3o7",
+                                  "name": "Name",
+                                  "fill": "#FFFFFF",
+                                  "content": "Camilo",
+                                  "textAlign": "center",
+                                  "fontFamily": "Rethink Sans",
+                                  "fontSize": 12,
+                                  "fontWeight": "normal"
                                 },
                                 {
                                   "type": "text",
@@ -42529,6 +42551,17 @@
                                 },
                                 {
                                   "type": "text",
+                                  "id": "LKSGN",
+                                  "name": "Name",
+                                  "fill": "#FFFFFF",
+                                  "content": "Laura",
+                                  "textAlign": "center",
+                                  "fontFamily": "Rethink Sans",
+                                  "fontSize": 12,
+                                  "fontWeight": "normal"
+                                },
+                                {
+                                  "type": "text",
                                   "id": "ttIen",
                                   "name": "Value",
                                   "fill": "#8A8A8A",
@@ -42555,7 +42588,7 @@
                                       "id": "c8VxsZ",
                                       "name": "Place",
                                       "fill": "#8A8A8A",
-                                      "content": "3",
+                                      "content": "2",
                                       "fontFamily": "Rethink Sans",
                                       "fontSize": 24,
                                       "fontWeight": "600"
