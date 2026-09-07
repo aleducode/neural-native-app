@@ -31692,10 +31692,15 @@
                         {
                           "type": "frame",
                           "id": "e37xS",
+                          "name": "Logo Neural",
                           "width": 132,
                           "height": 34,
-                          "fill": "#111111",
-                          "cornerRadius": 6,
+                          "fill": {
+                            "type": "image",
+                            "enabled": true,
+                            "url": "images/neural-logo.png",
+                            "mode": "fit"
+                          },
                           "layout": "none"
                         },
                         {
@@ -32056,10 +32061,15 @@
                         {
                           "type": "frame",
                           "id": "H1kRX",
+                          "name": "Logo Neural",
                           "width": 132,
                           "height": 34,
-                          "fill": "#111111",
-                          "cornerRadius": 6,
+                          "fill": {
+                            "type": "image",
+                            "enabled": true,
+                            "url": "images/neural-logo.png",
+                            "mode": "fit"
+                          },
                           "layout": "none"
                         },
                         {
