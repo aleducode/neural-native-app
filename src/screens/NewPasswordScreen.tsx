@@ -54,19 +54,13 @@ const TOKEN_SPENT =
   'Ese código ya venció. Pedí uno nuevo y volvé a intentar.';
 
 /**
- * The password rules come back as a list, and the API client hands it over
- * either keyed by field or as a bare array depending on the shape the server
- * used. Both flatten to the same thing: the reasons, in order, one per line.
+ * This endpoint always answers with a flat list — the password is its only
+ * field, so there is nothing to key the reasons by. That is not true of
+ * /auth/register/, which is a DRF serializer and does send them per field.
  */
 function flattenReasons(errors: unknown): string[] {
-  if (!errors) return [];
-  if (Array.isArray(errors)) return errors.map(String).filter(Boolean);
-  if (typeof errors === 'object') {
-    return Object.values(errors as Record<string, unknown>)
-      .flatMap((v) => (Array.isArray(v) ? v.map(String) : [String(v)]))
-      .filter(Boolean);
-  }
-  return [];
+  if (!Array.isArray(errors)) return [];
+  return errors.map(String).filter(Boolean);
 }
 
 type NewPasswordRouteProp = RouteProp<AuthStackParamList, 'NewPassword'>;
