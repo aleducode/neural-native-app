@@ -20,6 +20,11 @@ export interface LeaderboardStanding {
    * strip actually shows. `null` when the member is already first.
    */
   to_next: number | null;
+  /**
+   * The member directly above. Present when the server sends it; the copy for
+   * a tie names them, and a tie is the common case rather than the exception.
+   */
+  next_up?: { name: string; value: number } | null;
 }
 
 export interface LeaderboardResponse {

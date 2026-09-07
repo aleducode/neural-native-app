@@ -34,7 +34,14 @@ export interface RankedMember {
 export interface Standing {
   position: number;
   value: number;
+  /**
+   * How much more it takes to pass the member directly above. `null` means
+   * there is nobody above; `0` means the values are already level and only the
+   * tiebreak separates them.
+   */
   toNext: number | null;
+  /** Who is directly above, when the server says. */
+  nextUp?: { name: string; value: number } | null;
 }
 
 export interface Leaderboard {
@@ -73,7 +80,14 @@ function toMember(entry: LeaderboardEntry): RankedMember {
 
 function toStanding(me: LeaderboardStanding | null): Standing | null {
   if (!me) return null;
-  return { position: me.position, value: me.value, toNext: me.to_next };
+  return {
+    position: me.position,
+    value: me.value,
+    toNext: me.to_next,
+    nextUp: me.next_up
+      ? { name: me.next_up.name, value: me.next_up.value }
+      : null,
+  };
 }
 
 const EMPTY: Leaderboard = {
@@ -121,12 +135,50 @@ export async function fetchLeaderboard(
  * The gap to the next place is the whole point: a position is a fact, the gap
  * is a reason to book.
  */
+const PLURAL: Record<Metric, string> = {
+  trainings: 'entrenos',
+  strike: 'semanas',
+  posts: 'publicaciones',
+};
+
+const SINGULAR: Record<Metric, string> = {
+  trainings: 'entreno',
+  strike: 'semana',
+  posts: 'publicación',
+};
+
+/** Just the first name: the line has to fit one row of a card. */
+function firstNameOf(name: string): string {
+  const first = (name || '').trim().split(/\s+/)[0] ?? '';
+  if (first.length > 2 && first === first.toUpperCase()) {
+    return first[0] + first.slice(1).toLowerCase();
+  }
+  return first;
+}
+
+/**
+ * What the strip says under the podium.
+ *
+ * Three states, and the middle one is the common case rather than the edge:
+ * positions are unique but values tie constantly — 92 of the first 99 pairs
+ * share a number — so most members are level with the person above them and
+ * separated only by the tiebreak. Telling them "te faltan 0" would say
+ * nothing; telling them they are tied says exactly where they stand.
+ */
 export function standingLabel(me: Standing | null, metric: Metric): string {
   if (!me) return 'Entrená esta semana para entrar en la tabla';
-  if (me.toNext === null || me.toNext <= 0) return 'Vas primero. Sostenelo.';
+  if (me.toNext === null) return 'Vas primero. Sostenelo.';
 
-  const unit = metric === 'strike' ? 'semanas' : metric === 'posts' ? 'publicaciones' : 'entrenos';
-  const one = me.toNext === 1;
-  const noun = one ? unit.replace(/s$/, '') : unit;
-  return `Te falta${one ? '' : 'n'} ${me.toNext} ${noun} para el ${me.position - 1}.º`;
+  const one = SINGULAR[metric];
+
+  if (me.toNext === 0) {
+    const rival = me.nextUp ? firstNameOf(me.nextUp.name) : null;
+    return rival
+      ? `Estás empatado con ${rival}. Un ${one} más y lo pasás.`
+      : `Estás empatado con el ${me.position - 1}.º. Un ${one} más y lo pasás.`;
+  }
+
+  const isOne = me.toNext === 1;
+  const noun = isOne ? one : PLURAL[metric];
+  return `Te falta${isOne ? '' : 'n'} ${me.toNext} ${noun} para el ${me.position - 1}.º`;
 }
