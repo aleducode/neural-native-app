@@ -23,8 +23,9 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { colors, typography } from '../theme/colors';
 import Screen from '../components/ui/Screen';
 import AppHeader from '../components/ui/AppHeader';
+import ConfirmSheet from '../components/ui/ConfirmSheet';
 import { slotsApi } from '../api/slots';
-import { Slot } from '../types';
+import { Slot, Training } from '../types';
 import { RootStackParamList } from '../navigation/RootNavigator';
 
 type SlotDetailNavigationProp = StackNavigationProp<RootStackParamList>;
@@ -109,6 +110,13 @@ export default function SlotDetailScreen() {
   // The design shows the roster open; the pill collapses it, not the reverse.
   const [showRoster, setShowRoster] = useState(true);
 
+  // Cancelling needs the training id, and the slot detail endpoint does not
+  // return one — so when the member has a place here, the booking is located
+  // among their own trainings by slot.
+  const [myTraining, setMyTraining] = useState<Training | null>(null);
+  const [askCancel, setAskCancel] = useState(false);
+  const [isCancelling, setIsCancelling] = useState(false);
+
   const intro = useSharedValue(0);
   useEffect(() => {
     intro.value = withTiming(1, { duration: 460, easing: Easing.out(Easing.cubic) });
@@ -146,6 +154,39 @@ export default function SlotDetailScreen() {
   useEffect(() => {
     fetchSlotDetail();
   }, [fetchSlotDetail]);
+
+  useEffect(() => {
+    if (!userHasBooked) {
+      setMyTraining(null);
+      return;
+    }
+    let cancelled = false;
+    slotsApi.getMyTrainings(false).then(({ data }) => {
+      if (cancelled) return;
+      setMyTraining(data?.find((t) => t.slot?.id === slotId) ?? null);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [userHasBooked, slotId]);
+
+  const confirmCancel = async () => {
+    if (!myTraining) return;
+    setAskCancel(false);
+    setIsCancelling(true);
+    setBookError(null);
+
+    const { success, error: cancelApiError } = await slotsApi.cancelTraining(myTraining.id);
+    setIsCancelling(false);
+
+    if (success) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      fetchSlotDetail();
+    } else {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      setBookError(cancelApiError || 'No se pudo cancelar la reserva');
+    }
+  };
 
   const handleBook = async () => {
     if (!slot) return;
@@ -404,7 +445,7 @@ export default function SlotDetailScreen() {
         </Animated.View>
       </ScrollView>
 
-      {!userHasBooked && (
+      {(!userHasBooked || myTraining?.can_cancel) && (
         <View style={styles.footer}>
           {!!bookError && (
             <View style={styles.inlineError}>
@@ -413,6 +454,32 @@ export default function SlotDetailScreen() {
             </View>
           )}
 
+          {userHasBooked ? (
+            <Pressable
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                setAskCancel(true);
+              }}
+              disabled={isCancelling}
+              style={({ pressed }) => [
+                styles.cta,
+                styles.ctaCancel,
+                isCancelling && styles.ctaDisabled,
+                pressed && styles.ctaPressed,
+              ]}
+              accessibilityRole="button"
+              accessibilityState={{ disabled: isCancelling, busy: isCancelling }}
+            >
+              {isCancelling ? (
+                <ActivityIndicator color={colors.error} />
+              ) : (
+                <>
+                  <Text style={[styles.ctaLabel, styles.ctaLabelCancel]}>Cancelar reserva</Text>
+                  <Feather name="x" size={20} color={colors.error} />
+                </>
+              )}
+            </Pressable>
+          ) : (
           <Pressable
             onPress={handleBook}
             disabled={isBooking || isFull}
@@ -438,8 +505,20 @@ export default function SlotDetailScreen() {
               </>
             )}
           </Pressable>
+          )}
         </View>
       )}
+
+      <ConfirmSheet
+        visible={askCancel}
+        title="Cancelar reserva"
+        message="Tu lugar en este horario quedará libre para alguien más."
+        confirmText="Sí, cancelar"
+        cancelText="No, volver"
+        destructive
+        onConfirm={confirmCancel}
+        onCancel={() => setAskCancel(false)}
+      />
     </Screen>
   );
 }
@@ -756,6 +835,12 @@ const styles = StyleSheet.create({
   },
   ctaDisabled: {
     opacity: 0.45,
+  },
+  ctaCancel: {
+    borderColor: colors.error,
+  },
+  ctaLabelCancel: {
+    color: colors.error,
   },
   ctaPressed: {
     transform: [{ scale: 0.98 }],
