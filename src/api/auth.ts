@@ -32,10 +32,16 @@ export const authApi = {
   /**
    * Asks for a recovery code. The answer is deliberately the same whether or
    * not the address is registered — a reset form that says "no such account"
-   * is a free way to find out who is a member.
+   * is a free way to find out who is a member — and the same again when the
+   * rate limiter steps in, since a different answer there would enumerate too.
+   *
+   * The older /password-reset/ still mails a link, on purpose: the builds
+   * already in closed testing show "check your mail and tap the link", and a
+   * code would leave those testers holding a number with nowhere to type it.
+   * That route goes away once this build has replaced them everywhere.
    */
-  resetPassword: async (email: string) => {
-    return api.post('/auth/password-reset/', { email });
+  requestResetCode: async (email: string) => {
+    return api.post('/auth/password-reset/code/', { email });
   },
 
   /**

@@ -59,20 +59,18 @@ type Props = {
 const CONNECTION_ERROR = 'Error de conexión. Verifica tu internet.';
 
 /**
- * A code that has expired and a code that was mistyped both come back as a
- * rejection, but only one of them is worth retyping. The backend distinguishes
- * them and this keeps that distinction rather than flattening both into
- * "incorrecto", which would send people back to the boxes for nothing.
+ * A rejected code has three causes and they ask for different things: an
+ * expired one needs a new request, a superseded one — the reader had two mails
+ * open and typed the older, which the resend button below makes routine, not a
+ * slip — needs the newer mail, and a wrong one needs retyping. The server is
+ * the only side that can tell them apart, so its wording is what shows.
+ *
+ * Only the offline case is written here, because that request never reached a
+ * server to have an opinion.
  */
 function messageFor(apiError: string): string {
   if (apiError === CONNECTION_ERROR) return apiError;
-  if (/expir|venc/i.test(apiError)) {
-    return 'Ese código ya venció. Pedí uno nuevo con el botón de abajo.';
-  }
-  if (/intent|attempt|bloque/i.test(apiError)) {
-    return 'Demasiados intentos. Pedí un código nuevo.';
-  }
-  return 'El código no es correcto. Revisa e intenta de nuevo.';
+  return apiError || 'El código no es correcto. Revisa e intenta de nuevo.';
 }
 
 export default function VerificationCodeScreen({
@@ -248,7 +246,7 @@ export default function VerificationCodeScreen({
 
     try {
       if (onResend) await onResend();
-      else await authApi.resetPassword(email);
+      else await authApi.requestResetCode(email);
       setSecondsLeft(RESEND_SECONDS);
       inputRef.current?.focus();
     } catch (err) {

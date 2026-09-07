@@ -53,6 +53,22 @@ const CONNECTION_ERROR = 'Error de conexión. Verifica tu internet.';
 const TOKEN_SPENT =
   'Ese código ya venció. Pedí uno nuevo y volvé a intentar.';
 
+/**
+ * The password rules come back as a list, and the API client hands it over
+ * either keyed by field or as a bare array depending on the shape the server
+ * used. Both flatten to the same thing: the reasons, in order, one per line.
+ */
+function flattenReasons(errors: unknown): string[] {
+  if (!errors) return [];
+  if (Array.isArray(errors)) return errors.map(String).filter(Boolean);
+  if (typeof errors === 'object') {
+    return Object.values(errors as Record<string, unknown>)
+      .flatMap((v) => (Array.isArray(v) ? v.map(String) : [String(v)]))
+      .filter(Boolean);
+  }
+  return [];
+}
+
 type NewPasswordRouteProp = RouteProp<AuthStackParamList, 'NewPassword'>;
 
 export default function NewPasswordScreen() {
@@ -126,17 +142,25 @@ export default function NewPasswordScreen() {
     });
 
     try {
-      const { error: apiError } = await authApi.confirmPasswordReset(resetToken, password);
+      const { error: apiError, errors } = await authApi.confirmPasswordReset(
+        resetToken,
+        password
+      );
       setIsLoading(false);
 
-      if (apiError) {
-        if (apiError === CONNECTION_ERROR) {
+      if (apiError || errors) {
+        const reasons = flattenReasons(errors);
+
+        if (reasons.length > 0) {
+          // Django rejects a weak password for several reasons at once — too
+          // short, too common, all digits. Showing one hides the others and
+          // the member fixes them one failed attempt at a time.
+          setFieldErrors({ password: reasons.join('\n') });
+        } else if (apiError === CONNECTION_ERROR) {
           setError(apiError);
-        } else if (/token|expir|inv[áa]lid/i.test(apiError)) {
+        } else if (/token/i.test(apiError ?? '')) {
           setError(TOKEN_SPENT);
         } else {
-          // The backend validates the password too, and its complaint is more
-          // specific than anything this screen could guess at.
           setFieldErrors({ password: apiError });
         }
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);

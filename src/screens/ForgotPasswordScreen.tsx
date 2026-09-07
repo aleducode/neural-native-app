@@ -98,7 +98,7 @@ export default function ForgotPasswordScreen() {
     });
 
     try {
-      const { error: apiError } = await authApi.resetPassword(emailValue);
+      const { error: apiError } = await authApi.requestResetCode(emailValue);
       setIsLoading(false);
 
       if (apiError === CONNECTION_ERROR) {
