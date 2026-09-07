@@ -1,25 +1,29 @@
-import { fetchLeaderboard, RankedMember } from '../../services/leaderboard';
+import { fetchLeaderboard, Metric, Leaderboard } from '../../services/leaderboard';
 
 /**
- * A single, process-wide cache for `fetchLeaderboard()`.
+ * A per-metric cache for `fetchLeaderboard()`.
  *
- * The leaderboard costs one request per member (see `services/leaderboard.ts`).
- * `CommunityScreen` needs it for the pulse strip and the full table; the
- * profile screen needs it too, just to know one member's weekly rank. Without
- * this, opening a profile after the feed would pay the whole roster cost
- * again. Every caller in this app should go through `getLeaderboard()` rather
- * than importing `fetchLeaderboard` directly, so the request only ever
- * happens once per session.
+ * The old version of this comment said the leaderboard cost one request per
+ * member — that was true when the phone derived the ranking from the feed.
+ * `/community/leaderboard/` replaced that: the server ranks, so this is now
+ * one request per metric. `CommunityScreen` needs the `trainings` board for
+ * the pulse strip; `Ranking` fetches whichever metric chip is active; the
+ * profile screen needs `trainings` too, just to know one member's weekly
+ * rank. Every caller in this app should go through `getLeaderboard()` rather
+ * than importing `fetchLeaderboard` directly, so a given metric is only ever
+ * requested once per session.
  *
  * There is no invalidation: a training logged mid-session won't move anyone
  * until the app restarts. Acceptable for now — nothing here reads live from a
  * socket, and the design has no refresh affordance for the board either.
  */
-let cached: Promise<RankedMember[]> | null = null;
+const cache = new Map<Metric, Promise<Leaderboard>>();
 
-export function getLeaderboard(): Promise<RankedMember[]> {
-  if (!cached) {
-    cached = fetchLeaderboard();
+export function getLeaderboard(metric: Metric = 'trainings'): Promise<Leaderboard> {
+  let entry = cache.get(metric);
+  if (!entry) {
+    entry = fetchLeaderboard(metric);
+    cache.set(metric, entry);
   }
-  return cached;
+  return entry;
 }

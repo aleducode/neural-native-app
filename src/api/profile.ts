@@ -10,6 +10,12 @@ export interface Profile {
   emergency_contact_phone: string | null;
   profession: string | null;
   instagram: string | null;
+  /**
+   * Opt-out, not opt-in: false means the member appears. The server excludes
+   * them from the ranking queryset entirely rather than hiding the row, so
+   * they also stop counting towards everyone else's positions.
+   */
+  hide_from_leaderboard: boolean;
 }
 
 export interface UserWeight {

@@ -1,15 +1,13 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { colors, typography } from '../../theme/colors';
 import Screen from '../ui/Screen';
-import { METRICS, Metric, RankedMember, rankBy, valueOf } from '../../services/leaderboard';
+import { METRICS, Metric, Leaderboard, unitFor } from '../../services/leaderboard';
+import { getLeaderboard } from './leaderboardStore';
 import LeaderboardAvatar from './LeaderboardAvatar';
 
 interface RankingProps {
-  /** Unsorted roster — re-sorted locally by whichever metric chip is active. */
-  members: RankedMember[];
-  loading: boolean;
   currentUserId?: number;
   onBack: () => void;
   onSelectUser: (userId: number) => void;
@@ -21,22 +19,42 @@ const BASE_HEIGHT = [84, 56, 40] as const;
  * The full weekly table: metric chips, a scope notice, a 3-up podium and the
  * rest of the roster as rows.
  *
+ * Each metric chip is its own request against `/community/leaderboard/` (via
+ * the shared store, so re-opening the same metric this session is free). The
+ * previous board stays on screen while a new one loads — swapping to a blank
+ * table on every chip tap reads as broken, not fast.
+ *
  * This is not a navigator route — the strip toggles it in from local state in
  * `CommunityScreen`, so it can't reuse `AppHeader`'s back control (that calls
  * `navigation.goBack`, which would leave this overlay and pop the real stack
  * instead of just closing the table). The header below matches AppHeader's
  * look but wires back to `onBack`.
  */
-export default function Ranking({ members, loading, currentUserId, onBack, onSelectUser }: RankingProps) {
+export default function Ranking({ currentUserId, onBack, onSelectUser }: RankingProps) {
   const [metric, setMetric] = useState<Metric>('trainings');
-  const ranked = useMemo(() => rankBy(members, metric), [members, metric]);
-  const unit = METRICS.find((m) => m.key === metric)?.unit ?? '';
+  const [board, setBoard] = useState<Leaderboard | null>(null);
+  const [switching, setSwitching] = useState(true);
 
-  const podium = ranked.slice(0, 3).map((member, i) => ({ member, place: i + 1 }));
+  useEffect(() => {
+    let alive = true;
+    setSwitching(true);
+    getLeaderboard(metric).then((result) => {
+      if (!alive) return;
+      setBoard(result);
+      setSwitching(false);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [metric]);
+
+  const unit = unitFor(metric);
+  const entries = board?.entries ?? [];
+  const podium = entries.slice(0, 3).map((member, i) => ({ member, place: i + 1 }));
   const podiumOrder = [podium[1], podium[0], podium[2]].filter(
-    (entry): entry is { member: RankedMember; place: number } => !!entry
+    (entry): entry is { member: (typeof entries)[number]; place: number } => !!entry
   );
-  const rest = ranked.slice(3);
+  const rest = entries.slice(3);
 
   return (
     <Screen>
@@ -78,18 +96,29 @@ export default function Ranking({ members, loading, currentUserId, onBack, onSel
               </Pressable>
             );
           })}
+          {switching && board !== null && (
+            <ActivityIndicator size="small" color={colors.ink} style={styles.chipsLoading} />
+          )}
         </View>
 
         <View style={styles.scopeNotice}>
           <Feather name="users" size={16} color={colors.ink} />
-          <Text style={styles.scopeText}>Entre quienes participan en la comunidad</Text>
+          <Text style={styles.scopeText}>
+            {/*
+             * The old copy — "entre quienes participan en la comunidad" — described
+             * the client-derived board, which only knew members who posted. The
+             * server ranks every active member whether they post or not, so that
+             * copy would now be false; this states the real scope instead.
+             */}
+            Todos los socios activos{board ? ` · ${board.total}` : ''}
+          </Text>
         </View>
 
-        {loading ? (
+        {board === null ? (
           <View style={styles.loading}>
             <ActivityIndicator size="large" color={colors.ink} />
           </View>
-        ) : ranked.length === 0 ? (
+        ) : board.isEmpty ? (
           <Text style={styles.emptyText}>Todavía no hay datos suficientes para armar la tabla.</Text>
         ) : (
           <>
@@ -112,7 +141,7 @@ export default function Ranking({ members, loading, currentUserId, onBack, onSel
                         initials={member.initials}
                         size={avatarSize}
                       />
-                      <Text style={styles.podiumValue}>{valueOf(member, metric)}</Text>
+                      <Text style={styles.podiumValue}>{member.value}</Text>
                       <View style={[styles.podiumBase, { height: baseHeight }]}>
                         <Text
                           style={[
@@ -120,7 +149,7 @@ export default function Ranking({ members, loading, currentUserId, onBack, onSel
                             isFirst && styles.podiumRankFirst,
                           ]}
                         >
-                          {place}
+                          {member.position}
                         </Text>
                       </View>
                     </Pressable>
@@ -130,8 +159,7 @@ export default function Ranking({ members, loading, currentUserId, onBack, onSel
             </View>
 
             <View style={styles.rows}>
-              {rest.map((member, idx) => {
-                const rank = idx + 4;
+              {rest.map((member) => {
                 const isMe = currentUserId != null && member.id === currentUserId;
                 return (
                   <Pressable
@@ -145,14 +173,19 @@ export default function Ranking({ members, loading, currentUserId, onBack, onSel
                     accessibilityRole="button"
                     accessibilityLabel={`Ver el perfil de ${member.name}`}
                   >
-                    <Text style={[styles.rowRank, isMe && styles.rowAccentText]}>{rank}</Text>
+                    {/*
+                     * The server uses competition ranking: ties share a position
+                     * (e.g. two members can both be 2.º). Showing the array index
+                     * here would silently contradict that.
+                     */}
+                    <Text style={[styles.rowRank, isMe && styles.rowAccentText]}>{member.position}</Text>
                     <LeaderboardAvatar photoUrl={member.photoUrl} initials={member.initials} size={40} />
                     <Text style={[styles.rowName, isMe && styles.rowNameMe]} numberOfLines={1}>
                       {member.name}
                     </Text>
                     <View style={styles.rowValueBlock}>
                       <Text style={[styles.rowValue, isMe && styles.rowAccentText]}>
-                        {valueOf(member, metric)}
+                        {member.value}
                       </Text>
                       {/*
                        * gray400 is only proven at 5.3:1 on white (BRIEF rule 2).
@@ -211,7 +244,11 @@ const styles = StyleSheet.create({
   },
   chips: {
     flexDirection: 'row',
+    alignItems: 'center',
     gap: 8,
+  },
+  chipsLoading: {
+    marginLeft: 4,
   },
   chip: {
     minWidth: 86,

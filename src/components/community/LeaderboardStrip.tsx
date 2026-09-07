@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import Animated, {
@@ -9,15 +9,14 @@ import Animated, {
   Easing,
 } from 'react-native-reanimated';
 import { colors, typography } from '../../theme/colors';
-import { RankedMember, rankBy, valueOf } from '../../services/leaderboard';
+import { Leaderboard, RankedMember, standingLabel } from '../../services/leaderboard';
 import LeaderboardAvatar from './LeaderboardAvatar';
 import { ordinal } from './ordinal';
 
 interface LeaderboardStripProps {
-  /** Unsorted roster — this component ranks it by trainings itself. */
-  members: RankedMember[];
+  /** Already ranked by the server for `board.metric` — this component never re-sorts it. */
+  board: Leaderboard;
   loading: boolean;
-  currentUserId?: number;
   onViewTable: () => void;
 }
 
@@ -27,17 +26,11 @@ const PLACE_COLOR = [colors.accentDeep, colors.accent, '#8A8A8A'] as const;
  * The weekly pulse strip: top 3 by trainings, and where you stand. Sits above
  * the wall as the feed's first element.
  *
- * The board only knows members who post (see `services/leaderboard.ts`), so
- * this never claims to rank the whole gym — it ranks the community.
+ * `/community/leaderboard/` ranks every active member, not just the ones who
+ * post — so unlike the old client-derived board, this one can honestly claim
+ * to speak for the whole gym.
  */
-export default function LeaderboardStrip({
-  members,
-  loading,
-  currentUserId,
-  onViewTable,
-}: LeaderboardStripProps) {
-  const ranked = useMemo(() => rankBy(members, 'trainings'), [members]);
-
+export default function LeaderboardStrip({ board, loading, onViewTable }: LeaderboardStripProps) {
   const pulse = useSharedValue(0.4);
   useEffect(() => {
     if (!loading) return;
@@ -75,29 +68,21 @@ export default function LeaderboardStrip({
     );
   }
 
-  // No one has posted this week, or the roster read failed — the strip stays
-  // out of the feed rather than showing a broken card.
-  if (ranked.length === 0) return null;
+  // Nobody has activity this period (every value would be 0, in alphabetical
+  // order) or the read failed — either way a podium here would be three faces
+  // put up at random, so the strip stays out of the feed instead.
+  if (board.isEmpty || board.entries.length === 0) return null;
 
-  const top3 = ranked.slice(0, 3).map((member, i) => ({ member, place: i + 1 }));
+  const top3 = board.entries.slice(0, 3).map((member, i) => ({ member, place: i + 1 }));
   const visualOrder = [top3[1], top3[0], top3[2]].filter(
     (entry): entry is { member: RankedMember; place: number } => !!entry
   );
 
-  const myIndex = currentUserId != null ? ranked.findIndex((m) => m.id === currentUserId) : -1;
-  let myBadge: string | null = null;
-  let myMessage: string;
-  if (myIndex === -1) {
-    myMessage = 'Publicá tu primer entreno para entrar';
-  } else if (myIndex === 0) {
-    myBadge = ordinal(1);
-    myMessage = 'Vas primero. Sostenelo.';
-  } else {
-    const above = ranked[myIndex - 1];
-    const diff = valueOf(above, 'trainings') - valueOf(ranked[myIndex], 'trainings');
-    myBadge = ordinal(myIndex + 1);
-    myMessage = `Te faltan ${diff} entrenos para el ${ordinal(myIndex)}`;
-  }
+  // `board.me` is `null` for accounts outside the ranked set (staff, unverified —
+  // confirmed against the owner's own account), so the badge is conditional and
+  // the message always comes from the server-authored copy, never redrafted here.
+  const myBadge = board.me ? ordinal(board.me.position) : null;
+  const myMessage = standingLabel(board.me, board.metric);
 
   return (
     <View style={[styles.card, styles.cardSpacing]}>
@@ -132,7 +117,7 @@ export default function LeaderboardStrip({
               <Text style={styles.top3Name} numberOfLines={1}>
                 {member.name.split(' ')[0]}
               </Text>
-              <Text style={[styles.top3Value, { color }]}>{valueOf(member, 'trainings')}</Text>
+              <Text style={[styles.top3Value, { color }]}>{member.value}</Text>
             </View>
           );
         })}

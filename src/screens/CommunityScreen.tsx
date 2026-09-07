@@ -24,7 +24,7 @@ import { colors, typography } from '../theme/colors';
 import { Post, ReactionType } from '../types/community';
 import { communityApi } from '../api/community';
 import { PostCard, LeaderboardStrip, Ranking, getLeaderboard } from '../components/community';
-import { RankedMember } from '../services/leaderboard';
+import { Leaderboard } from '../services/leaderboard';
 import Screen from '../components/ui/Screen';
 import AppHeader from '../components/ui/AppHeader';
 import PrimaryButton from '../components/ui/PrimaryButton';
@@ -44,20 +44,27 @@ export default function CommunityScreen() {
   // has to dismiss before they can see the feed again.
   const [feedError, setFeedError] = useState<string | null>(null);
 
-  // The leaderboard is expensive — one request per member (see
-  // services/leaderboard.ts) — so it is read once per app session through the
-  // shared cache in components/community/leaderboardStore, not on every focus
-  // like the feed above. Switching the metric chip inside <Ranking> only
-  // re-sorts this same array; it never re-fetches.
-  const [leaderboardMembers, setLeaderboardMembers] = useState<RankedMember[]>([]);
+  // The strip only ever shows the "trainings" board. It is read once per app
+  // session through the shared cache in components/community/leaderboardStore,
+  // not on every focus like the feed above — `/community/leaderboard/` ranks
+  // server-side now, but there is still no reason to re-ask for the same
+  // metric twice in a session. <Ranking> fetches its own metrics through that
+  // same store when the chips change.
+  const [board, setBoard] = useState<Leaderboard>({
+    metric: 'trainings',
+    entries: [],
+    me: null,
+    total: 0,
+    isEmpty: true,
+  });
   const [leaderboardLoading, setLeaderboardLoading] = useState(true);
   const [showRanking, setShowRanking] = useState(false);
 
   useEffect(() => {
     let alive = true;
-    getLeaderboard()
-      .then((members) => {
-        if (alive) setLeaderboardMembers(members);
+    getLeaderboard('trainings')
+      .then((result) => {
+        if (alive) setBoard(result);
       })
       .finally(() => {
         if (alive) setLeaderboardLoading(false);
@@ -264,8 +271,6 @@ export default function CommunityScreen() {
   if (showRanking) {
     return (
       <Ranking
-        members={leaderboardMembers}
-        loading={leaderboardLoading}
         currentUserId={user?.id}
         onBack={() => setShowRanking(false)}
         onSelectUser={handleAuthorPress}
@@ -297,9 +302,8 @@ export default function CommunityScreen() {
           showsVerticalScrollIndicator={false}
           ListHeaderComponent={
             <LeaderboardStrip
-              members={leaderboardMembers}
+              board={board}
               loading={leaderboardLoading}
-              currentUserId={user?.id}
               onViewTable={() => setShowRanking(true)}
             />
           }

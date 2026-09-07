@@ -21,7 +21,6 @@ import { useNavigation, useRoute, useFocusEffect, RouteProp } from '@react-navig
 import { colors, typography } from '../theme/colors';
 import { communityApi, UserPublicProfile } from '../api/community';
 import { dashboardApi } from '../api/dashboard';
-import { rankBy } from '../services/leaderboard';
 import { getLeaderboard, LeaderboardAvatar, ordinal } from '../components/community';
 import Screen from '../components/ui/Screen';
 import AppHeader from '../components/ui/AppHeader';
@@ -40,18 +39,19 @@ export default function UserProfileScreen() {
   // The weekly rank badge and the streak comparison both need data this
   // screen doesn't otherwise fetch. Neither refetches on every focus like the
   // profile does below — the leaderboard is read once per session through
-  // the shared cache (services/leaderboard.ts is expensive: one request per
-  // member), and the viewer's own streak is a single small call.
+  // the shared cache (components/community/leaderboardStore), and the
+  // viewer's own streak is a single small call.
   const [leaderboardRank, setLeaderboardRank] = useState<number | null>(null);
   const [myStreak, setMyStreak] = useState<number | null>(null);
 
   useEffect(() => {
     let alive = true;
-    getLeaderboard().then((members) => {
+    getLeaderboard('trainings').then((board) => {
       if (!alive) return;
-      const ranked = rankBy(members, 'trainings');
-      const index = ranked.findIndex((m) => m.id === userId);
-      setLeaderboardRank(index === -1 ? null : index + 1);
+      // The endpoint only returns the top 25. If this member isn't in that
+      // set we don't know their real rank, so no badge rather than a guess.
+      const entry = board.entries.find((m) => m.id === userId);
+      setLeaderboardRank(entry ? entry.position : null);
     });
     dashboardApi.getDashboard().then(({ data }) => {
       if (alive && data) setMyStreak(data.strike.weeks);

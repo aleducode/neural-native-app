@@ -8,6 +8,7 @@ import {
   Image,
   Alert,
   ActivityIndicator,
+  Switch,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -63,6 +64,42 @@ function MenuRow({ icon, title, subtitle, onPress, first }: MenuRowProps) {
   );
 }
 
+interface ToggleRowProps {
+  icon: keyof typeof Feather.glyphMap;
+  title: string;
+  subtitle: string;
+  value: boolean;
+  disabled?: boolean;
+  onChange: (next: boolean) => void;
+}
+
+/**
+ * Same shape as MenuRow, but it settles something here instead of going
+ * somewhere. The switch replaces the chevron; nothing else changes.
+ */
+function ToggleRow({ icon, title, subtitle, value, disabled, onChange }: ToggleRowProps) {
+  return (
+    <View style={[styles.menuRow, styles.menuRowDivided]}>
+      <View style={styles.menuIcon}>
+        <Feather name={icon} size={18} color={colors.ink} />
+      </View>
+      <View style={styles.menuText}>
+        <Text style={styles.menuTitle}>{title}</Text>
+        <Text style={styles.menuSubtitle}>{subtitle}</Text>
+      </View>
+      <Switch
+        value={value}
+        onValueChange={onChange}
+        disabled={disabled}
+        trackColor={{ false: colors.surface, true: colors.accentDeep }}
+        thumbColor={colors.white}
+        ios_backgroundColor={colors.surface}
+        accessibilityLabel={`${title}. ${subtitle}`}
+      />
+    </View>
+  );
+}
+
 interface StatRowProps {
   label: string;
   value: string | number;
@@ -88,6 +125,10 @@ export default function ProfileScreen() {
   const { user, logout, updateUser } = useAuth();
   const [dashboardData, setDashboardData] = useState<DashboardResponse | null>(null);
   const [profileData, setProfileData] = useState<ProfileResponse | null>(null);
+  // Mirrors the server's opt-out flag. Held separately so the switch answers
+  // the finger immediately and rolls back only if the save fails.
+  const [hiddenFromBoard, setHiddenFromBoard] = useState(false);
+  const [savingVisibility, setSavingVisibility] = useState(false);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   // The photo flow used to fail into an Alert. It belongs next to the avatar
   // that failed, where you can see what you were trying to change.
@@ -107,6 +148,7 @@ export default function ProfileScreen() {
     const { data } = await profileApi.getProfile();
     if (data) {
       setProfileData(data);
+      setHiddenFromBoard(!!data.profile?.hide_from_leaderboard);
     }
   }, []);
 
@@ -136,6 +178,24 @@ export default function ProfileScreen() {
     ? `${user.first_name?.[0] || ''}${user.last_name?.[0] || ''}`.toUpperCase()
     : 'U';
   const userPhoto = user?.photo_url;
+
+  const setBoardVisibility = async (appear: boolean) => {
+    const hide = !appear;
+    const previous = hiddenFromBoard;
+
+    setHiddenFromBoard(hide);
+    setSavingVisibility(true);
+
+    const { error } = await profileApi.updateProfile({ hide_from_leaderboard: hide });
+    setSavingVisibility(false);
+
+    if (error) {
+      // Put the switch back where it was: leaving it showing a state the
+      // server never accepted is worse than the failure itself.
+      setHiddenFromBoard(previous);
+      Alert.alert('No se pudo guardar', error);
+    }
+  };
 
   const age = profileData?.profile.age;
   const weight = profileData?.latest_weight?.weight;
@@ -427,6 +487,19 @@ export default function ProfileScreen() {
               title="Notificaciones"
               subtitle="Tus avisos y novedades"
               onPress={() => go('Notifications')}
+            />
+            {/* Phrased as taking part, not as hiding: the API field is an
+                opt-out (`hide_from_leaderboard`), so the switch is its
+                inverse. Turning it off removes the member from the ranking
+                entirely — they stop counting towards everyone else's
+                positions too, which is what makes it a real opt-out. */}
+            <ToggleRow
+              icon="award"
+              title="Aparecer en la tabla"
+              subtitle="Compartís tu posición con la comunidad"
+              value={!hiddenFromBoard}
+              disabled={savingVisibility}
+              onChange={setBoardVisibility}
             />
           </Card>
 

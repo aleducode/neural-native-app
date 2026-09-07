@@ -1,41 +1,54 @@
-import { communityApi } from '../api/community';
-import type { PostAuthor } from '../types/community';
+import {
+  leaderboardApi,
+  type LeaderboardMetric,
+  type LeaderboardPeriod,
+  type LeaderboardEntry,
+  type LeaderboardStanding,
+} from '../api/leaderboard';
 import { captureException } from '../utils/sentry';
 
 /**
- * The community leaderboard, assembled on the phone.
+ * The community leaderboard.
  *
- * There is no ranking endpoint. What exists is a feed, which names the people
- * taking part, and a public profile per person, which carries their totals. So
- * the board is built by reading the feed for the roster and then asking each
- * member for their own numbers.
+ * This used to be assembled on the phone — read the feed for a roster, then ask
+ * each member for their totals — because no ranking endpoint existed. It cost
+ * a request per member and could only rank people who post, which left out the
+ * member who trains daily and never writes a word.
  *
- * That shapes the product as much as the code: this ranks the people who show
- * up in the community, not every member of the gym. The screen says so out
- * loud rather than implying a completeness it cannot deliver.
- *
- * A `/community/leaderboard/` endpoint would replace all of this with one
- * request, and should — the cost here is one call per member.
+ * `/community/leaderboard/` replaced all of it with one request over every
+ * active member, and the derivation is gone.
  */
 
-export type Metric = 'trainings' | 'strike' | 'posts';
+export type Metric = LeaderboardMetric;
+export type Period = LeaderboardPeriod;
 
 export interface RankedMember {
   id: number;
+  position: number;
   name: string;
   photoUrl: string | null;
   initials: string;
-  trainings: number;
-  strike: number;
-  posts: number;
+  value: number;
 }
 
-/** How many people the board asks about. Each one costs a request. */
-const ROSTER_LIMIT = 18;
-/** Feed pages read to find them. */
-const PAGES = 2;
-/** Requests in flight at once, so a big roster does not stampede the API. */
-const CONCURRENCY = 4;
+export interface Standing {
+  position: number;
+  value: number;
+  toNext: number | null;
+}
+
+export interface Leaderboard {
+  metric: Metric;
+  entries: RankedMember[];
+  /** `null` when the signed-in account is not part of the ranked set. */
+  me: Standing | null;
+  total: number;
+  /**
+   * Nobody has done anything this period, so every value is 0 and the order is
+   * alphabetical noise. A podium built on that is a lie with faces on it.
+   */
+  isEmpty: boolean;
+}
 
 export const METRICS: { key: Metric; label: string; unit: string }[] = [
   { key: 'trainings', label: 'Entrenos', unit: 'entrenos' },
@@ -43,88 +56,77 @@ export const METRICS: { key: Metric; label: string; unit: string }[] = [
   { key: 'posts', label: 'Publicaciones', unit: 'posts' },
 ];
 
-export function valueOf(member: RankedMember, metric: Metric): number {
-  if (metric === 'strike') return member.strike;
-  if (metric === 'posts') return member.posts;
-  return member.trainings;
+export function unitFor(metric: Metric): string {
+  return METRICS.find((m) => m.key === metric)?.unit ?? '';
 }
 
-/** Runs `task` over `items`, at most `limit` at a time. */
-async function pooled<T, R>(
-  items: T[],
-  limit: number,
-  task: (item: T) => Promise<R>
-): Promise<R[]> {
-  const results: R[] = [];
-  let cursor = 0;
-
-  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
-    while (cursor < items.length) {
-      const index = cursor++;
-      results[index] = await task(items[index]);
-    }
-  });
-
-  await Promise.all(workers);
-  return results;
+function toMember(entry: LeaderboardEntry): RankedMember {
+  return {
+    id: entry.user_id,
+    position: entry.position,
+    name: entry.name,
+    photoUrl: entry.photo_url,
+    initials: entry.initials,
+    value: entry.value,
+  };
 }
 
-/** Everyone who has posted recently, most recent first, without repeats. */
-async function readRoster(): Promise<PostAuthor[]> {
-  const seen = new Map<number, PostAuthor>();
+function toStanding(me: LeaderboardStanding | null): Standing | null {
+  if (!me) return null;
+  return { position: me.position, value: me.value, toNext: me.to_next };
+}
 
-  for (let page = 1; page <= PAGES; page++) {
-    const { data } = await communityApi.getFeed(page);
-    if (!data) break;
+const EMPTY: Leaderboard = {
+  metric: 'trainings',
+  entries: [],
+  me: null,
+  total: 0,
+  isEmpty: true,
+};
 
-    for (const post of data.posts) {
-      if (post.author && !seen.has(post.author.id)) seen.set(post.author.id, post.author);
-    }
-    if (!data.has_more) break;
+/**
+ * One request. The server ranks, so switching metric refetches rather than
+ * re-sorting — which is now cheap enough to be the simpler thing.
+ *
+ * A failure returns an empty board rather than throwing: the wall must keep
+ * working when the ranking does not.
+ */
+export async function fetchLeaderboard(
+  metric: Metric = 'trainings',
+  period: Period = 'week'
+): Promise<Leaderboard> {
+  try {
+    const { data } = await leaderboardApi.getLeaderboard(metric, period);
+    if (!data) return { ...EMPTY, metric };
+
+    const entries = (data.entries ?? []).map(toMember);
+
+    return {
+      metric: data.metric ?? metric,
+      entries,
+      me: toStanding(data.me),
+      total: data.total ?? entries.length,
+      // Everyone tied at zero is not a ranking, whatever the order says.
+      isEmpty: entries.length === 0 || entries[0].value === 0,
+    };
+  } catch (error) {
+    captureException(error as Error, { context: 'leaderboard.fetch' });
+    return { ...EMPTY, metric };
   }
-
-  return [...seen.values()].slice(0, ROSTER_LIMIT);
 }
 
 /**
- * The board, unsorted — the screen sorts it by whichever metric is on show, so
- * switching metrics costs nothing and never refetches.
+ * What the strip says under the podium.
  *
- * A member whose profile fails to load is left out rather than shown at zero:
- * a false last place is worse than an absence.
+ * The gap to the next place is the whole point: a position is a fact, the gap
+ * is a reason to book.
  */
-export async function fetchLeaderboard(): Promise<RankedMember[]> {
-  try {
-    const roster = await readRoster();
-    if (roster.length === 0) return [];
+export function standingLabel(me: Standing | null, metric: Metric): string {
+  if (!me) return 'Entrená esta semana para entrar en la tabla';
+  if (me.toNext === null || me.toNext <= 0) return 'Vas primero. Sostenelo.';
 
-    const rows = await pooled(roster, CONCURRENCY, async (author) => {
-      const { data } = await communityApi.getUserProfile(author.id);
-      if (!data) return null;
-
-      return {
-        id: author.id,
-        name: data.name || author.name,
-        photoUrl: data.photo_url ?? author.photo_url,
-        initials: author.initials,
-        trainings: data.stats?.total_trainings ?? 0,
-        strike: data.stats?.current_strike ?? 0,
-        posts: data.stats?.posts_count ?? 0,
-      } as RankedMember;
-    });
-
-    return rows.filter((row): row is RankedMember => row !== null);
-  } catch (error) {
-    captureException(error as Error, { context: 'leaderboard.fetch' });
-    return [];
-  }
-}
-
-/** Highest first, with a stable tiebreak so equal scores never jitter. */
-export function rankBy(members: RankedMember[], metric: Metric): RankedMember[] {
-  return [...members].sort((a, b) => {
-    const diff = valueOf(b, metric) - valueOf(a, metric);
-    if (diff !== 0) return diff;
-    return a.name.localeCompare(b.name, 'es');
-  });
+  const unit = metric === 'strike' ? 'semanas' : metric === 'posts' ? 'publicaciones' : 'entrenos';
+  const one = me.toNext === 1;
+  const noun = one ? unit.replace(/s$/, '') : unit;
+  return `Te falta${one ? '' : 'n'} ${me.toNext} ${noun} para el ${me.position - 1}.º`;
 }
