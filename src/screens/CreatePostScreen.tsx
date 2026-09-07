@@ -19,7 +19,7 @@ import Animated, {
   withDelay,
   Easing,
 } from 'react-native-reanimated';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import { colors, typography } from '../theme/colors';
 import { communityApi } from '../api/community';
@@ -73,6 +73,9 @@ function endedAt(training: Training): number {
 
 export default function CreatePostScreen() {
   const navigation = useNavigation<any>();
+  const route = useRoute<RouteProp<{ CreatePost: { trainingId?: number } | undefined }, 'CreatePost'>>();
+  // Arriving from a specific session shares that one, not merely the latest.
+  const requestedTrainingId = route.params?.trainingId;
 
   const [content, setContent] = useState('');
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
@@ -123,15 +126,23 @@ export default function CreatePostScreen() {
         })
         .sort((a, b) => endedAt(b) - endedAt(a));
 
-      const last = finished[0];
+      // The one the caller asked to share wins; otherwise the most recent.
+      const asked = requestedTrainingId
+        ? data.find((training) => training.id === requestedTrainingId)
+        : undefined;
+      const last = asked ?? finished[0];
       if (!last) return;
 
-      setLastTraining({
+      const chosen = {
         id: last.id,
         type: last.training_type?.name ?? last.slot?.training_type?.name ?? 'Entrenamiento',
         date: last.slot.date,
         duration_minutes: durationMinutes(last),
-      });
+      };
+      setLastTraining(chosen);
+      // Coming in to share one, the attachment is already the point — no
+      // reason to make somebody tap it again.
+      if (asked) setSelectedTraining(chosen);
     };
 
     fetchLastTraining();
@@ -139,7 +150,7 @@ export default function CreatePostScreen() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [requestedTrainingId]);
 
   /** Back always resolves somewhere, even opened with nothing behind it. */
   const goBack = () => {

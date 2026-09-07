@@ -23,7 +23,8 @@ export type RootStackParamList = {
   BirthdateInput: undefined;
   HeightInput: undefined;
   // Community
-  CreatePost: undefined;
+  /** A training id preselects that session, so sharing one starts from it. */
+  CreatePost: { trainingId?: number } | undefined;
   PostDetail: { postId: number };
   UserProfile: { userId: number };
 };

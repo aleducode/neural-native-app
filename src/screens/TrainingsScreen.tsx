@@ -434,6 +434,25 @@ export default function TrainingsScreen() {
                             )}
                           </Pressable>
                         )}
+
+                        {/* A finished session is the one thing worth telling the
+                            wall about, and until now nothing invited it: the
+                            only way into a post was the button in Comunidad,
+                            which attaches whatever session happened to be last. */}
+                        {isPast && (
+                          <Pressable
+                            onPress={() => {
+                              Haptics.selectionAsync();
+                              navigation.navigate('CreatePost', { trainingId: training.id });
+                            }}
+                            hitSlop={12}
+                            accessibilityRole="button"
+                            accessibilityLabel="Compartir este entrenamiento en la comunidad"
+                            style={({ pressed }) => pressed && styles.pressed}
+                          >
+                            <Feather name="share-2" size={16} color={colors.ink} />
+                          </Pressable>
+                        )}
                       </View>
 
                       <View style={styles.statusRow}>
