@@ -40,13 +40,6 @@ interface ConfirmedUser {
   name: string;
 }
 
-/** Up to two initials, so the roster reads as people rather than row numbers. */
-function initialsOf(name: string): string {
-  const parts = (name || '').trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return '?';
-  return `${parts[0][0] ?? ''}${parts[1]?.[0] ?? ''}`.toUpperCase();
-}
-
 /** "HH:MM AM/PM" -> minutes since midnight. */
 function parseTimeToMinutes(time: string): number {
   const match = time.match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
@@ -233,10 +226,23 @@ export default function SlotDetailScreen() {
   const isFull = slot.available_places <= 0;
   const duration = parseTimeToMinutes(slot.hour_end) - parseTimeToMinutes(slot.hour_init);
   const [hourValue, hourUnit] = splitHour(slot.hour_init);
+  // The badge rides the boundary, so it needs room at both ends.
+  const fillPct = Math.min(Math.max(takenRatio, 0.06), 0.94) * 100;
 
   return (
     <Screen wash edges={['top', 'bottom']}>
-      <AppHeader title="Detalle del turno" />
+      <AppHeader
+        title="Detalle del turno"
+        action={
+          confirmedUsers.length > 0
+            ? {
+                icon: 'more-vertical',
+                label: showRoster ? 'Ocultar asistentes' : 'Ver asistentes',
+                onPress: () => setShowRoster((v) => !v),
+              }
+            : undefined
+        }
+      />
 
       <ScrollView
         showsVerticalScrollIndicator={false}
@@ -260,20 +266,36 @@ export default function SlotDetailScreen() {
             <Text style={styles.heroTitle} numberOfLines={1}>
               {slot.training_type.name}
             </Text>
-            {/* The mock puts a red three-bar difficulty meter here. The API has
-                no difficulty for a slot, so the caption carries the date. */}
-            <Text style={styles.heroDate} numberOfLines={1}>
-              {formatDate(slot.date)}
-            </Text>
+
+            <View style={styles.heroMeta}>
+              {/* The mock reads these three bars as difficulty, which no slot
+                  carries. They report how full the class is instead — the same
+                  glyph, saying something the API actually knows. */}
+              <View style={styles.levelBars}>
+                {[0, 1, 2].map((i) => (
+                  <View
+                    key={i}
+                    style={[
+                      styles.levelBar,
+                      { height: 9 - i * 3 },
+                      takenRatio > i / 3 && styles.levelBarOn,
+                    ]}
+                  />
+                ))}
+              </View>
+              <Text style={styles.heroDate} numberOfLines={1}>
+                {formatDate(slot.date)}
+              </Text>
+            </View>
           </View>
         </Animated.View>
 
         <Animated.View style={bodyStyle}>
           <View style={styles.stats}>
-            <Stat icon="calendar" value={hourValue} unit={hourUnit} label="Horario" />
+            <Stat icon="zap" value={hourValue} unit={hourUnit} label="Horario" />
             <Stat icon="clock" value={String(duration)} unit="min" label="Duración" />
             <Stat
-              icon="users"
+              icon="trending-up"
               value={String(slot.available_places)}
               unit={`/${slot.max_places}`}
               label="Cupos"
@@ -318,19 +340,23 @@ export default function SlotDetailScreen() {
                   green end of the ramp instead of the whole ramp squeezed into
                   a sliver. */}
               <LinearGradient
-                colors={[colors.accentDeep, colors.accent, '#FF4040']}
+                colors={['#FF4040', colors.accent, colors.accentDeep]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
                 style={StyleSheet.absoluteFill}
               />
-              <View
-                style={[styles.meterEmpty, { left: `${Math.max(takenRatio, 0.03) * 100}%` }]}
-                pointerEvents="none"
-              />
-              <View style={styles.meterTicks} pointerEvents="none">
-                {TICKS.map((i) => (
-                  <View key={i} style={styles.tick} />
-                ))}
+
+              {/* Everything past the fill is hatched, as the design draws it. */}
+              <View style={[styles.meterEmpty, { left: `${fillPct}%` }]} pointerEvents="none">
+                <View style={styles.hatchRow}>
+                  {TICKS.map((i) => (
+                    <View key={i} style={styles.hatchLine} />
+                  ))}
+                </View>
+              </View>
+
+              <View style={[styles.meterBadge, { left: `${fillPct}%` }]} pointerEvents="none">
+                <Text style={styles.meterBadgeGlyph}>🏋️</Text>
               </View>
             </View>
           </View>
@@ -339,9 +365,6 @@ export default function SlotDetailScreen() {
             <View style={styles.roster}>
               {confirmedUsers.map((user) => (
                 <View key={user.id} style={styles.rosterRow}>
-                  <View style={styles.avatar}>
-                    <Text style={styles.avatarText}>{initialsOf(user.name)}</Text>
-                  </View>
                   <View style={styles.rosterTexts}>
                     <Text style={styles.rosterName} numberOfLines={1}>
                       {user.name}
@@ -402,15 +425,15 @@ export default function SlotDetailScreen() {
             accessibilityState={{ disabled: isBooking || isFull, busy: isBooking }}
           >
             {isBooking ? (
-              <ActivityIndicator color={colors.white} />
+              <ActivityIndicator color={colors.ink} />
             ) : (
               <>
                 <Text style={styles.ctaLabel}>Confirmar reserva</Text>
                 {/* Three chevrons overlapping at -5, straight from the design. */}
                 <View style={styles.ctaArrows}>
-                  <Feather name="chevron-right" size={24} color={colors.white} />
-                  <Feather name="chevron-right" size={24} color={colors.white} style={styles.ctaArrowLap} />
-                  <Feather name="chevron-right" size={24} color={colors.white} style={styles.ctaArrowLap} />
+                  <Feather name="chevron-right" size={24} color={colors.ink} />
+                  <Feather name="chevron-right" size={24} color={colors.ink} style={styles.ctaArrowLap} />
+                  <Feather name="chevron-right" size={24} color={colors.ink} style={styles.ctaArrowLap} />
                 </View>
               </>
             )}
@@ -454,7 +477,30 @@ const styles = StyleSheet.create({
     left: 16,
     right: 16,
     bottom: 16,
-    gap: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  heroMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  levelBars: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 3,
+    height: 9,
+  },
+  levelBar: {
+    width: 6,
+    borderRadius: 2,
+    // Off is the same bar dimmed, so the row keeps its shape at any level.
+    backgroundColor: 'rgba(255, 255, 255, 0.45)',
+  },
+  levelBarOn: {
+    backgroundColor: '#E2223F',
   },
   heroTitle: {
     fontFamily: typography.fontFamily,
@@ -581,31 +627,43 @@ const styles = StyleSheet.create({
     bottom: 0,
     right: 0,
     backgroundColor: colors.surface,
+    overflow: 'hidden',
+  },
+  hatchRow: {
+    ...StyleSheet.absoluteFillObject,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingLeft: 4,
+  },
+  hatchLine: {
+    width: 2,
+    height: 80,
+    backgroundColor: '#DEDEDE',
+    // The design rakes these over instead of standing them upright.
+    transform: [{ rotate: '20deg' }],
+  },
+  meterBadge: {
+    position: 'absolute',
+    width: 30,
+    height: 30,
+    marginLeft: -15,
+    borderRadius: 15,
+    backgroundColor: colors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  meterBadgeGlyph: {
+    fontSize: 12,
   },
   roster: {
-    backgroundColor: colors.white,
-    borderRadius: 20,
-    padding: 16,
-    gap: 16,
+    gap: 20,
+    paddingHorizontal: 4,
   },
   rosterRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-  },
-  avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarText: {
-    fontFamily: typography.fontFamily,
-    fontSize: 14,
-    fontWeight: typography.fontWeight.semiBold,
-    color: colors.ink,
   },
   rosterTexts: {
     flex: 1,
@@ -676,9 +734,17 @@ const styles = StyleSheet.create({
     borderRadius: 32,
     paddingLeft: 24,
     paddingRight: 16,
-    // The design fills this pill white, which on the #F4F4F4 ground leaves the
-    // screen's primary action at 1.06:1 against its own background.
-    backgroundColor: colors.ink,
+    backgroundColor: colors.white,
+    // White on the #F4F4F4 ground is 1.06:1, so the pill's own edge would be
+    // invisible. The label is ink on white and reads fine; the hairline and
+    // shadow give the control the boundary the colour cannot.
+    borderWidth: 1,
+    borderColor: '#DEDEDE',
+    shadowColor: colors.ink,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.08,
+    shadowRadius: 14,
+    elevation: 3,
   },
   ctaDisabled: {
     opacity: 0.45,
@@ -689,8 +755,7 @@ const styles = StyleSheet.create({
   ctaLabel: {
     fontFamily: typography.fontFamily,
     fontSize: 16,
-    fontWeight: typography.fontWeight.semiBold,
-    color: colors.white,
+    color: colors.ink,
   },
   ctaArrows: {
     flexDirection: 'row',

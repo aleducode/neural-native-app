@@ -34,12 +34,12 @@ export default function AppHeader({ title, subtitle, showBack = true, action }: 
       {showBack ? (
         <Pressable
           onPress={goBack}
-          style={({ pressed }) => [styles.circle, pressed && styles.pressed]}
-          hitSlop={8}
+          style={({ pressed }) => [styles.control, pressed && styles.pressed]}
+          hitSlop={14}
           accessibilityRole="button"
           accessibilityLabel="Volver"
         >
-          <Feather name="arrow-left" size={20} color={colors.ink} />
+          <Feather name="arrow-left" size={24} color={colors.ink} />
         </Pressable>
       ) : (
         <View style={styles.spacer} />
@@ -59,12 +59,12 @@ export default function AppHeader({ title, subtitle, showBack = true, action }: 
       {action ? (
         <Pressable
           onPress={action.onPress}
-          style={({ pressed }) => [styles.circle, pressed && styles.pressed]}
-          hitSlop={8}
+          style={({ pressed }) => [styles.control, pressed && styles.pressed]}
+          hitSlop={14}
           accessibilityRole="button"
           accessibilityLabel={action.label}
         >
-          <Feather name={action.icon} size={20} color={colors.ink} />
+          <Feather name={action.icon} size={24} color={colors.ink} />
         </Pressable>
       ) : (
         <View style={styles.spacer} />
@@ -79,18 +79,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    // The design's header row is 52 tall.
+    height: 52,
   },
-  circle: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: colors.white,
+  control: {
+    // The design draws these as bare 24px glyphs, not buttons on a disc. The
+    // hitSlop carries the touch target the disc used to provide.
+    width: 24,
+    height: 24,
     alignItems: 'center',
     justifyContent: 'center',
   },
   spacer: {
-    width: 44,
+    width: 24,
   },
   pressed: {
     opacity: 0.7,
@@ -102,8 +103,9 @@ const styles = StyleSheet.create({
   },
   title: {
     fontFamily: typography.fontFamily,
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: typography.fontWeight.semiBold,
+    letterSpacing: -0.2,
     color: colors.ink,
   },
   subtitle: {

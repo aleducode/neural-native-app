@@ -416,6 +416,7 @@ export default function HomeScreen() {
             <WeightCard
               weights={weights}
               stats={weightStats}
+              style={styles.stackedCard}
               onPress={() => navigation.navigate('WeightHistory')}
             />
 
@@ -470,6 +471,10 @@ const styles = StyleSheet.create({
   },
   scroll: {
     paddingHorizontal: 16,
+  },
+  /** The gap every card on this screen leaves under itself. */
+  stackedCard: {
+    marginBottom: 12,
   },
   header: {
     flexDirection: 'row',

@@ -120,7 +120,7 @@ function SlotRow({ slot, onPress }: { slot: Slot; onPress: () => void }) {
 
       <View style={[styles.tile, isFull && styles.tileFull]}>
         <Image
-          source={trainingImage(training_type)}
+          source={trainingImage(training_type, slot.id)}
           style={[styles.tileImage, isFull && styles.tileImageFull]}
           resizeMode="contain"
           accessible={false}

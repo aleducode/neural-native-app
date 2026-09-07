@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, Pressable } from 'react-native';
+import { View, Text, StyleSheet, Pressable, type ViewStyle } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { colors, typography } from '../theme/colors';
@@ -13,6 +13,8 @@ interface WeightCardProps {
   weights: UserWeight[];
   stats: WeightListResponse['stats'] | null;
   onPress: () => void;
+  /** Spacing belongs to whoever stacks the cards, not to the card. */
+  style?: ViewStyle;
 }
 
 /**
@@ -23,7 +25,7 @@ interface WeightCardProps {
  * labels, because at this size the labels would collide and the card is a way
  * in, not the reading itself.
  */
-export default function WeightCard({ weights, stats, onPress }: WeightCardProps) {
+export default function WeightCard({ weights, stats, onPress, style }: WeightCardProps) {
   const current = stats?.current;
   if (current == null) return null;
 
@@ -40,7 +42,7 @@ export default function WeightCard({ weights, stats, onPress }: WeightCardProps)
   return (
     <Pressable
       onPress={onPress}
-      style={({ pressed }) => [styles.card, pressed && styles.pressed]}
+      style={({ pressed }) => [styles.card, style, pressed && styles.pressed]}
       accessibilityRole="button"
       accessibilityLabel={`Tu peso, ${current} kilos. Ver historial.`}
     >

@@ -15,7 +15,20 @@ const IMAGES = {
   movilidad: require('../../assets/trainings/movilidad.png'),
   individual: require('../../assets/trainings/individual.png'),
   default: require('../../assets/trainings/default.png'),
+  atleta1: require('../../assets/trainings/atleta1.png'),
+  atleta2: require('../../assets/trainings/atleta2.png'),
+  atleta3: require('../../assets/trainings/atleta3.png'),
 } as const;
+
+/**
+ * The pool a slot falls back into when its training type says nothing useful.
+ *
+ * This gym runs one type all day, so keying only on the type painted the same
+ * athlete on every card of the list — which the design does not do. The pick is
+ * decorative but deterministic: a given slot always shows the same picture, so
+ * the list never reshuffles under you between refreshes.
+ */
+const POOL: Bucket[] = ['funcional', 'atleta1', 'fuerza', 'atleta2', 'cardio', 'atleta3'];
 
 type Bucket = keyof typeof IMAGES;
 
@@ -34,12 +47,31 @@ function normalize(text: string): string {
     .replace(/[\u0300-\u036f]/g, '');
 }
 
-export function trainingImage(type: TrainingType): ImageSourcePropType {
-  // The discipline wins over the format: a functional session is a functional
-  // picture whether it is booked as a class or one-on-one.
+/** The bucket a training type names outright, if it names one. */
+function matchBucket(type: TrainingType): Bucket | null {
   const haystack = normalize(`${type.slug_name} ${type.name}`);
   for (const [bucket, words] of KEYWORDS) {
-    if (words.some((word) => haystack.includes(word))) return IMAGES[bucket];
+    if (words.some((word) => haystack.includes(word))) return bucket;
   }
-  return type.is_group ? IMAGES.default : IMAGES.individual;
+  return null;
+}
+
+/**
+ * The picture for a training.
+ *
+ * With no `variant` the answer is purely the discipline. Pass one — a slot id,
+ * a row index — and the card joins a rotation that still leads with its own
+ * discipline, so a list of six identical "Funcional" slots stops looking like
+ * the same card printed six times.
+ */
+export function trainingImage(type: TrainingType, variant?: number): ImageSourcePropType {
+  const matched = matchBucket(type);
+
+  if (variant == null) {
+    if (matched) return IMAGES[matched];
+    return type.is_group ? IMAGES.default : IMAGES.individual;
+  }
+
+  const pool = matched ? [matched, ...POOL.filter((b) => b !== matched)] : POOL;
+  return IMAGES[pool[Math.abs(variant) % pool.length]];
 }
