@@ -30,9 +30,25 @@ const BASE_HEIGHT = [84, 56, 40] as const;
  * instead of just closing the table). The header below matches AppHeader's
  * look but wires back to `onBack`.
  */
+/**
+ * The API returns names as they were typed at sign-up, so some arrive shouting
+ * in caps. Beside names in ordinary case they read as an error.
+ */
+function properCase(name: string): string {
+  return (name || '')
+    .trim()
+    .split(/\s+/)
+    .map((word) =>
+      word.length > 2 && word === word.toUpperCase()
+        ? word[0] + word.slice(1).toLowerCase()
+        : word
+    )
+    .join(' ');
+}
+
 /** First name only: a full name will not fit a third of the podium. */
 function firstName(name: string): string {
-  return (name || '').trim().split(/\s+/)[0] || name;
+  return properCase(name).trim().split(/\s+/)[0] || name;
 }
 
 export default function Ranking({ currentUserId, onBack, onSelectUser }: RankingProps) {
@@ -53,7 +69,6 @@ export default function Ranking({ currentUserId, onBack, onSelectUser }: Ranking
     };
   }, [metric]);
 
-  const unit = unitFor(metric);
   const entries = board?.entries ?? [];
   const podium = entries.slice(0, 3).map((member, i) => ({ member, place: i + 1 }));
   const podiumOrder = [podium[1], podium[0], podium[2]].filter(
@@ -141,11 +156,13 @@ export default function Ranking({ currentUserId, onBack, onSelectUser }: Ranking
                       accessibilityRole="button"
                       accessibilityLabel={`Ver el perfil de ${member.name}`}
                     >
-                      <LeaderboardAvatar
-                        photoUrl={member.photoUrl}
-                        initials={member.initials}
-                        size={avatarSize}
-                      />
+                      <View style={styles.podiumAvatarSlot}>
+                        <LeaderboardAvatar
+                          photoUrl={member.photoUrl}
+                          initials={member.initials}
+                          size={avatarSize}
+                        />
+                      </View>
                       {/* Two initials do not tell three people apart, and with
                           ties the base repeats a place — the name is the only
                           thing that says who this is. */}
@@ -195,8 +212,12 @@ export default function Ranking({ currentUserId, onBack, onSelectUser }: Ranking
                     <Text style={[styles.rowRank, isMe && styles.rowAccentText]}>{member.position}</Text>
                     <LeaderboardAvatar photoUrl={member.photoUrl} initials={member.initials} size={40} />
                     <Text style={[styles.rowName, isMe && styles.rowNameMe]} numberOfLines={1}>
-                      {member.name}
+                      {properCase(member.name)}
                     </Text>
+                    {/* The unit used to repeat under all 25 rows. The metric
+                        chip above already names it; the podium spells it out
+                        once. Down here it was noise between the names and the
+                        numbers. */}
                     <View style={styles.rowValueBlock}>
                       <Text style={[styles.rowValue, isMe && styles.rowAccentText]}>
                         {member.value}
@@ -208,7 +229,6 @@ export default function Ranking({ currentUserId, onBack, onSelectUser }: Ranking
                        * already uses on ink elsewhere (the strip's "ESTA
                        * SEMANA" eyebrow), which clears AA there.
                        */}
-                      <Text style={[styles.rowUnit, isMe && styles.rowUnitMe]}>{unit}</Text>
                     </View>
                   </Pressable>
                 );
@@ -332,6 +352,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
   },
+  podiumAvatarSlot: {
+    // The first place wears a bigger avatar. Without a slot of its own that
+    // difference pushed each column's name and value to a different height,
+    // and the three read as three separate cards.
+    height: 64,
+    justifyContent: 'flex-end',
+  },
   podiumName: {
     fontFamily: typography.fontFamily,
     fontSize: 12,
@@ -417,13 +444,5 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: typography.fontWeight.semiBold,
     color: colors.ink,
-  },
-  rowUnit: {
-    fontFamily: typography.fontFamily,
-    fontSize: 12,
-    color: colors.gray400,
-  },
-  rowUnitMe: {
-    color: '#8A8A8A',
   },
 });
