@@ -39998,24 +39998,17 @@
                       "name": "Foto",
                       "clip": true,
                       "width": "fill_container",
+                      "height": 200,
                       "fill": "#C6FF40",
                       "cornerRadius": 20,
-                      "layout": "vertical",
-                      "gap": 8,
-                      "padding": [
-                        0,
-                        0,
-                        8,
-                        0
-                      ],
-                      "justifyContent": "center",
+                      "gap": 16,
                       "alignItems": "center",
                       "children": [
                         {
                           "type": "frame",
                           "id": "xGS2M",
                           "clip": true,
-                          "width": 200,
+                          "width": 162,
                           "height": 200,
                           "fill": {
                             "type": "image",
@@ -40029,32 +40022,67 @@
                         },
                         {
                           "type": "frame",
-                          "id": "mx85B",
-                          "width": 200,
-                          "justifyContent": "end",
+                          "id": "k7qu8Q",
+                          "width": "fill_container",
+                          "layout": "vertical",
+                          "gap": 12,
+                          "padding": [
+                            0,
+                            16,
+                            0,
+                            0
+                          ],
                           "children": [
                             {
-                              "type": "frame",
-                              "id": "L6VBFF",
-                              "width": 32,
-                              "height": 32,
+                              "type": "text",
+                              "id": "b1Pp6",
                               "fill": "#111111",
-                              "cornerRadius": 16,
-                              "stroke": "#C6FF40",
-                              "strokeWidth": 3,
-                              "layout": "vertical",
+                              "content": "Alejandro Duque",
+                              "fontFamily": "Rethink Sans",
+                              "fontSize": 20,
+                              "fontWeight": "600"
+                            },
+                            {
+                              "type": "text",
+                              "id": "EAoJj",
+                              "fill": "#3E5A00",
+                              "content": "Socio desde marzo 2025",
+                              "fontFamily": "Rethink Sans",
+                              "fontSize": 12,
+                              "fontWeight": "normal"
+                            },
+                            {
+                              "type": "frame",
+                              "id": "WoBlb",
+                              "name": "Cambiar foto",
+                              "fill": "#111111",
+                              "cornerRadius": 32,
+                              "gap": 8,
+                              "padding": [
+                                10,
+                                14
+                              ],
                               "justifyContent": "center",
                               "alignItems": "center",
                               "children": [
                                 {
                                   "type": "icon",
-                                  "id": "S0zJ7",
+                                  "id": "UkLAZ",
                                   "name": "photo_camera",
-                                  "width": 14,
-                                  "height": 14,
+                                  "width": 16,
+                                  "height": 16,
                                   "icon": "photo_camera",
                                   "library": "Material Symbols Rounded",
                                   "fill": "#FFFFFF"
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "S7wqv7",
+                                  "fill": "#FFFFFF",
+                                  "content": "Cambiar foto",
+                                  "fontFamily": "Rethink Sans",
+                                  "fontSize": 13,
+                                  "fontWeight": "600"
                                 }
                               ]
                             }
