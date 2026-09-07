@@ -9,7 +9,7 @@ import Animated, {
   Easing,
 } from 'react-native-reanimated';
 import { colors, typography } from '../../theme/colors';
-import { Leaderboard, RankedMember, standingLabel } from '../../services/leaderboard';
+import { Leaderboard, RankedMember, displayName, standingLabel } from '../../services/leaderboard';
 import LeaderboardAvatar from './LeaderboardAvatar';
 import { ordinal } from './ordinal';
 
@@ -115,7 +115,7 @@ export default function LeaderboardStrip({ board, loading, onViewTable }: Leader
                 fontSize={15}
               />
               <Text style={styles.top3Name} numberOfLines={1}>
-                {member.name.split(' ')[0]}
+                {displayName(member).split(' ')[0]}
               </Text>
               <Text style={[styles.top3Value, { color }]}>{member.value}</Text>
             </View>

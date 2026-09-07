@@ -25,6 +25,7 @@ export type Period = LeaderboardPeriod;
 export interface RankedMember {
   id: number;
   position: number;
+  /** Empty when the member never set one; render `initials` instead. */
   name: string;
   photoUrl: string | null;
   initials: string;
@@ -40,8 +41,18 @@ export interface Standing {
    * tiebreak separates them.
    */
   toNext: number | null;
-  /** Who is directly above, when the server says. */
-  nextUp?: { name: string; value: number } | null;
+  /** Who is directly above, when the server says. Name is null if they never set one. */
+  nextUp?: { name: string | null; value: number } | null;
+}
+
+/**
+ * What to print for a member. Those who never filled in a name arrive without
+ * one — the server sends null rather than leak the local part of their email —
+ * and their initials are all there is to show. Two letters identify nobody,
+ * which is the point.
+ */
+export function displayName(member: RankedMember): string {
+  return member.name.trim() || member.initials;
 }
 
 export interface Leaderboard {
@@ -71,7 +82,7 @@ function toMember(entry: LeaderboardEntry): RankedMember {
   return {
     id: entry.user_id,
     position: entry.position,
-    name: entry.name,
+    name: entry.name ?? '',
     photoUrl: entry.photo_url,
     initials: entry.initials,
     value: entry.value,
@@ -151,16 +162,23 @@ const SINGULAR: Record<Metric, string> = {
  * Just the first name, and only when it is one.
  *
  * A member who never filled in a name comes back as the local part of their
- * email. "Estás empatado con Jperez.94" is worse than not naming anyone, and
- * it also hands out half an address, so those fall back to the position.
+ * address, and "Estás empatado con Jperez.94" both reads badly and hands out
+ * half an email.
+ *
+ * The test is deliberately narrow. An earlier version also rejected a dot,
+ * which flagged "Nora Elena Cardona C." and "Clara. Múnera" — real members
+ * whose surname initial carries a period, which is ordinary here. Measured
+ * against the top hundred, "@" and a digit catch every genuine case and
+ * nobody else. The server sends null for these now anyway; this only stands
+ * in until every client is on that.
  */
-function firstNameOf(name: string): string | null {
+function firstNameOf(name: string | null): string | null {
   const raw = (name || '').trim();
   if (!raw) return null;
-  if (raw.includes('@') || /[._\d]/.test(raw.split(/\s+/)[0] ?? '')) return null;
 
   const first = raw.split(/\s+/)[0] ?? '';
   if (first.length < 2) return null;
+  if (raw.includes('@') || /\d/.test(first)) return null;
   if (first === first.toUpperCase()) return first[0] + first.slice(1).toLowerCase();
   return first;
 }

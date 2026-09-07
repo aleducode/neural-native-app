@@ -6,7 +6,8 @@ export type LeaderboardPeriod = 'week' | 'month' | 'all';
 export interface LeaderboardEntry {
   position: number;
   user_id: number;
-  name: string;
+  /** Null when the member never set a name — do not fall back to the email. */
+  name: string | null;
   photo_url: string | null;
   initials: string;
   value: number;
@@ -24,7 +25,7 @@ export interface LeaderboardStanding {
    * The member directly above. Present when the server sends it; the copy for
    * a tie names them, and a tie is the common case rather than the exception.
    */
-  next_up?: { name: string; value: number } | null;
+  next_up?: { name: string | null; value: number } | null;
 }
 
 export interface LeaderboardResponse {

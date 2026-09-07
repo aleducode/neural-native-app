@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator } from
 import { Feather } from '@expo/vector-icons';
 import { colors, typography } from '../../theme/colors';
 import Screen from '../ui/Screen';
-import { METRICS, Metric, Leaderboard, unitFor } from '../../services/leaderboard';
+import { METRICS, Metric, Leaderboard, displayName, unitFor } from '../../services/leaderboard';
 import { getLeaderboard } from './leaderboardStore';
 import LeaderboardAvatar from './LeaderboardAvatar';
 
@@ -154,7 +154,7 @@ export default function Ranking({ currentUserId, onBack, onSelectUser }: Ranking
                       style={styles.podiumCol}
                       onPress={() => onSelectUser(member.id)}
                       accessibilityRole="button"
-                      accessibilityLabel={`Ver el perfil de ${member.name}`}
+                      accessibilityLabel={`Ver el perfil de ${displayName(member)}`}
                     >
                       <View style={styles.podiumAvatarSlot}>
                         <LeaderboardAvatar
@@ -167,7 +167,7 @@ export default function Ranking({ currentUserId, onBack, onSelectUser }: Ranking
                           ties the base repeats a place — the name is the only
                           thing that says who this is. */}
                       <Text style={styles.podiumName} numberOfLines={1}>
-                        {firstName(member.name)}
+                        {firstName(displayName(member))}
                       </Text>
                       <View style={styles.podiumValueRow}>
                         <Text style={styles.podiumValue}>{member.value}</Text>
@@ -202,7 +202,7 @@ export default function Ranking({ currentUserId, onBack, onSelectUser }: Ranking
                     ]}
                     onPress={() => onSelectUser(member.id)}
                     accessibilityRole="button"
-                    accessibilityLabel={`Ver el perfil de ${member.name}`}
+                    accessibilityLabel={`Ver el perfil de ${displayName(member)}`}
                   >
                     {/*
                      * The server uses competition ranking: ties share a position
@@ -212,7 +212,7 @@ export default function Ranking({ currentUserId, onBack, onSelectUser }: Ranking
                     <Text style={[styles.rowRank, isMe && styles.rowAccentText]}>{member.position}</Text>
                     <LeaderboardAvatar photoUrl={member.photoUrl} initials={member.initials} size={40} />
                     <Text style={[styles.rowName, isMe && styles.rowNameMe]} numberOfLines={1}>
-                      {properCase(member.name)}
+                      {properCase(displayName(member))}
                     </Text>
                     {/* The unit used to repeat under all 25 rows. The metric
                         chip above already names it; the podium spells it out
