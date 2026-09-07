@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -39,47 +39,17 @@ const BLOB_PATH =
 const DECOR_W = SCREEN_W * 0.95;
 const DECOR_H = DECOR_W * (380.74 / 343);
 
-// Standard anti-spam window before the link can be requested again.
-const RESEND_SECONDS = 30;
-
-// The single message the screen shows on a completed request. It never says
-// whether the address exists — a reset form that answers "no such account" is
-// a free account-enumeration oracle.
-const NEUTRAL_SUCCESS = 'Si ese correo está registrado, te enviamos un enlace.';
-
 // The client turns a failed fetch into exactly this string. It is the only
 // outcome worth surfacing: every other backend answer, including "unknown
 // email", has to look identical to a success.
 const CONNECTION_ERROR = 'Error de conexión. Verifica tu internet.';
-
-function formatCountdown(seconds: number) {
-  const mm = String(Math.floor(seconds / 60)).padStart(2, '0');
-  const ss = String(seconds % 60).padStart(2, '0');
-  return `${mm}:${ss}`;
-}
 
 export default function ForgotPasswordScreen() {
   const navigation = useNavigation<any>();
 
   const [email, setEmail] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [sent, setSent] = useState(false);
-  const [sentTo, setSentTo] = useState('');
   const [error, setError] = useState<string | undefined>(undefined);
-  const [cooldown, setCooldown] = useState(0);
-
-  // Tick the resend timer down. Recreated on every transition to a non-zero
-  // value, which is also how a resend restarts it.
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  useEffect(() => {
-    if (cooldown <= 0) return;
-    timerRef.current = setInterval(() => {
-      setCooldown((s) => (s <= 1 ? 0 : s - 1));
-    }, 1000);
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
-  }, [cooldown > 0]);
 
   // Same short staggered entrance as the login. Anything longer reads as lag
   // on a screen the user only reaches when something already went wrong.
@@ -97,20 +67,12 @@ export default function ForgotPasswordScreen() {
     transform: [{ translateY: withDelay(80, withTiming((1 - intro.value) * 18, { duration: 400 })) }],
   }));
 
-  // The confirmation replaces the form in place, so it gets its own short
-  // entrance instead of appearing fully formed.
-  const confirm = useSharedValue(0);
-  const confirmStyle = useAnimatedStyle(() => ({
-    opacity: confirm.value,
-    transform: [{ translateY: (1 - confirm.value) * 14 }],
-  }));
-
   const goBack = () => {
     if (navigation.canGoBack?.()) navigation.goBack();
     else navigation.navigate('Login');
   };
 
-  const submit = async (isResend: boolean) => {
+  const submit = async () => {
     const emailValue = email?.trim() || '';
 
     // Validation belongs beside the field that failed, not in a modal the user
@@ -130,7 +92,7 @@ export default function ForgotPasswordScreen() {
     setIsLoading(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
-    addBreadcrumb(isResend ? 'Password reset resend' : 'Password reset requested', 'auth', {
+    addBreadcrumb('Password reset requested', 'auth', {
       email: emailValue.toLowerCase(),
       emailLength: emailValue.length,
     });
@@ -148,17 +110,17 @@ export default function ForgotPasswordScreen() {
       }
 
       addBreadcrumb('Password reset request finished', 'auth');
-      setSentTo(emailValue);
-      setSent(true);
-      setCooldown(RESEND_SECONDS);
-      confirm.value = withTiming(1, { duration: 320, easing: Easing.out(Easing.cubic) });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+      // Always, whether or not the address is registered. Sending only real
+      // members onward would answer the question this screen exists not to
+      // answer; an unregistered address simply never receives a code.
+      navigation.navigate('VerificationCode', { email: emailValue });
     } catch (err) {
       setIsLoading(false);
       captureException(err as Error, {
         context: 'handleResetPassword',
         email: emailValue.toLowerCase(),
-        isResend,
         errorMessage: (err as Error)?.message,
       });
       setError('Ocurrió un error inesperado. Inténtalo de nuevo.');
@@ -208,95 +170,48 @@ export default function ForgotPasswordScreen() {
               <View style={styles.header}>
                 <Text style={styles.title}>Recupera tu{'\n'}contraseña</Text>
                 <Text style={styles.subtitle}>
-                  Ingresa tu correo y te enviamos un enlace para restablecerla.
+                  Ingresa tu correo y te enviamos un código de 6 dígitos para
+                  restablecerla.
                 </Text>
               </View>
             </Animated.View>
 
-            {sent ? (
-              <Animated.View style={[styles.confirm, confirmStyle]}>
-                <View style={styles.badge}>
-                  <Feather name="mail" size={30} color={colors.ink} />
-                </View>
+            <Animated.View style={[styles.form, bodyStyle]}>
+              <AuthField
+                kind="email"
+                label="Correo electrónico"
+                value={email}
+                error={error}
+                editable={!isLoading}
+                returnKeyType="go"
+                onSubmitEditing={submit}
+                onChangeText={(text) => {
+                  setEmail(text || '');
+                  if (error) setError(undefined);
+                }}
+              />
 
-                <Text style={styles.confirmTitle}>Revisa tu correo</Text>
-                <Text style={styles.confirmBody}>{NEUTRAL_SUCCESS}</Text>
-                <Text style={styles.confirmEmail}>{sentTo}</Text>
-
-                <Pressable
-                  onPress={() => submit(true)}
-                  disabled={isLoading || cooldown > 0}
-                  accessibilityRole="button"
-                  accessibilityLabel="Reenviar enlace"
-                  style={({ pressed }) => [
-                    styles.resend,
-                    pressed && styles.pressed,
-                    (isLoading || cooldown > 0) && styles.resendDisabled,
-                  ]}
-                >
-                  {isLoading ? (
-                    <ActivityIndicator size="small" color={colors.ink} />
-                  ) : (
-                    <Text style={styles.resendLabel}>
-                      {cooldown > 0 ? `Reenviar en ${formatCountdown(cooldown)}` : 'Reenviar enlace'}
-                    </Text>
-                  )}
-                </Pressable>
-
-                {!!error && (
-                  <View style={styles.errorRow}>
-                    <Feather name="alert-circle" size={14} color={colors.error} />
-                    <Text style={styles.errorText}>{error}</Text>
-                  </View>
+              <Pressable
+                onPress={submit}
+                disabled={isLoading}
+                accessibilityRole="button"
+                accessibilityLabel="Enviar código"
+                style={({ pressed }) => [
+                  styles.cta,
+                  pressed && styles.ctaPressed,
+                  isLoading && styles.ctaLoading,
+                ]}
+              >
+                {isLoading ? (
+                  <ActivityIndicator size="small" color={colors.white} />
+                ) : (
+                  <>
+                    <Text style={styles.ctaLabel}>Enviar código</Text>
+                    <Feather name="arrow-right" size={19} color={colors.white} />
+                  </>
                 )}
-
-                <Pressable
-                  onPress={goBack}
-                  accessibilityRole="button"
-                  accessibilityLabel="Volver a iniciar sesión"
-                  style={({ pressed }) => [styles.secondary, pressed && styles.pressed]}
-                >
-                  <Text style={styles.secondaryLabel}>Volver a iniciar sesión</Text>
-                </Pressable>
-              </Animated.View>
-            ) : (
-              <Animated.View style={[styles.form, bodyStyle]}>
-                <AuthField
-                  kind="email"
-                  label="Correo electrónico"
-                  value={email}
-                  error={error}
-                  editable={!isLoading}
-                  returnKeyType="go"
-                  onSubmitEditing={() => submit(false)}
-                  onChangeText={(text) => {
-                    setEmail(text || '');
-                    if (error) setError(undefined);
-                  }}
-                />
-
-                <Pressable
-                  onPress={() => submit(false)}
-                  disabled={isLoading}
-                  accessibilityRole="button"
-                  accessibilityLabel="Enviar enlace"
-                  style={({ pressed }) => [
-                    styles.cta,
-                    pressed && styles.ctaPressed,
-                    isLoading && styles.ctaLoading,
-                  ]}
-                >
-                  {isLoading ? (
-                    <ActivityIndicator size="small" color={colors.white} />
-                  ) : (
-                    <>
-                      <Text style={styles.ctaLabel}>Enviar enlace</Text>
-                      <Feather name="arrow-right" size={19} color={colors.white} />
-                    </>
-                  )}
-                </Pressable>
-              </Animated.View>
-            )}
+              </Pressable>
+            </Animated.View>
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
@@ -395,79 +310,6 @@ const styles = StyleSheet.create({
     fontWeight: typography.fontWeight.semiBold,
     color: colors.white,
     letterSpacing: 0.2,
-  },
-  confirm: {
-    alignItems: 'center',
-    gap: 12,
-  },
-  badge: {
-    width: 76,
-    height: 76,
-    borderRadius: 38,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.accentSoft,
-    marginBottom: 8,
-  },
-  confirmTitle: {
-    fontFamily: typography.fontFamily,
-    fontSize: 22,
-    fontWeight: typography.fontWeight.bold,
-    letterSpacing: -0.4,
-    color: colors.ink,
-  },
-  confirmBody: {
-    fontFamily: typography.fontFamily,
-    fontSize: 15,
-    lineHeight: 21,
-    textAlign: 'center',
-    color: colors.gray400,
-  },
-  confirmEmail: {
-    fontFamily: typography.fontFamily,
-    fontSize: 15,
-    fontWeight: typography.fontWeight.semiBold,
-    color: colors.ink,
-  },
-  resend: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    height: 48,
-    paddingHorizontal: 24,
-    borderRadius: 24,
-    backgroundColor: colors.surface,
-    marginTop: 12,
-  },
-  resendDisabled: {
-    opacity: 0.55,
-  },
-  resendLabel: {
-    fontFamily: typography.fontFamily,
-    fontSize: 15,
-    fontWeight: typography.fontWeight.semiBold,
-    color: colors.ink,
-  },
-  errorRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  errorText: {
-    fontFamily: typography.fontFamily,
-    fontSize: 13,
-    color: colors.error,
-  },
-  secondary: {
-    marginTop: 'auto',
-    paddingTop: 40,
-  },
-  secondaryLabel: {
-    fontFamily: typography.fontFamily,
-    fontSize: 15,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.ink,
-    textDecorationLine: 'underline',
   },
   pressed: {
     opacity: 0.7,

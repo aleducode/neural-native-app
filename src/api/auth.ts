@@ -29,9 +29,34 @@ export const authApi = {
     return api.uploadFile<User>('/auth/me/', imageUri, name, type);
   },
 
+  /**
+   * Asks for a recovery code. The answer is deliberately the same whether or
+   * not the address is registered — a reset form that says "no such account"
+   * is a free way to find out who is a member.
+   */
   resetPassword: async (email: string) => {
     return api.post('/auth/password-reset/', { email });
   },
+
+  /**
+   * Exchanges the emailed code for a short-lived token that authorises exactly
+   * one password change. The code itself never travels again after this.
+   */
+  verifyResetCode: async (email: string, code: string) => {
+    return api.post<ResetVerifyResponse>('/auth/password-reset/verify/', { email, code });
+  },
+
+  /** Spends the token from `verifyResetCode` on the new password. */
+  confirmPasswordReset: async (resetToken: string, newPassword: string) => {
+    return api.post('/auth/password-reset/confirm/', {
+      reset_token: resetToken,
+      new_password: newPassword,
+    });
+  },
 };
+
+export interface ResetVerifyResponse {
+  reset_token: string;
+}
 
 export default authApi;

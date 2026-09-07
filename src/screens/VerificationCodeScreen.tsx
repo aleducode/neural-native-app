@@ -27,6 +27,7 @@ import { Feather } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { colors, typography } from '../theme/colors';
 import { captureException, addBreadcrumb } from '../utils/sentry';
+import { authApi } from '../api/auth';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 
@@ -47,34 +48,31 @@ export type VerificationResult = { ok: boolean; error?: string };
 type Props = {
   /** Email the code was sent to. Shown in the subtitle. */
   email?: string;
-  /**
-   * Real verification call. There is no code-verification endpoint in src/api
-   * yet, so this is injected from the outside once the backend exists.
-   */
+  /** Overrides the verification call. Only tests and previews pass this. */
   onVerify?: (code: string) => Promise<VerificationResult>;
-  /** Resend call, same reasoning as onVerify. */
+  /** Overrides the resend call, same reasoning as onVerify. */
   onResend?: () => Promise<void>;
-  /** Called after a code verifies, so the navigator decides where to go next. */
-  onVerified?: (code: string) => void;
+  /** Overrides where a verified code leads. Defaults to the new-password step. */
+  onVerified?: (code: string, resetToken: string) => void;
 };
 
-/**
- * TODO: there is no verification endpoint in src/api yet. Until one exists this
- * simulates the round trip so the screen is testable end to end. Wire the real
- * call by passing `onVerify` from the navigator; do NOT call authApi here with
- * a method that does not exist.
- */
-async function simulateVerify(code: string): Promise<VerificationResult> {
-  await new Promise((resolve) => setTimeout(resolve, 900));
-  // Placeholder rule so both paths are reachable while the backend is missing.
-  return code === '123456'
-    ? { ok: true }
-    : { ok: false, error: 'El código no es correcto. Revisa e intenta de nuevo.' };
-}
+const CONNECTION_ERROR = 'Error de conexión. Verifica tu internet.';
 
-/** TODO: same as above — no resend endpoint exists yet. */
-async function simulateResend(): Promise<void> {
-  await new Promise((resolve) => setTimeout(resolve, 600));
+/**
+ * A code that has expired and a code that was mistyped both come back as a
+ * rejection, but only one of them is worth retyping. The backend distinguishes
+ * them and this keeps that distinction rather than flattening both into
+ * "incorrecto", which would send people back to the boxes for nothing.
+ */
+function messageFor(apiError: string): string {
+  if (apiError === CONNECTION_ERROR) return apiError;
+  if (/expir|venc/i.test(apiError)) {
+    return 'Ese código ya venció. Pedí uno nuevo con el botón de abajo.';
+  }
+  if (/intent|attempt|bloque/i.test(apiError)) {
+    return 'Demasiados intentos. Pedí un código nuevo.';
+  }
+  return 'El código no es correcto. Revisa e intenta de nuevo.';
 }
 
 export default function VerificationCodeScreen({
@@ -86,8 +84,8 @@ export default function VerificationCodeScreen({
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
 
-  // The screen is not wired to the navigator yet, so params are a fallback and
-  // never assumed to be there.
+  // Normally the address arrives as a route param from the request screen; the
+  // prop is what previews and tests use instead.
   const email: string = emailProp ?? route.params?.email ?? '';
 
   const [code, setCode] = useState('');
@@ -157,11 +155,21 @@ export default function VerificationCodeScreen({
       addBreadcrumb('Verification code submitted', 'auth', {
         email: email.toLowerCase(),
         codeLength: value.length,
-        simulated: !onVerify,
       });
 
       try {
-        const result = onVerify ? await onVerify(value) : await simulateVerify(value);
+        let result: VerificationResult;
+        let resetToken = '';
+
+        if (onVerify) {
+          result = await onVerify(value);
+        } else {
+          const { data, error: apiError } = await authApi.verifyResetCode(email, value);
+          resetToken = data?.reset_token ?? '';
+          result = apiError
+            ? { ok: false, error: messageFor(apiError) }
+            : { ok: !!resetToken, error: resetToken ? undefined : 'No pudimos validar el código.' };
+        }
 
         setIsLoading(false);
         submittingRef.current = false;
@@ -169,7 +177,10 @@ export default function VerificationCodeScreen({
         if (result.ok) {
           addBreadcrumb('Verification code accepted', 'auth', { email: email.toLowerCase() });
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-          onVerified?.(value);
+          if (onVerified) onVerified(value, resetToken);
+          // The code screen has nothing left to offer once it has been used,
+          // and going back to it with a spent code is a dead end.
+          else navigation.replace('NewPassword', { resetToken, email });
           return;
         }
 
@@ -197,7 +208,7 @@ export default function VerificationCodeScreen({
         inputRef.current?.focus();
       }
     },
-    [email, onVerify, onVerified]
+    [email, navigation, onVerify, onVerified]
   );
 
   const handleChange = useCallback(
@@ -233,12 +244,11 @@ export default function VerificationCodeScreen({
 
     addBreadcrumb('Verification code resend requested', 'auth', {
       email: email.toLowerCase(),
-      simulated: !onResend,
     });
 
     try {
       if (onResend) await onResend();
-      else await simulateResend();
+      else await authApi.resetPassword(email);
       setSecondsLeft(RESEND_SECONDS);
       inputRef.current?.focus();
     } catch (err) {
