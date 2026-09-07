@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -141,6 +141,28 @@ export default function WeightInputScreen() {
     else if (event.nativeEvent.actionName === 'decrement') stepWeight(-1);
   };
 
+  // The ruler is static: nothing in it depends on the selected value.
+  // Rebuilding its ticks on every scroll frame was reconciling every
+  // one of them at 60fps, which is what made the ruler stick.
+  const ticks = useMemo(
+    () => (
+      <>
+        {weights.map((weight) => {
+        const isMajor = weight % 10 === 0;
+        const isMid = weight % 5 === 0 && !isMajor;
+         return (
+          <View key={weight} style={styles.tickContainer}>
+            <View
+              style={[styles.tick, isMid && styles.tickMid, isMajor && styles.tickMajor]}
+            />
+          </View>
+        );
+      })}
+      </>
+    ),
+    [weights]
+  );
+
   const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const offsetX = event.nativeEvent.contentOffset.x;
     const value = Math.round(offsetX / TICK_WIDTH) + MIN_WEIGHT;
@@ -164,8 +186,10 @@ export default function WeightInputScreen() {
     const value = Math.round(offsetX / TICK_WIDTH) + MIN_WEIGHT;
     const clampedValue = Math.max(MIN_WEIGHT, Math.min(MAX_WEIGHT, value));
 
-    // Snap to nearest value
-    scrollToWeight(clampedValue, true);
+    // No scrollTo here: snapToInterval already lands the ruler on a tick,
+    // and a second programmatic scroll fights the one the system is
+    // already running — which is what made it stick.
+    if (clampedValue !== selectedWeight) setSelectedWeight(clampedValue);
   };
 
   const delta = previousWeight === null ? null : selectedWeight - previousWeight;
@@ -232,18 +256,7 @@ export default function WeightInputScreen() {
                 snapToInterval={TICK_WIDTH}
                 importantForAccessibility="no-hide-descendants"
               >
-                {weights.map((weight) => {
-                  const isMajor = weight % 10 === 0;
-                  const isMid = weight % 5 === 0 && !isMajor;
-
-                  return (
-                    <View key={weight} style={styles.tickContainer}>
-                      <View
-                        style={[styles.tick, isMid && styles.tickMid, isMajor && styles.tickMajor]}
-                      />
-                    </View>
-                  );
-                })}
+                                {ticks}
               </ScrollView>
             </View>
 

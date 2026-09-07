@@ -64,42 +64,60 @@ interface WheelPickerProps {
 
 function WheelPicker({ data, selectedIndex, onValueChange, width, label }: WheelPickerProps) {
   const scrollViewRef = useRef<ScrollView>(null);
-  const lastHapticIndex = useRef(selectedIndex);
+  const lastIndex = useRef(selectedIndex);
+  // True from the moment a finger lands until the wheel comes to rest. The
+  // effect below must not yank the list back while somebody is turning it.
+  const userDriving = useRef(false);
 
+  const clamp = (index: number) => Math.max(0, Math.min(data.length - 1, index));
+  const indexAt = (event: NativeSyntheticEvent<NativeScrollEvent>) =>
+    clamp(Math.round(event.nativeEvent.contentOffset.y / ITEM_HEIGHT));
+
+  // Follow the value when it changes from outside — the saved birthdate
+  // arrives from the API after the first render, and the wheel has to move to
+  // it. Never while the wheel is being turned.
   useEffect(() => {
-    // Scroll to selected index on mount
-    setTimeout(() => {
-      scrollViewRef.current?.scrollTo({
-        y: selectedIndex * ITEM_HEIGHT,
-        animated: false,
-      });
-    }, 100);
-  }, []);
+    if (userDriving.current) return;
+    lastIndex.current = selectedIndex;
+    scrollViewRef.current?.scrollTo({ y: selectedIndex * ITEM_HEIGHT, animated: false });
+  }, [selectedIndex]);
 
-  const scrollToIndex = (index: number, animated: boolean) => {
-    scrollViewRef.current?.scrollTo({ y: index * ITEM_HEIGHT, animated });
+  const handleScrollBegin = () => {
+    userDriving.current = true;
   };
 
+  /**
+   * Ticks as the wheel passes each item.
+   *
+   * It deliberately does not report the value up: at 16ms intervals that
+   * re-rendered all three wheels mid-gesture, which is what made the picker
+   * stick. The value is committed once, when the wheel stops.
+   */
   const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const offsetY = event.nativeEvent.contentOffset.y;
-    const index = Math.round(offsetY / ITEM_HEIGHT);
-    const clampedIndex = Math.max(0, Math.min(data.length - 1, index));
-
-    if (clampedIndex !== lastHapticIndex.current) {
+    const index = indexAt(event);
+    if (index !== lastIndex.current) {
+      lastIndex.current = index;
       Haptics.selectionAsync();
-      lastHapticIndex.current = clampedIndex;
-      onValueChange(clampedIndex);
     }
   };
 
-  const handleScrollEnd = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const offsetY = event.nativeEvent.contentOffset.y;
-    const index = Math.round(offsetY / ITEM_HEIGHT);
-    const clampedIndex = Math.max(0, Math.min(data.length - 1, index));
+  const settle = (index: number) => {
+    userDriving.current = false;
+    lastIndex.current = index;
+    // No scrollTo here: snapToInterval already lands the wheel on an item, and
+    // a second, programmatic scroll fights the one the system is running.
+    if (index !== selectedIndex) onValueChange(index);
+  };
 
-    // Snap to nearest item
-    scrollToIndex(clampedIndex, true);
-    onValueChange(clampedIndex);
+  const handleMomentumEnd = (event: NativeSyntheticEvent<NativeScrollEvent>) =>
+    settle(indexAt(event));
+
+  /**
+   * A release with no speed left produces no momentum phase on iOS, so
+   * `onMomentumScrollEnd` never fires and the value would never be committed.
+   */
+  const handleDragEnd = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    if (Math.abs(event.nativeEvent.velocity?.y ?? 0) < 0.05) settle(indexAt(event));
   };
 
   // Dragging a vertical wheel is not something a screen reader user can do
@@ -107,11 +125,10 @@ function WheelPicker({ data, selectedIndex, onValueChange, width, label }: Wheel
   // up/down moves one step without touching the scroll surface at all.
   const handleAccessibilityAction = (event: AccessibilityActionEvent) => {
     const delta = event.nativeEvent.actionName === 'increment' ? 1 : -1;
-    const nextIndex = Math.max(0, Math.min(data.length - 1, selectedIndex + delta));
+    const nextIndex = clamp(selectedIndex + delta);
     if (nextIndex === selectedIndex) return;
     Haptics.selectionAsync();
-    lastHapticIndex.current = nextIndex;
-    scrollToIndex(nextIndex, true);
+    lastIndex.current = nextIndex;
     onValueChange(nextIndex);
   };
 
@@ -134,9 +151,10 @@ function WheelPicker({ data, selectedIndex, onValueChange, width, label }: Wheel
           showsVerticalScrollIndicator={false}
           snapToInterval={ITEM_HEIGHT}
           decelerationRate="fast"
+          onScrollBeginDrag={handleScrollBegin}
           onScroll={handleScroll}
-          onMomentumScrollEnd={handleScrollEnd}
-          onScrollEndDrag={handleScrollEnd}
+          onMomentumScrollEnd={handleMomentumEnd}
+          onScrollEndDrag={handleDragEnd}
           scrollEventThrottle={16}
           contentContainerStyle={{
             paddingVertical: ITEM_HEIGHT * 2,

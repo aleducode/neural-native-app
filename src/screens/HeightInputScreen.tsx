@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -144,6 +144,28 @@ export default function HeightInputScreen() {
     else if (event.nativeEvent.actionName === 'decrement') stepHeight(-1);
   };
 
+  // The ruler is static: nothing in it depends on the selected value.
+  // Rebuilding its ticks on every scroll frame was reconciling every
+  // one of them at 60fps, which is what made the ruler stick.
+  const ticks = useMemo(
+    () => (
+      <>
+        {heights.map((height) => {
+        const isMajor = height % 10 === 0;
+        const isMid = height % 5 === 0 && !isMajor;
+         return (
+          <View key={height} style={styles.tickContainer}>
+            <View
+              style={[styles.tick, isMid && styles.tickMid, isMajor && styles.tickMajor]}
+            />
+          </View>
+        );
+      })}
+      </>
+    ),
+    [heights]
+  );
+
   const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const offsetX = event.nativeEvent.contentOffset.x;
     const value = Math.round(offsetX / TICK_WIDTH) + MIN_HEIGHT;
@@ -168,8 +190,10 @@ export default function HeightInputScreen() {
     const value = Math.round(offsetX / TICK_WIDTH) + MIN_HEIGHT;
     const clampedValue = Math.max(MIN_HEIGHT, Math.min(MAX_HEIGHT, value));
 
-    // Snap to nearest value
-    scrollToHeight(clampedValue, true);
+    // No scrollTo here: snapToInterval already lands the ruler on a tick,
+    // and a second programmatic scroll fights the one the system is
+    // already running — which is what made it stick.
+    if (clampedValue !== selectedHeight) setSelectedHeight(clampedValue);
   };
 
   const meters = (selectedHeight / 100).toFixed(2).replace('.', ',');
@@ -232,18 +256,7 @@ export default function HeightInputScreen() {
                 snapToInterval={TICK_WIDTH}
                 importantForAccessibility="no-hide-descendants"
               >
-                {heights.map((height) => {
-                  const isMajor = height % 10 === 0;
-                  const isMid = height % 5 === 0 && !isMajor;
-
-                  return (
-                    <View key={height} style={styles.tickContainer}>
-                      <View
-                        style={[styles.tick, isMid && styles.tickMid, isMajor && styles.tickMajor]}
-                      />
-                    </View>
-                  );
-                })}
+                                {ticks}
               </ScrollView>
             </View>
 
