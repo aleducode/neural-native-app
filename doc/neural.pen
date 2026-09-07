@@ -33783,7 +33783,7 @@
                       "id": "fHJl7",
                       "name": "Racha",
                       "width": "fill_container",
-                      "fill": "#FFFFFF",
+                      "fill": "#111111",
                       "cornerRadius": 20,
                       "layout": "vertical",
                       "gap": 16,
@@ -33803,7 +33803,7 @@
                             {
                               "type": "text",
                               "id": "BUDWy",
-                              "fill": "#111111",
+                              "fill": "#FFFFFF",
                               "content": "Racha",
                               "fontFamily": "Rethink Sans",
                               "fontSize": 20,
@@ -33812,7 +33812,7 @@
                             {
                               "type": "text",
                               "id": "qxT7O",
-                              "fill": "#727272",
+                              "fill": "#8A8A8A",
                               "content": "Llevas 3 semanas seguidas",
                               "fontFamily": "Rethink Sans",
                               "fontSize": 12,
@@ -33838,16 +33838,17 @@
                                 {
                                   "type": "text",
                                   "id": "kOLvb",
-                                  "fill": "#111111",
+                                  "fill": "#C6FF40",
                                   "content": "3",
                                   "fontFamily": "Rethink Sans",
-                                  "fontSize": 24,
-                                  "fontWeight": "600"
+                                  "fontSize": 32,
+                                  "fontWeight": "600",
+                                  "letterSpacing": -0.6
                                 },
                                 {
                                   "type": "text",
                                   "id": "HUfkL",
-                                  "fill": "#727272",
+                                  "fill": "#8A8A8A",
                                   "content": "semanas",
                                   "fontFamily": "Rethink Sans",
                                   "fontSize": 12,
@@ -33866,7 +33867,7 @@
                                 {
                                   "type": "text",
                                   "id": "Th5oQ",
-                                  "fill": "#727272",
+                                  "fill": "#8A8A8A",
                                   "content": "Meta",
                                   "fontFamily": "Rethink Sans",
                                   "fontSize": 12,
@@ -33882,7 +33883,7 @@
                                     {
                                       "type": "text",
                                       "id": "dWtDV",
-                                      "fill": "#111111",
+                                      "fill": "#FFFFFF",
                                       "content": "4",
                                       "fontFamily": "Rethink Sans",
                                       "fontSize": 16,
@@ -33891,7 +33892,7 @@
                                     {
                                       "type": "text",
                                       "id": "QrUFy",
-                                      "fill": "#727272",
+                                      "fill": "#8A8A8A",
                                       "content": "semanas",
                                       "fontFamily": "Rethink Sans",
                                       "fontSize": 12,
@@ -33910,7 +33911,7 @@
                           "clip": true,
                           "width": "fill_container",
                           "height": 16,
-                          "fill": "#DEDEDE",
+                          "fill": "#1E1E1E",
                           "cornerRadius": 8,
                           "children": [
                             {
@@ -38864,24 +38865,18 @@
                         {
                           "type": "frame",
                           "id": "P3rn0",
+                          "clip": true,
                           "width": 162,
                           "height": 200,
-                          "fill": "#111111",
+                          "fill": {
+                            "type": "image",
+                            "enabled": true,
+                            "url": "images/fe475fbe30.png",
+                            "mode": "fill"
+                          },
                           "layout": "vertical",
                           "justifyContent": "center",
-                          "alignItems": "center",
-                          "children": [
-                            {
-                              "type": "text",
-                              "id": "oQJvf",
-                              "fill": "#FFFFFF",
-                              "content": "AD",
-                              "textAlign": "center",
-                              "fontFamily": "Rethink Sans",
-                              "fontSize": 40,
-                              "fontWeight": "700"
-                            }
-                          ]
+                          "alignItems": "center"
                         },
                         {
                           "type": "frame",
@@ -40019,24 +40014,18 @@
                         {
                           "type": "frame",
                           "id": "xGS2M",
+                          "clip": true,
                           "width": 200,
                           "height": 200,
-                          "fill": "#111111",
+                          "fill": {
+                            "type": "image",
+                            "enabled": true,
+                            "url": "images/fe475fbe30.png",
+                            "mode": "fill"
+                          },
                           "layout": "vertical",
                           "justifyContent": "center",
-                          "alignItems": "center",
-                          "children": [
-                            {
-                              "type": "text",
-                              "id": "eW1vr",
-                              "fill": "#FFFFFF",
-                              "content": "AD",
-                              "textAlign": "center",
-                              "fontFamily": "Rethink Sans",
-                              "fontSize": 48,
-                              "fontWeight": "700"
-                            }
-                          ]
+                          "alignItems": "center"
                         },
                         {
                           "type": "frame",
