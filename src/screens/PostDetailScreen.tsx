@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,8 @@ import {
   Pressable,
   Alert,
   Image,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
@@ -45,6 +47,7 @@ export default function PostDetailScreen() {
   const [showReactionPicker, setShowReactionPicker] = useState(false);
   const [showFullScreenImage, setShowFullScreenImage] = useState(false);
   const [commentError, setCommentError] = useState<string | null>(null);
+  const listRef = useRef<FlatList<Comment>>(null);
 
   const intro = useSharedValue(0);
   useEffect(() => {
@@ -129,6 +132,13 @@ export default function PostDetailScreen() {
 
   const handleMainLongPress = () => {
     setShowReactionPicker(true);
+  };
+
+  const handleCommentFocus = () => {
+    // The keyboard's own show animation (~250-300ms) runs after this fires, so
+    // the list still has its pre-keyboard height at this point; nudge the
+    // scroll once that resize has had time to settle instead of racing it.
+    setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 100);
   };
 
   const handleAddComment = async (content: string) => {
@@ -323,24 +333,39 @@ export default function PostDetailScreen() {
         }
       />
 
-      <FlatList
-        data={comments}
-        keyExtractor={(item) => item.id.toString()}
-        renderItem={renderComment}
-        ListHeaderComponent={renderPostHeader}
-        ListEmptyComponent={isLoadingComments ? null : renderEmptyComments}
-        contentContainerStyle={styles.listContent}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-      />
-
-      <SafeAreaView edges={['bottom']} style={styles.inputBar}>
-        <CommentInput
-          onSubmit={handleAddComment}
-          error={commentError ?? undefined}
-          onChangeContent={() => commentError && setCommentError(null)}
+      {/*
+        Scoped to the list + input bar (not the header above): with no
+        native navigation header (headerShown: false everywhere, see
+        App.tsx) AppHeader is a plain sibling view, so this container's
+        measured position already includes AppHeader's height and the top
+        safe-area inset — no keyboardVerticalOffset needed to compensate
+        for either.
+      */}
+      <KeyboardAvoidingView
+        style={styles.keyboardAvoider}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <FlatList
+          ref={listRef}
+          data={comments}
+          keyExtractor={(item) => item.id.toString()}
+          renderItem={renderComment}
+          ListHeaderComponent={renderPostHeader}
+          ListEmptyComponent={isLoadingComments ? null : renderEmptyComments}
+          contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
         />
-      </SafeAreaView>
+
+        <SafeAreaView edges={['bottom']} style={styles.inputBar}>
+          <CommentInput
+            onSubmit={handleAddComment}
+            error={commentError ?? undefined}
+            onChangeContent={() => commentError && setCommentError(null)}
+            onFocus={handleCommentFocus}
+          />
+        </SafeAreaView>
+      </KeyboardAvoidingView>
 
       {post.image_url && (
         <FullScreenImage
@@ -374,6 +399,9 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.gray400,
     textAlign: 'center',
+  },
+  keyboardAvoider: {
+    flex: 1,
   },
   listContent: {
     paddingHorizontal: 16,

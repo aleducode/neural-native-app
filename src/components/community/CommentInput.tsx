@@ -6,7 +6,6 @@ import {
   TextInput,
   Pressable,
   ActivityIndicator,
-  KeyboardAvoidingView,
   Platform,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
@@ -19,6 +18,8 @@ interface CommentInputProps {
   /** Inline failure message, shown above the field instead of in an alert. */
   error?: string;
   onChangeContent?: () => void;
+  /** Lets the screen keep the last comment in view once the keyboard covers it. */
+  onFocus?: () => void;
 }
 
 export default function CommentInput({
@@ -26,6 +27,7 @@ export default function CommentInput({
   placeholder = 'Escribe un comentario...',
   error,
   onChangeContent,
+  onFocus,
 }: CommentInputProps) {
   const [content, setContent] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -47,55 +49,51 @@ export default function CommentInput({
   const canSubmit = content.trim().length > 0 && !isSubmitting;
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
-    >
-      <View style={styles.wrapper}>
-        {!!error && <Text style={styles.error}>{error}</Text>}
+    <View style={styles.wrapper}>
+      {!!error && <Text style={styles.error}>{error}</Text>}
 
-        <View style={styles.row}>
-          <View style={styles.field}>
-            <TextInput
-              style={styles.input}
-              value={content}
-              onChangeText={(text) => {
-                setContent(text);
-                onChangeContent?.();
-              }}
-              placeholder={placeholder}
-              placeholderTextColor={colors.gray400}
-              multiline
-              maxLength={300}
-              editable={!isSubmitting}
-            />
-          </View>
-
-          <Pressable
-            style={({ pressed }) => [
-              styles.send,
-              !canSubmit && styles.sendDisabled,
-              pressed && styles.pressed,
-            ]}
-            onPress={handleSubmit}
-            disabled={!canSubmit}
-            accessibilityRole="button"
-            accessibilityLabel="Enviar comentario"
-            accessibilityState={{ disabled: !canSubmit, busy: isSubmitting }}
-          >
-            {isSubmitting ? (
-              <ActivityIndicator size="small" color={colors.white} />
-            ) : (
-              <Feather
-                name="arrow-up"
-                size={20}
-                color={canSubmit ? colors.white : colors.gray400}
-              />
-            )}
-          </Pressable>
+      <View style={styles.row}>
+        <View style={styles.field}>
+          <TextInput
+            style={styles.input}
+            value={content}
+            onChangeText={(text) => {
+              setContent(text);
+              onChangeContent?.();
+            }}
+            onFocus={onFocus}
+            placeholder={placeholder}
+            placeholderTextColor={colors.gray400}
+            multiline
+            maxLength={300}
+            editable={!isSubmitting}
+          />
         </View>
+
+        <Pressable
+          style={({ pressed }) => [
+            styles.send,
+            !canSubmit && styles.sendDisabled,
+            pressed && styles.pressed,
+          ]}
+          onPress={handleSubmit}
+          disabled={!canSubmit}
+          accessibilityRole="button"
+          accessibilityLabel="Enviar comentario"
+          accessibilityState={{ disabled: !canSubmit, busy: isSubmitting }}
+        >
+          {isSubmitting ? (
+            <ActivityIndicator size="small" color={colors.white} />
+          ) : (
+            <Feather
+              name="arrow-up"
+              size={20}
+              color={canSubmit ? colors.white : colors.gray400}
+            />
+          )}
+        </Pressable>
       </View>
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 

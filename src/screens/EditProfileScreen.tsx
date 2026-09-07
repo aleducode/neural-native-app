@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
+  type TextInput,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -78,6 +79,11 @@ export default function EditProfileScreen() {
   const [phoneError, setPhoneError] = useState<string | undefined>(undefined);
   const [photoError, setPhotoError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
+
+  // Correo is read-only, so the return-key chain skips straight from
+  // Apellido to Teléfono — the same handoff pattern as RegisterScreen.
+  const lastNameRef = useRef<TextInput>(null);
+  const phoneRef = useRef<TextInput>(null);
 
   const userEmail = user?.email || '';
   const userPhoto = user?.photo_url;
@@ -231,7 +237,10 @@ export default function EditProfileScreen() {
 
       <KeyboardAvoidingView
         style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          // Android resizes the window itself (adjustResize in the manifest),
+          // so a behavior here shrinks the layout a second time and the field
+          // it was meant to reveal ends up hidden anyway.
       >
         <ScrollView
           contentContainerStyle={styles.scroll}
@@ -325,17 +334,20 @@ export default function EditProfileScreen() {
                   error={nameError}
                   editable={!isSaving}
                   returnKeyType="next"
+                  onSubmitEditing={() => lastNameRef.current?.focus()}
                   onChangeText={(text) => {
                     setFirstName(text);
                     if (nameError) setNameError(undefined);
                   }}
                 />
                 <AuthField
+                  ref={lastNameRef}
                   kind="text"
                   label="Apellido"
                   value={lastName}
                   editable={!isSaving}
-                  returnKeyType="done"
+                  returnKeyType="next"
+                  onSubmitEditing={() => phoneRef.current?.focus()}
                   onChangeText={setLastName}
                 />
               </View>
@@ -381,12 +393,14 @@ export default function EditProfileScreen() {
                 onChangeText={() => {}}
               />
               <AuthField
+                ref={phoneRef}
                 kind="phone"
                 label="Teléfono"
                 value={phone}
                 error={phoneError}
                 editable={!isSaving}
                 returnKeyType="done"
+                onSubmitEditing={handleSave}
                 onChangeText={(text) => {
                   setPhone(text);
                   if (phoneError) setPhoneError(undefined);

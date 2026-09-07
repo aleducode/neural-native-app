@@ -253,7 +253,10 @@ export default function LoginScreen() {
 
       <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
         <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          // Android resizes the window itself (adjustResize in the manifest),
+          // so a behavior here shrinks the layout a second time and the field
+          // it was meant to reveal ends up hidden anyway.
           style={styles.flex}
         >
           <ScrollView

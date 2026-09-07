@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, Text, TextInput, StyleSheet, TouchableOpacity } from 'react-native';
+import React, { forwardRef, useState } from 'react';
+import { View, Text, TextInput, StyleSheet, TouchableOpacity, type TextInputProps } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, typography, spacing, borderRadius } from '../theme/colors';
 
@@ -12,18 +12,25 @@ interface InputProps {
   autoCapitalize?: 'none' | 'sentences' | 'words' | 'characters';
   error?: string;
   editable?: boolean;
+  returnKeyType?: TextInputProps['returnKeyType'];
+  onSubmitEditing?: TextInputProps['onSubmitEditing'];
 }
 
-export default function Input({
-  placeholder,
-  value,
-  onChangeText,
-  secureTextEntry,
-  keyboardType = 'default',
-  autoCapitalize = 'none',
-  error,
-  editable = true,
-}: InputProps) {
+const Input = forwardRef<TextInput, InputProps>(function Input(
+  {
+    placeholder,
+    value,
+    onChangeText,
+    secureTextEntry,
+    keyboardType = 'default',
+    autoCapitalize = 'none',
+    error,
+    editable = true,
+    returnKeyType,
+    onSubmitEditing,
+  },
+  ref
+) {
   const [showPassword, setShowPassword] = useState(false);
   const isPassword = secureTextEntry !== undefined;
 
@@ -32,6 +39,7 @@ export default function Input({
       <Text style={styles.placeholder}>{placeholder}</Text>
       <View style={styles.inputRow}>
         <TextInput
+          ref={ref}
           style={[styles.input, !editable && styles.inputDisabled, error && styles.inputError]}
           value={value || ''}
           onChangeText={(text) => {
@@ -45,6 +53,8 @@ export default function Input({
           autoCapitalize={autoCapitalize}
           placeholderTextColor={colors.gray400}
           editable={editable}
+          returnKeyType={returnKeyType}
+          onSubmitEditing={onSubmitEditing}
         />
         {isPassword && (
           <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
@@ -64,7 +74,9 @@ export default function Input({
       )}
     </View>
   );
-}
+});
+
+export default Input;
 
 const styles = StyleSheet.create({
   container: {

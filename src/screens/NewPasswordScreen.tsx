@@ -197,10 +197,14 @@ export default function NewPasswordScreen() {
         <KeyboardAvoidingView
           style={styles.flex}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          // Android resizes the window itself (adjustResize in the manifest),
+          // so a behavior here shrinks the layout a second time and the field
+          // it was meant to reveal ends up hidden anyway.
         >
           <ScrollView
             contentContainerStyle={styles.scroll}
             keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
             showsVerticalScrollIndicator={false}
           >
             {!done && (

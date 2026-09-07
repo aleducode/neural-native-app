@@ -276,6 +276,7 @@ export default function CreatePostScreen() {
           contentContainerStyle={styles.scroll}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
         >
           <Animated.View style={bodyStyle}>
             <TextInput
