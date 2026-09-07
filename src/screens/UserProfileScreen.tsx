@@ -28,6 +28,27 @@ import { RootStackParamList } from '../navigation/RootNavigator';
 
 type UserProfileRouteProp = RouteProp<RootStackParamList, 'UserProfile'>;
 
+/**
+ * A member who never filled in a name arrives without one. The server used to
+ * send the local part of their email here, which both read badly and handed
+ * out half an address; it sends null now, and this is what we show instead.
+ *
+ * The ranking labels the same person by their initials, and tapping their row
+ * is how you get to this screen, so the two have to agree. "Miembro de Neural"
+ * only stands in until the endpoint carries `initials` like the table does.
+ */
+function profileName(profile: UserPublicProfile): string {
+  const given = (profile.name || '').trim();
+  if (given) return given;
+  return profile.initials?.trim() || 'Miembro de Neural';
+}
+
+/** Two letters for the avatar, from whichever field still has them. */
+function avatarInitials(profile: UserPublicProfile): string {
+  const fromName = `${profile.first_name?.[0] || ''}${profile.last_name?.[0] || ''}`.trim();
+  return fromName || profile.initials?.trim() || '';
+}
+
 export default function UserProfileScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<UserProfileRouteProp>();
@@ -139,7 +160,7 @@ export default function UserProfileScreen() {
         <Animated.View style={[styles.identity, headerStyle]}>
           <LeaderboardAvatar
             photoUrl={profile.photo_url}
-            initials={`${profile.first_name?.[0] || ''}${profile.last_name?.[0] || ''}`}
+            initials={avatarInitials(profile)}
             size={72}
             borderWidth={2}
             borderColor={colors.accentDeep}
@@ -147,7 +168,7 @@ export default function UserProfileScreen() {
           />
 
           <View style={styles.identityText}>
-            <Text style={styles.name}>{profile.name}</Text>
+            <Text style={styles.name}>{profileName(profile)}</Text>
             {!!profile.member_since && (
               <Text style={styles.meta}>En Neural desde {profile.member_since}</Text>
             )}

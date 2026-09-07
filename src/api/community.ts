@@ -134,9 +134,12 @@ export const communityApi = {
 // Types
 export interface UserPublicProfile {
   id: number;
-  name: string;
+  /** Null when the member never set one — the server no longer sends the email. */
+  name: string | null;
   first_name: string;
   last_name: string;
+  /** Two letters for the avatar, sent when there is no name to take them from. */
+  initials?: string;
   photo_url: string | null;
   instagram: string | null;
   profession: string | null;

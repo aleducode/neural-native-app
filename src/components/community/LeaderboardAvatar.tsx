@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, Image, StyleSheet } from 'react-native';
+import { Feather } from '@expo/vector-icons';
 import { colors, typography } from '../../theme/colors';
 
 interface LeaderboardAvatarProps {
@@ -41,8 +42,12 @@ export default function LeaderboardAvatar({
     >
       {photoUrl ? (
         <Image source={{ uri: photoUrl }} style={styles.image} resizeMode="cover" />
-      ) : (
+      ) : initials.trim() ? (
         <Text style={[styles.initials, { fontSize: resolvedFontSize }]}>{initials}</Text>
+      ) : (
+        // No photo and no letters to fall back on: an empty dark disc reads as
+        // a failed image, and a person does not.
+        <Feather name="user" size={Math.round(size * 0.44)} color={colors.gray400} />
       )}
     </View>
   );
