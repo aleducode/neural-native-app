@@ -3,3 +3,8 @@ export { default as ReactionBar } from './ReactionBar';
 export { default as TrainingBadge } from './TrainingBadge';
 export { default as CommentItem } from './CommentItem';
 export { default as CommentInput } from './CommentInput';
+export { default as LeaderboardStrip } from './LeaderboardStrip';
+export { default as Ranking } from './Ranking';
+export { default as LeaderboardAvatar } from './LeaderboardAvatar';
+export { getLeaderboard } from './leaderboardStore';
+export { ordinal } from './ordinal';

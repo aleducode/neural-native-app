@@ -23,7 +23,8 @@ import { useAuth } from '../context/AuthContext';
 import { colors, typography } from '../theme/colors';
 import { Post, ReactionType } from '../types/community';
 import { communityApi } from '../api/community';
-import { PostCard } from '../components/community';
+import { PostCard, LeaderboardStrip, Ranking, getLeaderboard } from '../components/community';
+import { RankedMember } from '../services/leaderboard';
 import Screen from '../components/ui/Screen';
 import AppHeader from '../components/ui/AppHeader';
 import PrimaryButton from '../components/ui/PrimaryButton';
@@ -42,6 +43,29 @@ export default function CommunityScreen() {
   // Feed and delete failures are shown in the screen, not in an alert the user
   // has to dismiss before they can see the feed again.
   const [feedError, setFeedError] = useState<string | null>(null);
+
+  // The leaderboard is expensive — one request per member (see
+  // services/leaderboard.ts) — so it is read once per app session through the
+  // shared cache in components/community/leaderboardStore, not on every focus
+  // like the feed above. Switching the metric chip inside <Ranking> only
+  // re-sorts this same array; it never re-fetches.
+  const [leaderboardMembers, setLeaderboardMembers] = useState<RankedMember[]>([]);
+  const [leaderboardLoading, setLeaderboardLoading] = useState(true);
+  const [showRanking, setShowRanking] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    getLeaderboard()
+      .then((members) => {
+        if (alive) setLeaderboardMembers(members);
+      })
+      .finally(() => {
+        if (alive) setLeaderboardLoading(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   const intro = useSharedValue(0);
   useEffect(() => {
@@ -235,6 +259,20 @@ export default function CommunityScreen() {
     );
   }
 
+  // Not a navigator route: the strip's "Ver tabla" link toggles this in from
+  // local state instead (see components/community/Ranking.tsx for why).
+  if (showRanking) {
+    return (
+      <Ranking
+        members={leaderboardMembers}
+        loading={leaderboardLoading}
+        currentUserId={user?.id}
+        onBack={() => setShowRanking(false)}
+        onSelectUser={handleAuthorPress}
+      />
+    );
+  }
+
   return (
     <Screen wash>
       {/*
@@ -257,6 +295,14 @@ export default function CommunityScreen() {
             posts.length === 0 && styles.listContentEmpty,
           ]}
           showsVerticalScrollIndicator={false}
+          ListHeaderComponent={
+            <LeaderboardStrip
+              members={leaderboardMembers}
+              loading={leaderboardLoading}
+              currentUserId={user?.id}
+              onViewTable={() => setShowRanking(true)}
+            />
+          }
           ListEmptyComponent={renderEmptyState}
           ListFooterComponent={renderFooter}
           refreshControl={
