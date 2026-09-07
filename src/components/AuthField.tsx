@@ -7,6 +7,7 @@ import {
   Pressable,
   Platform,
   type TextInputProps,
+  type ViewProps,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import Animated, {
@@ -28,6 +29,10 @@ interface AuthFieldProps {
   editable?: boolean;
   returnKeyType?: TextInputProps['returnKeyType'];
   onSubmitEditing?: TextInputProps['onSubmitEditing'];
+  /** Lets the screen scroll this field clear of the keyboard. */
+  onFocus?: () => void;
+  /** Reports where the field sits, so the screen knows how far to scroll. */
+  onLayout?: ViewProps['onLayout'];
 }
 
 const LEADING_ICON: Record<FieldKind, keyof typeof Feather.glyphMap> = {
@@ -70,7 +75,18 @@ const PLACEHOLDER: Record<FieldKind, string> = {
  * minimum for body copy.
  */
 const AuthField = forwardRef<TextInput, AuthFieldProps>(function AuthField(
-  { kind, label, value, onChangeText, error, editable = true, returnKeyType, onSubmitEditing },
+  {
+    kind,
+    label,
+    value,
+    onChangeText,
+    error,
+    editable = true,
+    returnKeyType,
+    onSubmitEditing,
+    onFocus,
+    onLayout,
+  },
   ref
 ) {
   const [revealed, setRevealed] = useState(false);
@@ -93,7 +109,7 @@ const AuthField = forwardRef<TextInput, AuthFieldProps>(function AuthField(
   const iconColor = error ? colors.error : focused ? colors.ink : colors.gray400;
 
   return (
-    <View style={styles.wrapper}>
+    <View style={styles.wrapper} onLayout={onLayout}>
       <Text style={[styles.label, !!error && styles.labelError]}>{label}</Text>
 
       <Animated.View style={[styles.field, boxStyle, !editable && styles.fieldDisabled]}>
@@ -104,7 +120,10 @@ const AuthField = forwardRef<TextInput, AuthFieldProps>(function AuthField(
           style={styles.input}
           value={value || ''}
           onChangeText={(text) => onChangeText?.(text || '')}
-          onFocus={() => setFocus(true)}
+          onFocus={() => {
+            setFocus(true);
+            onFocus?.();
+          }}
           onBlur={() => setFocus(false)}
           placeholder={PLACEHOLDER[kind]}
           placeholderTextColor={colors.gray400}

@@ -9,7 +9,6 @@ import {
   Image,
   ActivityIndicator,
   KeyboardAvoidingView,
-  Platform,
   type TextInput,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
@@ -25,6 +24,7 @@ import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../context/AuthContext';
 import { colors, typography } from '../theme/colors';
+import { useRevealOnFocus } from '../hooks/useRevealOnFocus';
 import { authApi } from '../api/auth';
 import { profileApi, ProfileResponse } from '../api/profile';
 import { dashboardApi, DashboardResponse } from '../api/dashboard';
@@ -84,6 +84,10 @@ export default function EditProfileScreen() {
   // Apellido to Teléfono — the same handoff pattern as RegisterScreen.
   const lastNameRef = useRef<TextInput>(null);
   const phoneRef = useRef<TextInput>(null);
+
+  // Android never scrolls a focused field clear of the keyboard on its own,
+  // and this is the longest form in the app.
+  const { scrollRef, onScroll, reveal } = useRevealOnFocus();
 
   const userEmail = user?.email || '';
   const userPhoto = user?.photo_url;
@@ -237,12 +241,16 @@ export default function EditProfileScreen() {
 
       <KeyboardAvoidingView
         style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          // Android resizes the window itself (adjustResize in the manifest),
-          // so a behavior here shrinks the layout a second time and the field
-          // it was meant to reveal ends up hidden anyway.
+        // Both platforms need padding. The manifest still asks for
+          // adjustResize, but this app is edge-to-edge, and from Android 15 on
+          // those windows are not resized for the keyboard — nothing shrinks on
+          // its own, so the compensation has to happen here.
+          behavior="padding"
       >
         <ScrollView
+          ref={scrollRef}
+          onScroll={onScroll}
+          scrollEventThrottle={16}
           contentContainerStyle={styles.scroll}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
@@ -342,6 +350,7 @@ export default function EditProfileScreen() {
                 />
                 <AuthField
                   ref={lastNameRef}
+                  onFocus={() => reveal(lastNameRef.current)}
                   kind="text"
                   label="Apellido"
                   value={lastName}
@@ -394,6 +403,7 @@ export default function EditProfileScreen() {
               />
               <AuthField
                 ref={phoneRef}
+                onFocus={() => reveal(phoneRef.current)}
                 kind="phone"
                 label="Teléfono"
                 value={phone}

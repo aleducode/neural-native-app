@@ -196,10 +196,11 @@ export default function NewPasswordScreen() {
       <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
         <KeyboardAvoidingView
           style={styles.flex}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          // Android resizes the window itself (adjustResize in the manifest),
-          // so a behavior here shrinks the layout a second time and the field
-          // it was meant to reveal ends up hidden anyway.
+          // Both platforms need padding. The manifest still asks for
+          // adjustResize, but this app is edge-to-edge, and from Android 15 on
+          // those windows are not resized for the keyboard — nothing shrinks on
+          // its own, so the compensation has to happen here.
+          behavior="padding"
         >
           <ScrollView
             contentContainerStyle={styles.scroll}

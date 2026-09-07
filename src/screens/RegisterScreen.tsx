@@ -27,6 +27,7 @@ import { Ionicons, Feather } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
 import { colors, typography } from '../theme/colors';
+import { useRevealOnFocus } from '../hooks/useRevealOnFocus';
 import AuthField from '../components/AuthField';
 
 const { width: SCREEN_W } = Dimensions.get('window');
@@ -72,6 +73,10 @@ export default function RegisterScreen() {
   const phoneRef = useRef<TextInput>(null);
   const passwordRef = useRef<TextInput>(null);
   const confirmRef = useRef<TextInput>(null);
+
+  // Android does not move a focused field out from under the keyboard on its
+  // own; this is what puts Contraseña and Confirmar back in view.
+  const { scrollRef, onScroll, reveal } = useRevealOnFocus();
 
   // Short staggered entrance, matching the login screen. Anything longer
   // makes the form feel heavier than it already is.
@@ -225,13 +230,17 @@ export default function RegisterScreen() {
 
       <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
         <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          // Android resizes the window itself (adjustResize in the manifest),
-          // so a behavior here shrinks the layout a second time and the field
-          // it was meant to reveal ends up hidden anyway.
+          // Both platforms need padding. The manifest still asks for
+          // adjustResize, but from Android 15 on, edge-to-edge windows are not
+          // resized for the keyboard, so nothing shrinks on its own and a form
+          // this tall has almost no room to scroll without this.
+          behavior="padding"
           style={styles.flex}
         >
           <ScrollView
+            ref={scrollRef}
+            onScroll={onScroll}
+            scrollEventThrottle={16}
             contentContainerStyle={styles.scroll}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
@@ -287,6 +296,7 @@ export default function RegisterScreen() {
 
               <AuthField
                 ref={emailRef}
+                onFocus={() => reveal(emailRef.current)}
                 kind="email"
                 label="Correo electrónico"
                 value={formData.email}
@@ -299,6 +309,7 @@ export default function RegisterScreen() {
 
               <AuthField
                 ref={phoneRef}
+                onFocus={() => reveal(phoneRef.current)}
                 kind="phone"
                 label="Teléfono"
                 value={formData.phone_number}
@@ -311,6 +322,7 @@ export default function RegisterScreen() {
 
               <AuthField
                 ref={passwordRef}
+                onFocus={() => reveal(passwordRef.current)}
                 kind="password"
                 label="Contraseña"
                 value={formData.password}
@@ -323,6 +335,7 @@ export default function RegisterScreen() {
 
               <AuthField
                 ref={confirmRef}
+                onFocus={() => reveal(confirmRef.current)}
                 kind="password"
                 label="Confirmar contraseña"
                 value={formData.password_confirmation}

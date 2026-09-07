@@ -9,7 +9,6 @@ import {
   Alert,
   Image,
   KeyboardAvoidingView,
-  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
@@ -343,7 +342,11 @@ export default function PostDetailScreen() {
       */}
       <KeyboardAvoidingView
         style={styles.keyboardAvoider}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        // Both platforms need padding. The manifest still asks for
+          // adjustResize, but this app is edge-to-edge, and from Android 15 on
+          // those windows are not resized for the keyboard — nothing shrinks on
+          // its own, so the compensation has to happen here.
+          behavior="padding"
       >
         <FlatList
           ref={listRef}

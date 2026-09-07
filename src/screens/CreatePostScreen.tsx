@@ -8,7 +8,6 @@ import {
   Image,
   ScrollView,
   KeyboardAvoidingView,
-  Platform,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { Feather } from '@expo/vector-icons';
@@ -255,7 +254,11 @@ export default function CreatePostScreen() {
   return (
     <Screen tone="plain" edges={['top', 'bottom']}>
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        // Both platforms need padding. The manifest still asks for
+          // adjustResize, but this app is edge-to-edge, and from Android 15 on
+          // those windows are not resized for the keyboard — nothing shrinks on
+          // its own, so the compensation has to happen here.
+          behavior="padding"
         style={styles.flex}
       >
         <Animated.View style={[styles.header, headerStyle]}>
