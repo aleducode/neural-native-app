@@ -147,12 +147,21 @@ const SINGULAR: Record<Metric, string> = {
   posts: 'publicación',
 };
 
-/** Just the first name: the line has to fit one row of a card. */
-function firstNameOf(name: string): string {
-  const first = (name || '').trim().split(/\s+/)[0] ?? '';
-  if (first.length > 2 && first === first.toUpperCase()) {
-    return first[0] + first.slice(1).toLowerCase();
-  }
+/**
+ * Just the first name, and only when it is one.
+ *
+ * A member who never filled in a name comes back as the local part of their
+ * email. "Estás empatado con Jperez.94" is worse than not naming anyone, and
+ * it also hands out half an address, so those fall back to the position.
+ */
+function firstNameOf(name: string): string | null {
+  const raw = (name || '').trim();
+  if (!raw) return null;
+  if (raw.includes('@') || /[._\d]/.test(raw.split(/\s+/)[0] ?? '')) return null;
+
+  const first = raw.split(/\s+/)[0] ?? '';
+  if (first.length < 2) return null;
+  if (first === first.toUpperCase()) return first[0] + first.slice(1).toLowerCase();
   return first;
 }
 
