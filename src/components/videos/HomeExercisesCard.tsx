@@ -116,6 +116,18 @@ export default function HomeExercisesCard() {
 
   return (
     <View style={styles.card}>
+      <Image
+        source={next?.poster ? { uri: next.poster } : HOME_MEDIA}
+        style={styles.mediaImage}
+      />
+      {/* The photo runs the whole card, so the footer sits on it too; the
+          gradient is what keeps that text readable over any frame. */}
+      <LinearGradient
+        colors={['rgba(17,17,17,0.35)', 'rgba(17,17,17,0.55)', 'rgba(17,17,17,0.94)']}
+        locations={[0, 0.5, 1]}
+        style={StyleSheet.absoluteFill}
+      />
+
       <Pressable
         onPress={openList}
         style={({ pressed }) => [styles.media, pressed && styles.pressed]}
@@ -124,13 +136,6 @@ export default function HomeExercisesCard() {
           next ? `Te toca el video ${next.order}, ${next.name}` : `Módulo ${active.name}`
         }
       >
-        {next?.poster ? (
-          <Image source={{ uri: next.poster }} style={styles.mediaImage} />
-        ) : (
-          <Image source={HOME_MEDIA} style={styles.mediaImage} />
-        )}
-        <View style={styles.mediaScrim} />
-
         <View style={styles.mediaTop}>
           <View style={styles.chipDark}>
             <Feather name="play-circle" size={14} color={colors.accent} />
@@ -210,7 +215,12 @@ const styles = StyleSheet.create({
   pressed: { opacity: 0.9 },
 
   media: { height: 176, padding: 14, justifyContent: 'space-between' },
-  mediaImage: { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%' },
+  // Nothing of its own behind the footer any more: the photo and its gradient
+  // already cover the card, and a second fill would only mute them.
+  // Sólo absoluteFill: sumarle width/height al 100% los resuelve contra la
+  // caja de contenido del padre, así que con padding la imagen queda más
+  // angosta que su caja y deja una franja a un costado.
+  mediaImage: StyleSheet.absoluteFillObject,
   // The chips carry a background blur in the design. Without a blur view the
   // same colour at the same alpha keeps the text legible over any photo.
   mediaScrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(17,17,17,0.28)' },
@@ -282,6 +292,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
+    backgroundColor: 'transparent',
     paddingTop: 12,
     paddingHorizontal: 14,
     paddingBottom: 14,

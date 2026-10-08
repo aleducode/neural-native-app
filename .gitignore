@@ -54,3 +54,7 @@ secrets/
 .kiro/
 .claude/
 skills-lock.json
+
+# Capturas de tienda: la config y los flujos sí, el render no
+goldie/out/
+.argent/recordings/

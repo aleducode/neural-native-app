@@ -1,0 +1,9 @@
+executionPrerequisite: >-
+  En la solapa Ejercicios, con el héroe "Continuá donde quedaste" a la vista.
+steps:
+  - tap: { text: Continuá el video }
+  - await: { visible: { text: Empezar de nuevo } }
+  - wait: 900
+  - tap: { text: Empezar de nuevo }
+  - echo: Se deja correr el video para que el clip muestre reproducción real.
+  - wait: 3000

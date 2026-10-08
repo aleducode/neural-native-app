@@ -1,0 +1,30 @@
+steps:
+  - launch: com.ducode.neural
+  - echo: La app corre una animación de intro antes del login; sin esta espera el await se agota.
+  - wait: 4000
+  - await: { visible: { text: Ingresar } }
+  - echo: El correo es el único campo sin teclado encima, así que su coordenada es estable.
+  - tap: { x: 0.5, y: 0.434 }
+  - await: { idle: true }
+  - tool: keyboard
+    args: { text: "demo@neural.com.co" }
+  - echo: >-
+      El formulario usa returnKeyType next en el correo y go en la contraseña,
+      así que se salta de campo con la tecla enter. Tocar por coordenada no sirve:
+      al abrirse el teclado el formulario se desplaza hacia arriba.
+  - tool: keyboard
+    args: { key: enter }
+  - await: { idle: true }
+  - tool: keyboard
+    args: { text: "demo1234" }
+  - tool: keyboard
+    args: { key: enter }
+  - await: { visible: { text: Más tarde } }
+  - echo: En una instalación nueva se abre el panel de datos faltantes sobre el Inicio.
+  - tap: { text: Más tarde }
+  - await: { idle: true }
+  - echo: La tarjeta de ejercicios vive debajo de la tira de la semana.
+  - tool: gesture-swipe
+    args: { fromX: 0.5, fromY: 0.72, toX: 0.5, toY: 0.46, durationMs: 700 }
+  - await: { visible: { text: Tus ejercicios } }
+  - await: { idle: true }

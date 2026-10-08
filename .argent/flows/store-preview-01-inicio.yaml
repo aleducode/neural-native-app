@@ -1,0 +1,12 @@
+executionPrerequisite: >-
+  App recién reinstalada por goldie, en la pantalla de login.
+steps:
+  - echo: La sesión ya está puesta por las capturas; este segmento abre en el Inicio.
+  - wait: 2500
+  - echo: >-
+      Resumen queda bajo el pliegue en pantallas más cortas (Pixel), así que
+      se espera el encabezado del próximo entrenamiento, visible en ambas.
+  - await: { visible: { text: Ver mi agenda } }
+  - await: { idle: true }
+  - wait: 1200
+  - wait: 1200

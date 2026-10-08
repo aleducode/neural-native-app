@@ -863,7 +863,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 32,
     gap: 10,
   },
-  outsidePoster: { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%' },
+  // Sólo absoluteFill: sumarle width/height al 100% los resuelve contra la
+  // caja de contenido del padre, así que con padding la imagen queda más
+  // angosta que su caja y deja una franja a un costado.
+  outsidePoster: StyleSheet.absoluteFillObject,
   outsideScrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(17,17,17,0.7)' },
   outsideName: {
     fontFamily: typography.fontFamily,

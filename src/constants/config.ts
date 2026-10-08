@@ -16,9 +16,13 @@ export const STORAGE_KEYS = {
 
 export const APP_NAME = 'Neural';
 
-// WhatsApp Support - Format: 57{NEURAL_PHONE} (e.g., 573001234567)
-// This should match the NEURAL_PHONE environment variable in Django backend
-export const NEURAL_PHONE = '3137141228'; // TODO: Update with actual Neural phone number
+/**
+ * The gym's WhatsApp, without the country code — the links add `57`.
+ *
+ * Confirmed as the real number. It has to match `NEURAL_PHONE` in the Django
+ * backend, which builds its own WhatsApp links for the same conversations.
+ */
+export const NEURAL_PHONE = '3137141228';
 
 // Sentry Configuration
 // Get your DSN from https://sentry.io/settings/{your-org}/projects/{your-project}/keys/

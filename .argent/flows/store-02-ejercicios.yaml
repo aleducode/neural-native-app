@@ -1,0 +1,18 @@
+steps:
+  - launch: com.ducode.neural
+  - echo: >-
+      La sesión sobrevive entre flujos: goldie reinstala la app una vez al
+      empezar, no antes de cada escena. store-01-inicio es el que inicia
+      sesión; este continúa con ella.
+  - wait: 4000
+  - echo: >-
+      Resumen queda bajo el pliegue en pantallas más cortas (Pixel), así que
+      se espera el encabezado del próximo entrenamiento, visible en ambas.
+  - await: { visible: { text: Ver mi agenda } }
+  - await: { idle: true }
+  - echo: "Cuarta pestaña de la barra inferior: Mis entrenos."
+  - tap: { x: 0.66, y: 0.935 }
+  - await: { visible: { text: Agenda } }
+  - tap: { text: Ejercicios }
+  - await: { visible: { text: CONTINUÁ DONDE QUEDASTE } }
+  - await: { idle: true }

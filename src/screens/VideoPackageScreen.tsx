@@ -381,7 +381,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  duePosterImage: { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%' },
+  // Sólo absoluteFill: sumarle width/height al 100% los resuelve contra la
+  // caja de contenido del padre, así que con padding la imagen queda más
+  // angosta que su caja y deja una franja a un costado.
+  duePosterImage: StyleSheet.absoluteFillObject,
   duePosterFallback: { backgroundColor: '#DEDEDE' },
   duePosition: {
     position: 'absolute',

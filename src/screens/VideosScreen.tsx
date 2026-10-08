@@ -420,7 +420,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  heroImage: { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%' },
+  // Sólo absoluteFill: sumarle width/height al 100% los resuelve contra la
+  // caja de contenido del padre, así que con padding la imagen queda más
+  // angosta que su caja y deja una franja a un costado.
+  heroImage: StyleSheet.absoluteFillObject,
   heroFallback: { backgroundColor: '#2A2A2A' },
   heroPlay: {
     width: 52,
