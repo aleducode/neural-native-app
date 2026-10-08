@@ -13,6 +13,8 @@ export type RootStackParamList = {
   EditProfile: undefined;
   Notifications: undefined;
   SlotDetail: { slotId: number };
+  VideoPackage: { packageId: number };
+  VideoPlayer: { packageId: number; videoId: number };
   BookingConfirmation: {
     trainingType: string;
     date: string;

@@ -23,6 +23,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import HomeExercisesCard from '../components/videos/HomeExercisesCard';
 import { useAuth } from '../context/AuthContext';
 import { colors, typography } from '../theme/colors';
 import { dashboardApi, DashboardResponse } from '../api/dashboard';
@@ -333,6 +334,8 @@ export default function HomeScreen() {
                 );
               })}
             </View>
+
+            <HomeExercisesCard />
 
             <View style={styles.card}>
               <View style={styles.cardHead}>

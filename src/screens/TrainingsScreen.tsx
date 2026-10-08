@@ -9,7 +9,8 @@ import {
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useNavigation, useFocusEffect, useRoute } from '@react-navigation/native';
+import { useNewExercises } from '../hooks/useNewExercises';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
@@ -24,6 +25,8 @@ import { colors, typography } from '../theme/colors';
 import { slotsApi } from '../api/slots';
 import { Training } from '../types';
 import Screen from '../components/ui/Screen';
+import { Tabs } from '../components/videos/Pieces';
+import VideosScreen from './VideosScreen';
 import AppHeader from '../components/ui/AppHeader';
 import PrimaryButton from '../components/ui/PrimaryButton';
 import ConfirmSheet from '../components/ui/ConfirmSheet';
@@ -92,9 +95,25 @@ function Metric({ value, unit, label }: { value: string; unit: string; label: st
 
 export default function TrainingsScreen() {
   const navigation = useNavigation<any>();
+  const route = useRoute<any>();
   const [trainings, setTrainings] = useState<Training[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  // The home card opens this screen straight on the exercises tab.
+  const [tab, setTab] = useState<'agenda' | 'ejercicios'>(
+    route.params?.tab === 'ejercicios' ? 'ejercicios' : 'agenda'
+  );
   const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const { hasNew: hasNewExercises, markSeen: markExercisesSeen } = useNewExercises();
+
+  // The initial state only fires on the first mount, and a tab screen stays
+  // alive — without this, coming back from the home card a second time would
+  // land on the agenda again.
+  const askedTab = route.params?.tab;
+  useEffect(() => {
+    if (askedTab === 'ejercicios' || askedTab === 'agenda') setTab(askedTab);
+    if (askedTab === 'ejercicios') markExercisesSeen();
+  }, [askedTab, markExercisesSeen]);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [offset, setOffset] = useState(0);
@@ -304,14 +323,45 @@ export default function TrainingsScreen() {
     </>
   );
 
+  /**
+   * Agenda says when you come; Ejercicios says what you do. Keeping them as two
+   * tabs of one screen is what let this feature in without a sixth pestaña.
+   */
+  const header = (
+    <>
+      <AppHeader
+        title="Mis entrenos"
+        showBack={false}
+        action={{ icon: 'plus', label: 'Agendar entrenamiento', onPress: handleSchedule }}
+      />
+      <View style={styles.tabsWrap}>
+        <Tabs
+          active={tab}
+          dot={hasNewExercises}
+          onChange={(next) => {
+            setTab(next);
+            if (next === 'ejercicios') markExercisesSeen();
+          }}
+        />
+      </View>
+    </>
+  );
+
+  // Checked before the agenda's own loading, so picking Ejercicios never waits
+  // on a request it does not need.
+  if (tab === 'ejercicios') {
+    return (
+      <Screen tone="surface" wash>
+        {header}
+        <VideosScreen />
+      </Screen>
+    );
+  }
+
   if (isLoading) {
     return (
       <Screen tone="surface" wash>
-        <AppHeader
-          title="Mis entrenos"
-          showBack={false}
-          action={{ icon: 'plus', label: 'Agendar entrenamiento', onPress: handleSchedule }}
-        />
+        {header}
         <View style={styles.loading}>
           <ActivityIndicator size="small" color={colors.ink} />
         </View>
@@ -321,12 +371,7 @@ export default function TrainingsScreen() {
 
   return (
     <Screen tone="surface" wash>
-      {/* A tab root has nothing behind it, so it carries no back control. */}
-      <AppHeader
-        title="Mis entrenos"
-        showBack={false}
-        action={{ icon: 'plus', label: 'Agendar entrenamiento', onPress: handleSchedule }}
-      />
+      {header}
 
       {trainings.length > 0 ? (
         <ScrollView
@@ -535,6 +580,7 @@ export default function TrainingsScreen() {
 }
 
 const styles = StyleSheet.create({
+  tabsWrap: { paddingHorizontal: 16, paddingBottom: 16 },
   // qM8hZ > Container > Exercise List > Items > Item: a 46-wide time column and
   // a white card at radius 16, padding [8,12], stacked at 16, 16 apart.
   item: {

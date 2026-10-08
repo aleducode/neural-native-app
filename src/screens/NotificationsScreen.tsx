@@ -253,6 +253,15 @@ export default function NotificationsScreen() {
             </Pressable>
           </View>
 
+          {/* The design card stops at the title, but a notification whose
+              message cannot be read is just a label — and it left the card
+              with a visible gap where the text should have been. */}
+          {!!item.body && (
+            <Text style={styles.body} numberOfLines={3}>
+              {item.body}
+            </Text>
+          )}
+
           <View style={styles.statusRow}>
             <View style={[styles.statusDot, { backgroundColor: status.color }]} />
             <Text style={styles.statusLabel}>{status.label}</Text>
@@ -440,11 +449,21 @@ const styles = StyleSheet.create({
   },
   card: {
     flex: 1,
+    // Without this the card stretches to match the timeline beside it, which
+    // is taller than the card's own content.
+    alignSelf: 'flex-start',
     backgroundColor: colors.white,
     borderRadius: 16,
     paddingVertical: 8,
     paddingHorizontal: 12,
     gap: 16,
+  },
+  body: {
+    fontFamily: typography.fontFamily,
+    fontSize: 14,
+    lineHeight: 20,
+    color: colors.gray400,
+    marginTop: -6,
   },
   titleRow: {
     flexDirection: 'row',

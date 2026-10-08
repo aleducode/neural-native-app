@@ -2,8 +2,8 @@
   "expo": {
     "name": "Neural Consciente",
     "slug": "neural-consciente",
-    "version": "1.0.3",
-    "orientation": "portrait",
+    "version": "1.0.4",
+    "orientation": "default",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
@@ -59,7 +59,8 @@
           "sounds": [],
           "defaultChannel": "default"
         }
-      ]
+      ],
+      "expo-video"
     ],
     "extra": {
       "eas": {

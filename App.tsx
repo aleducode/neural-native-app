@@ -10,6 +10,8 @@ import LoginScreen from './src/screens/LoginScreen';
 import RegisterScreen from './src/screens/RegisterScreen';
 import ForgotPasswordScreen from './src/screens/ForgotPasswordScreen';
 import NewPasswordScreen from './src/screens/NewPasswordScreen';
+import VideoPackageScreen from './src/screens/VideoPackageScreen';
+import VideoPlayerScreen from './src/screens/VideoPlayerScreen';
 import VerificationCodeScreen from './src/screens/VerificationCodeScreen';
 import PendingScreen from './src/screens/PendingScreen';
 import MembershipScreen from './src/screens/MembershipScreen';
@@ -34,7 +36,7 @@ const Stack = createNativeStackNavigator();
 
 function AuthStack() {
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
+    <Stack.Navigator screenOptions={{ headerShown: false, orientation: 'portrait' }}>
       <Stack.Screen name="Login" component={LoginScreen} />
       <Stack.Screen name="Register" component={RegisterScreen} />
       <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
@@ -46,13 +48,21 @@ function AuthStack() {
 
 function MainStack() {
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
+    // Portrait is the default for every screen. The player is the one
+    // exception, declared on its own Screen below.
+    <Stack.Navigator screenOptions={{ headerShown: false, orientation: 'portrait' }}>
       <Stack.Screen name="MainTabs" component={BottomTabs} />
       <Stack.Screen name="Calendar" component={CalendarScreen} />
       <Stack.Screen name="Membership" component={MembershipScreen} />
       <Stack.Screen name="EditProfile" component={EditProfileScreen} />
       <Stack.Screen name="Notifications" component={NotificationsScreen} />
       <Stack.Screen name="SlotDetail" component={SlotDetailScreen} />
+      <Stack.Screen name="VideoPackage" component={VideoPackageScreen} />
+      <Stack.Screen
+        name="VideoPlayer"
+        component={VideoPlayerScreen}
+        options={{ orientation: 'all', animation: 'fade' }}
+      />
       <Stack.Screen name="BookingConfirmation" component={BookingConfirmationScreen} />
       <Stack.Screen name="WeightInput" component={WeightInputScreen} />
       <Stack.Screen name="WeightHistory" component={WeightHistoryScreen} />
