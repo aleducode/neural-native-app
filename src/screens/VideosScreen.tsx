@@ -137,7 +137,7 @@ export default function VideosScreen() {
           style={({ pressed }) => [styles.emptyCta, pressed && styles.pressed]}
           accessibilityRole="button"
         >
-          <Text style={styles.emptyCtaText}>Mientras tanto, reservá tu próximo entreno</Text>
+          <Text style={styles.emptyCtaText}>Mientras tanto, reserva tu próximo entreno</Text>
           <Feather name="chevron-right" size={18} color={colors.ink} />
         </Pressable>
       </Animated.View>
@@ -222,7 +222,7 @@ function ResumeCard({
 
   return (
     <View style={styles.hero}>
-      <Text style={styles.heroLabel}>CONTINUÁ DONDE QUEDASTE</Text>
+      <Text style={styles.heroLabel}>CONTINÚA DONDE QUEDASTE</Text>
 
       <Pressable onPress={onPress} style={({ pressed }) => [styles.heroPoster, pressed && styles.pressed]}>
         {video.poster ? (

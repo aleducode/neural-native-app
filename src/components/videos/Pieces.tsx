@@ -133,7 +133,7 @@ export function PackageCard({ pkg, onPress }: { pkg: VideoPackage; onPress: () =
         <View style={styles.resume}>
           <Feather name="play-circle" size={28} color={colors.ink} />
           <View style={styles.resumeTexts}>
-            <Text style={styles.resumeLabel}>SEGUÍ CON · VIDEO {next.order}</Text>
+            <Text style={styles.resumeLabel}>SIGUE CON · VIDEO {next.order}</Text>
             <Text style={styles.resumeVideo} numberOfLines={1}>
               {next.name}
             </Text>
@@ -146,7 +146,7 @@ export function PackageCard({ pkg, onPress }: { pkg: VideoPackage; onPress: () =
           <View style={styles.resumeTexts}>
             <Text style={[styles.resumeLabel, styles.resumeLabelDone]}>COMPLETO</Text>
             <Text style={styles.resumeVideo} numberOfLines={1}>
-              Podés repetirlo cuando quieras
+              Puedes repetirlo cuando quieras
             </Text>
           </View>
           <Feather name="chevron-right" size={20} color={GREEN_TEXT} />

@@ -657,7 +657,7 @@ export default function VideoPlayerScreen() {
             <Text style={styles.sheetTitle}>
               Ya viste {formatClock(watchedBefore.current)} de {formatClock(video.duration)}
             </Text>
-            <Text style={styles.sheetBody}>Retomá donde lo dejaste o empezá otra vez.</Text>
+            <Text style={styles.sheetBody}>Retoma donde lo dejaste o empieza otra vez.</Text>
 
             <Pressable
               onPress={() => resumeAt(watchedBefore.current)}

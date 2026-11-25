@@ -38,6 +38,11 @@ export interface PackageVideo {
   completed: boolean;
   /** What to play it with. Older rows may not carry it, hence the fallback. */
   player?: VideoPlayer;
+  /**
+   * The section of the package this video belongs to ("Calentamiento"). Empty
+   * when the package has no sections; missing on servers that predate them.
+   */
+  block?: string;
 }
 
 export interface VideoPackage {

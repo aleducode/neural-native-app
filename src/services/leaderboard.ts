@@ -201,8 +201,8 @@ export function standingLabel(me: Standing | null, metric: Metric): string {
   if (me.toNext === 0) {
     const rival = me.nextUp ? firstNameOf(me.nextUp.name) : null;
     return rival
-      ? `Estás empatado con ${rival}. Un ${one} más y lo pasás.`
-      : `Estás empatado con el ${me.position - 1}.º. Un ${one} más y lo pasás.`;
+      ? `Estás empatado con ${rival}. Un ${one} más y lo pasas.`
+      : `Estás empatado con el ${me.position - 1}.º. Un ${one} más y lo pasas.`;
   }
 
   const isOne = me.toNext === 1;

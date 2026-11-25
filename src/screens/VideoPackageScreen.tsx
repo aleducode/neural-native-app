@@ -74,6 +74,9 @@ export default function VideoPackageScreen() {
   }
 
   const ordered = [...pkg.videos].sort((a, b) => a.order - b.order);
+  // Sections only show when the trainer used them; a package without blocks
+  // keeps reading as one sequence.
+  const hasBlocks = ordered.some((video) => !!video.block);
   const percent = packagePercent(pkg);
   const due = nextVideo(pkg);
   const totalMinutes = formatMinutes(packageSeconds(pkg));
@@ -134,9 +137,17 @@ export default function VideoPackageScreen() {
             const done = isComplete(video);
             const isDue = due?.id === video.id;
             const last = index === ordered.length - 1;
+            const startsBlock =
+              hasBlocks && !!video.block && video.block !== ordered[index - 1]?.block;
 
             return (
-              <View key={video.id} style={styles.step}>
+              <React.Fragment key={video.id}>
+              {startsBlock && (
+                <Text style={[styles.blockLabel, index > 0 && styles.blockLabelSpaced]} accessibilityRole="header">
+                  {video.block}
+                </Text>
+              )}
+              <View style={styles.step}>
                 {/* The rail is what makes this read as a sequence rather than a
                     list: the line above is green once you have passed it. */}
                 <View style={styles.rail}>
@@ -173,6 +184,7 @@ export default function VideoPackageScreen() {
                   <VideoRow video={video} onPress={() => open(video)} dimmed={done} />
                 </View>
               </View>
+              </React.Fragment>
             );
           })}
         </View>
@@ -234,7 +246,7 @@ function DueCard({
         <View style={styles.dueTitles}>
           <View style={styles.dueEyebrow}>
             <View style={styles.dueDot} />
-            <Text style={styles.dueLabel}>{started ? 'SEGUÍ CON' : 'TE TOCA'}</Text>
+            <Text style={styles.dueLabel}>{started ? 'SIGUE CON' : 'TE TOCA'}</Text>
           </View>
 
           <Text style={styles.dueName} numberOfLines={2}>
@@ -504,6 +516,14 @@ const styles = StyleSheet.create({
     color: colors.gray400,
     marginBottom: 12,
   },
+  blockLabel: {
+    fontFamily: typography.fontFamily,
+    fontSize: 15,
+    fontWeight: typography.fontWeight.semiBold,
+    color: colors.ink,
+    marginBottom: 8,
+  },
+  blockLabelSpaced: { marginTop: 20 },
   step: { flexDirection: 'row', gap: 10 },
   rail: { width: 24, alignItems: 'center' },
   railSegment: { width: 2, height: 30 },

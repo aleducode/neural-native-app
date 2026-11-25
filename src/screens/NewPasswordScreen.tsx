@@ -266,7 +266,7 @@ export default function NewPasswordScreen() {
                   <AuthField
                     ref={confirmationRef}
                     kind="password"
-                    label="Repetí la contraseña"
+                    label="Repite la contraseña"
                     value={confirmation}
                     error={fieldErrors.confirmation}
                     editable={!isLoading}
