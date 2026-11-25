@@ -51,7 +51,7 @@ const CONNECTION_ERROR = 'Error de conexión. Verifica tu internet.';
  * wrong. Saying so is the difference between retrying and giving up.
  */
 const TOKEN_SPENT =
-  'Ese código ya venció. Pedí uno nuevo y volvé a intentar.';
+  'Ese código ya venció. Pide uno nuevo y vuelve a intentarlo.';
 
 /**
  * This endpoint always answers with a flat list — the password is its only
@@ -227,7 +227,7 @@ export default function NewPasswordScreen() {
                 </View>
                 <Text style={styles.doneTitle}>Contraseña actualizada</Text>
                 <Text style={styles.doneBody}>
-                  Ya podés entrar con tu contraseña nueva.
+                  Ya puedes entrar con tu contraseña nueva.
                 </Text>
 
                 <Pressable
@@ -241,7 +241,7 @@ export default function NewPasswordScreen() {
             ) : (
               <>
                 <Animated.View style={[styles.header, headerStyle]}>
-                  <Text style={styles.title}>Elegí tu nueva{'\n'}contraseña</Text>
+                  <Text style={styles.title}>Elige tu nueva{'\n'}contraseña</Text>
                   <Text style={styles.subtitle}>
                     Al menos {MIN_LENGTH} caracteres. Que no sea una que ya hayas usado
                     en otro lado.

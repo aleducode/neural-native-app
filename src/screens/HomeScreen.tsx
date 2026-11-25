@@ -132,20 +132,24 @@ export default function HomeScreen() {
 
   // "Ahora no" holds for a week. Asking again on the next launch would make the
   // dismissal meaningless; never asking again would lose the data for good.
+  // Keyed per member: a shared phone must not carry one person's "later" over
+  // to the next one who signs in.
+  const snoozeKey = `${NUDGE_SNOOZE_KEY}:${user?.id ?? 'anon'}`;
+
   const readSnooze = useCallback(async () => {
     try {
-      const until = await AsyncStorage.getItem(NUDGE_SNOOZE_KEY);
+      const until = await AsyncStorage.getItem(snoozeKey);
       setNudgeSnoozed(!!until && Date.now() < Number(until));
     } catch {
       setNudgeSnoozed(false);
     }
-  }, []);
+  }, [snoozeKey]);
 
   const snoozeNudge = useCallback(async () => {
     setNudgeSnoozed(true);
     setNudgeShown(true);
     try {
-      await AsyncStorage.setItem(NUDGE_SNOOZE_KEY, String(Date.now() + NUDGE_SNOOZE_MS));
+      await AsyncStorage.setItem(snoozeKey, String(Date.now() + NUDGE_SNOOZE_MS));
     } catch {
       // A snooze that fails to persist comes back next launch; that is the
       // safe direction to fail in, and not worth an error in front of anyone.

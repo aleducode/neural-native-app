@@ -93,7 +93,7 @@ export default function VideosScreen() {
         </View>
         <Text style={styles.stateTitle}>Se cortó la conexión</Text>
         <Text style={styles.stateBody}>
-          No pudimos traer tus rutinas, pero tu avance sigue guardado. Probá de nuevo en un
+          No pudimos traer tus rutinas, pero tu avance sigue guardado. Prueba de nuevo en un
           momento.
         </Text>
         <Pressable
@@ -273,7 +273,7 @@ function ResumeCard({
         style={({ pressed }) => [styles.heroCta, pressed && styles.pressed]}
         accessibilityRole="button"
       >
-        <Text style={styles.heroCtaText}>Continuá el video</Text>
+        <Text style={styles.heroCtaText}>Continúa el video</Text>
         <Feather name="play" size={16} color={colors.ink} />
       </Pressable>
     </View>

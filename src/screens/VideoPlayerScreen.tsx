@@ -666,7 +666,7 @@ export default function VideoPlayerScreen() {
             >
               <Feather name="play" size={20} color={colors.white} />
               <Text style={styles.sheetCtaText}>
-                Continuá desde {formatClock(watchedBefore.current)}
+                Continúa desde {formatClock(watchedBefore.current)}
               </Text>
             </Pressable>
 
@@ -778,7 +778,7 @@ export default function VideoPlayerScreen() {
               style={({ pressed }) => [styles.finishedPrimary, pressed && styles.pressed]}
               accessibilityRole="button"
             >
-              <Text style={styles.finishedPrimaryText}>Volvé a Mis ejercicios</Text>
+              <Text style={styles.finishedPrimaryText}>Vuelve a Mis ejercicios</Text>
             </Pressable>
 
             <Pressable

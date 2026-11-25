@@ -26,6 +26,7 @@ import { colors, typography } from '../theme/colors';
 import { dashboardApi, DashboardResponse } from '../api/dashboard';
 import { profileApi, ProfileResponse } from '../api/profile';
 import { authApi } from '../api/auth';
+import { membershipApi, MembershipSummary } from '../api/membership';
 import Screen from '../components/ui/Screen';
 import AppHeader from '../components/ui/AppHeader';
 import Card from '../components/ui/Card';
@@ -124,6 +125,7 @@ export default function ProfileScreen() {
   const navigation = useNavigation<any>();
   const { user, logout, updateUser } = useAuth();
   const [dashboardData, setDashboardData] = useState<DashboardResponse | null>(null);
+  const [membershipSummary, setMembershipSummary] = useState<MembershipSummary | null>(null);
   const [profileData, setProfileData] = useState<ProfileResponse | null>(null);
   // Mirrors the server's opt-out flag. Held separately so the switch answers
   // the finger immediately and rolls back only if the save fails.
@@ -152,11 +154,18 @@ export default function ProfileScreen() {
     }
   }, []);
 
+  // Only /membership/ knows how many classes a ticket pack has left.
+  const fetchMembershipSummary = useCallback(async () => {
+    const { data } = await membershipApi.getMembership();
+    setMembershipSummary(data?.summary ?? null);
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
       fetchDashboard();
       fetchProfile();
-    }, [fetchDashboard, fetchProfile])
+      fetchMembershipSummary();
+    }, [fetchDashboard, fetchProfile, fetchMembershipSummary])
   );
 
   const intro = useSharedValue(0);
@@ -365,6 +374,13 @@ export default function ProfileScreen() {
               )}
             </View>
             <Text style={styles.membershipPlan}>{membership?.plan_name || 'Sin plan activo'}</Text>
+            {membershipSummary?.is_ticket_pack && (
+              <Text style={styles.membershipSessions}>
+                {membershipSummary.sessions_left === 1
+                  ? `Te queda 1 de ${membershipSummary.sessions_total} clases`
+                  : `Te quedan ${membershipSummary.sessions_left ?? 0} de ${membershipSummary.sessions_total} clases`}
+              </Text>
+            )}
           </Pressable>
 
           {/* PointsCard (GdF5n) — maps directly to membership.days_left. */}
@@ -496,7 +512,7 @@ export default function ProfileScreen() {
             <ToggleRow
               icon="award"
               title="Aparecer en la tabla"
-              subtitle="Compartís tu posición con la comunidad"
+              subtitle="Compartes tu posición con la comunidad"
               value={!hiddenFromBoard}
               disabled={savingVisibility}
               onChange={setBoardVisibility}
@@ -696,6 +712,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: typography.fontWeight.semiBold,
     color: colors.ink,
+  },
+  membershipSessions: {
+    fontFamily: typography.fontFamily,
+    fontSize: 14,
+    color: colors.gray500,
+    marginTop: 4,
   },
   pointsCard: {
     marginTop: 12,

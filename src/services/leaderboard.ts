@@ -193,7 +193,7 @@ function firstNameOf(name: string | null): string | null {
  * nothing; telling them they are tied says exactly where they stand.
  */
 export function standingLabel(me: Standing | null, metric: Metric): string {
-  if (!me) return 'Entrená esta semana para entrar en la tabla';
+  if (!me) return 'Entrena esta semana para entrar en la tabla';
   if (me.toNext === null) return 'Vas primero. Sostenelo.';
 
   const one = SINGULAR[metric];

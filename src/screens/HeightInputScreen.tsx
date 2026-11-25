@@ -200,7 +200,9 @@ export default function HeightInputScreen() {
   const hint =
     previousHeight === null
       ? `Equivale a ${meters} m. Es tu primer registro.`
-      : `Equivale a ${meters} m. Tenías ${previousHeight} cm registrados.`;
+      : previousHeight === selectedHeight
+        ? `Equivale a ${meters} m.`
+        : `Equivale a ${meters} m. Tenías ${previousHeight} cm registrados.`;
 
   if (isLoading) {
     return (

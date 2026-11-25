@@ -272,7 +272,7 @@ function DueCard({
 
         <View style={styles.dueCta}>
           <Feather name="play" size={20} color={colors.white} />
-          <Text style={styles.dueCtaText}>{started ? 'Continuá' : 'Empezá'}</Text>
+          <Text style={styles.dueCtaText}>{started ? 'Continúa' : 'Empieza'}</Text>
         </View>
       </View>
     </Pressable>

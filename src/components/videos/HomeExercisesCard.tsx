@@ -76,7 +76,7 @@ export default function HomeExercisesCard() {
           <View style={styles.mediaTop}>
             <View style={styles.chipLime}>
               <Feather name="home" size={14} color={colors.ink} />
-              <Text style={styles.chipLimeText}>Entrená en casa</Text>
+              <Text style={styles.chipLimeText}>Entrena en casa</Text>
             </View>
           </View>
 
