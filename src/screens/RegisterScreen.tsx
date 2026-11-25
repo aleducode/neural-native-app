@@ -53,7 +53,7 @@ interface FormErrors {
 
 export default function RegisterScreen() {
   const navigation = useNavigation<any>();
-  const { register } = useAuth();
+  const { register, login } = useAuth();
 
   const [formData, setFormData] = useState({
     first_name: '',
@@ -162,11 +162,17 @@ export default function RegisterScreen() {
 
     if (success) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      // Registration successful - navigate to login
-      // In web, Alert might not work well, so navigate directly after a brief delay
-      setTimeout(() => {
-        navigation.navigate('Login');
-      }, 500);
+      // Register returns no token. Signing in with the same credentials takes
+      // the new member straight to the next step instead of a blank login.
+      setIsLoading(true);
+      const signIn = await login(
+        { email: formData.email.trim(), password: formData.password },
+        false
+      );
+      setIsLoading(false);
+      if (!signIn.success) {
+        navigation.navigate('Login', { email: formData.email.trim() });
+      }
       return;
     }
 

@@ -11,7 +11,7 @@ export interface NeuralPlan {
 
 export interface UserMembership {
   id: number;
-  membership_type: 'MENSUAL' | 'QUARTER' | 'SEMESTER';
+  membership_type: 'MENSUAL' | 'QUARTER' | 'SEMESTER' | 'TICKETS';
   plan: NeuralPlan | null;
   is_active: boolean;
   init_date: string;
@@ -19,9 +19,20 @@ export interface UserMembership {
   days_left: number;
 }
 
+/** What the gym wants the member to read about their plan, ticket balance included. */
+export interface MembershipSummary {
+  active: boolean;
+  is_ticket_pack: boolean;
+  sessions_total: number;
+  sessions_used: number;
+  sessions_left: number | null;
+  message: string;
+}
+
 export interface MembershipResponse {
   current_membership: UserMembership | null;
   available_plans: NeuralPlan[];
+  summary?: MembershipSummary;
 }
 
 export const membershipApi = {

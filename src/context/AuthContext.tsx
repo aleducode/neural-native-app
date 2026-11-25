@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
+import { Alert } from 'react-native';
 import { User, LoginRequest, RegisterRequest } from '../types';
 import { authApi } from '../api/auth';
 import api from '../api/client';
@@ -60,9 +61,20 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   };
 
+  // A screen fires several requests at once, so a revoked token comes back as
+  // several 401s; the ref keeps the notice to one per lost session.
+  const signedInRef = useRef(false);
+  useEffect(() => {
+    signedInRef.current = !!user;
+  }, [user]);
+
   // Set up unauthorized callback
   useEffect(() => {
     api.setOnUnauthorized(() => {
+      if (signedInRef.current) {
+        signedInRef.current = false;
+        Alert.alert('Tu sesión se cerró', 'Vuelve a iniciar sesión para continuar.');
+      }
       setUserState(null);
     });
   }, []);

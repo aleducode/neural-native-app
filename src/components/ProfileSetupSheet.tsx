@@ -25,6 +25,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useNavigation } from '@react-navigation/native';
 import { colors, typography } from '../theme/colors';
+import { SetupRoute } from '../navigation/RootNavigator';
 
 const { height: SCREEN_H } = Dimensions.get('window');
 
@@ -33,7 +34,7 @@ export type MissingField = 'weight' | 'height' | 'birthdate';
 interface FieldSpec {
   label: string;
   hint: string;
-  route: string;
+  route: SetupRoute;
   render: (color: string) => React.ReactNode;
 }
 
@@ -161,11 +162,14 @@ export default function ProfileSetupSheet({
     });
   };
 
-  const openField = (route: string) => {
+  // The chosen field opens first and the other missing ones follow it, so a
+  // single tap on "Empezar" walks the whole list.
+  const openField = (field: MissingField) => {
     Haptics.selectionAsync();
+    const setupQueue = fields.filter((key) => key !== field).map((key) => FIELDS[key].route);
     dismiss(() => {
       onClose();
-      navigation.navigate(route);
+      navigation.navigate(FIELDS[field].route, { setupQueue });
     });
   };
 
@@ -244,13 +248,13 @@ export default function ProfileSetupSheet({
                 field={FIELDS[key]}
                 index={index}
                 progress={progress}
-                onPress={() => openField(FIELDS[key].route)}
+                onPress={() => openField(key)}
               />
             ))}
           </View>
 
           <Pressable
-            onPress={() => fields[0] && openField(FIELDS[fields[0]].route)}
+            onPress={() => fields[0] && openField(fields[0])}
             style={({ pressed }) => [styles.cta, pressed && styles.ctaPressed]}
             accessibilityRole="button"
           >

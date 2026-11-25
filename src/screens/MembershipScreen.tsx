@@ -13,6 +13,7 @@ import Screen from '../components/ui/Screen';
 import AppHeader from '../components/ui/AppHeader';
 import Card from '../components/ui/Card';
 import PrimaryButton from '../components/ui/PrimaryButton';
+import { parseISODate } from '../components/calendar/MonthCalendar';
 import { colors, typography } from '../theme/colors';
 import { membershipApi, MembershipResponse, NeuralPlan } from '../api/membership';
 
@@ -186,6 +187,7 @@ export default function MembershipScreen() {
 
   const currentMembership = membershipData?.current_membership;
   const currentPlanName = currentMembership?.plan?.name || 'Neural';
+  const ticketSummary = membershipData?.summary?.is_ticket_pack ? membershipData.summary : null;
   const plans = membershipData?.available_plans ?? [];
   const canSubscribe = !currentMembership;
 
@@ -240,11 +242,21 @@ export default function MembershipScreen() {
                   {currentMembership.days_left === 1 ? 'día restante' : 'días restantes'}
                 </Text>
               </View>
+              {ticketSummary && (
+                <View style={styles.detailRow}>
+                  <Feather name="tag" size={16} color={colors.gray400} />
+                  <Text style={styles.detailText}>
+                    {ticketSummary.sessions_left === 1
+                      ? `Te queda 1 de ${ticketSummary.sessions_total} clases`
+                      : `Te quedan ${ticketSummary.sessions_left ?? 0} de ${ticketSummary.sessions_total} clases`}
+                  </Text>
+                </View>
+              )}
               <View style={styles.detailRow}>
                 <Feather name="calendar" size={16} color={colors.gray400} />
                 <Text style={styles.detailText}>
                   Vence:{' '}
-                  {new Date(currentMembership.expiration_date).toLocaleDateString('es-CO', {
+                  {parseISODate(currentMembership.expiration_date).toLocaleDateString('es-CO', {
                     day: 'numeric',
                     month: 'long',
                     year: 'numeric',

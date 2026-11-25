@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import { useSetupQueue } from '../hooks/useSetupQueue';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, {
@@ -45,6 +46,7 @@ const ADJUSTABLE_ACTIONS: AccessibilityActionInfo[] = [
 
 export default function WeightInputScreen() {
   const navigation = useNavigation<any>();
+  const { inSetup, advance } = useSetupQueue();
   const scrollViewRef = useRef<ScrollView>(null);
 
   const [selectedWeight, setSelectedWeight] = useState(70);
@@ -110,8 +112,10 @@ export default function WeightInputScreen() {
 
     if (data) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      // Navigate to weight history screen
-      navigation.replace('WeightHistory');
+      // From the setup sheet the next missing field comes next; otherwise
+      // the history shows the entry that was just added.
+      if (inSetup) advance();
+      else navigation.replace('WeightHistory');
     } else {
       // The failure belongs next to the button that failed, not behind a modal
       // the user has to dismiss before they can retry.

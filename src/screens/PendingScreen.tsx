@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, Linking, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, Linking, ScrollView, AppState } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import Animated, {
   useSharedValue,
@@ -10,12 +10,24 @@ import Animated, {
 } from 'react-native-reanimated';
 import { colors, typography } from '../theme/colors';
 import { useAuth } from '../context/AuthContext';
+import { authApi } from '../api/auth';
 import { NEURAL_PHONE } from '../constants/config';
 import Screen from '../components/ui/Screen';
 import PrimaryButton from '../components/ui/PrimaryButton';
 
 export default function PendingScreen() {
-  const { logout, user } = useAuth();
+  const { logout, user, updateUser } = useAuth();
+
+  // The usual path is: tap WhatsApp, staff verifies the account, come back.
+  // Re-reading the account on return lets the app open without a re-login.
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', async (state) => {
+      if (state !== 'active') return;
+      const { data } = await authApi.getMe();
+      if (data?.is_verified) updateUser(data);
+    });
+    return () => subscription.remove();
+  }, [updateUser]);
 
   const intro = useSharedValue(0);
   useEffect(() => {

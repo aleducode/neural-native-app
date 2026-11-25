@@ -22,6 +22,7 @@ import { profileApi, UserWeight } from '../api/profile';
 import Screen from '../components/ui/Screen';
 import AppHeader from '../components/ui/AppHeader';
 import Card from '../components/ui/Card';
+import { parseISODate } from '../components/calendar/MonthCalendar';
 
 const GUTTER = 16;
 
@@ -52,7 +53,7 @@ function WeightChart({ weights }: { weights: UserWeight[] }) {
       {sortedWeights.map((w) => {
         const ratio = (w.weight - min) / span;
         const barHeight = CHART_MIN_BAR + ratio * (CHART_HEIGHT - CHART_MIN_BAR);
-        const date = new Date(w.date);
+        const date = parseISODate(w.date);
         const label = `${date.getDate()}/${date.getMonth() + 1}`;
 
         return (
@@ -124,7 +125,7 @@ export default function WeightHistoryScreen() {
   };
 
   const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
+    const date = parseISODate(dateStr);
     return date.toLocaleDateString('es-ES', {
       day: 'numeric',
       month: 'short',

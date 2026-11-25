@@ -12,7 +12,7 @@ import {
   AccessibilityActionInfo,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useSetupQueue } from '../hooks/useSetupQueue';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, {
@@ -43,7 +43,7 @@ const ADJUSTABLE_ACTIONS: AccessibilityActionInfo[] = [
 ];
 
 export default function HeightInputScreen() {
-  const navigation = useNavigation();
+  const { advance } = useSetupQueue();
   const scrollViewRef = useRef<ScrollView>(null);
 
   const [selectedHeight, setSelectedHeight] = useState(170);
@@ -119,7 +119,7 @@ export default function HeightInputScreen() {
 
   const handleSuccessClose = () => {
     setSaved(false);
-    navigation.goBack();
+    advance();
   };
 
   const scrollToHeight = (value: number, animated: boolean) => {

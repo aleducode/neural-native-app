@@ -26,7 +26,8 @@ import Animated, {
   Easing,
 } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { AuthStackParamList } from '../navigation/RootNavigator';
 import { useAuth } from '../context/AuthContext';
 import { colors, typography } from '../theme/colors';
 import AuthField from '../components/AuthField';
@@ -53,6 +54,14 @@ export default function LoginScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [remember, setRemember] = useState(true);
   const [fieldErrors, setFieldErrors] = useState<{ email?: string; password?: string }>({});
+
+  // Login stays mounted under Register, so a sign-up that comes back here
+  // arrives as new params on this screen rather than a fresh mount.
+  const route = useRoute<RouteProp<AuthStackParamList, 'Login'>>();
+  const prefilledEmail = route.params?.email;
+  useEffect(() => {
+    if (prefilledEmail) setEmail(prefilledEmail);
+  }, [prefilledEmail]);
 
   const passwordRef = useRef<TextInput>(null);
 

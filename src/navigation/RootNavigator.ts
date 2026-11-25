@@ -1,5 +1,6 @@
 export type AuthStackParamList = {
-  Login: undefined;
+  /** Prefilled after a sign-up whose automatic sign-in did not go through. */
+  Login: { email?: string } | undefined;
   Register: undefined;
   ForgotPassword: undefined;
   VerificationCode: { email: string };
@@ -21,10 +22,10 @@ export type RootStackParamList = {
     hourInit: string;
     hourEnd: string;
   };
-  WeightInput: undefined;
+  WeightInput: SetupParams;
   WeightHistory: undefined;
-  BirthdateInput: undefined;
-  HeightInput: undefined;
+  BirthdateInput: SetupParams;
+  HeightInput: SetupParams;
   // Community
   /** A training id preselects that session, so sharing one starts from it. */
   CreatePost: { trainingId?: number } | undefined;
@@ -32,3 +33,9 @@ export type RootStackParamList = {
   UserProfile: { userId: number };
 };
 
+
+/** The profile fields the setup sheet can ask for, in the order it asks. */
+export type SetupRoute = 'WeightInput' | 'HeightInput' | 'BirthdateInput';
+
+/** Present only when the screen was opened from the setup sheet. */
+type SetupParams = { setupQueue?: SetupRoute[] } | undefined;

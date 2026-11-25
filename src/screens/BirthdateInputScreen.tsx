@@ -11,7 +11,7 @@ import {
   AccessibilityActionInfo,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useSetupQueue } from '../hooks/useSetupQueue';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, {
@@ -26,6 +26,7 @@ import { profileApi } from '../api/profile';
 import Screen from '../components/ui/Screen';
 import AppHeader from '../components/ui/AppHeader';
 import PrimaryButton from '../components/ui/PrimaryButton';
+import { parseISODate } from '../components/calendar/MonthCalendar';
 
 const ITEM_HEIGHT = 44;
 const VISIBLE_ITEMS = 5;
@@ -185,7 +186,7 @@ function WheelPicker({ data, selectedIndex, onValueChange, width, label }: Wheel
 }
 
 export default function BirthdateInputScreen() {
-  const navigation = useNavigation();
+  const { advance } = useSetupQueue();
 
   const [selectedDay, setSelectedDay] = useState(14);
   const [selectedMonth, setSelectedMonth] = useState(0); // January = 0
@@ -226,7 +227,7 @@ export default function BirthdateInputScreen() {
   const fetchProfile = async () => {
     const { data } = await profileApi.getProfile();
     if (data?.profile.birthdate) {
-      const date = new Date(data.profile.birthdate);
+      const date = parseISODate(data.profile.birthdate);
       setSelectedDay(date.getDate());
       setSelectedMonth(date.getMonth());
       setSelectedYear(date.getFullYear());
@@ -262,7 +263,7 @@ export default function BirthdateInputScreen() {
 
   const handleSuccessClose = () => {
     setSaved(false);
-    navigation.goBack();
+    advance();
   };
 
   const formatDisplayDate = () => {
